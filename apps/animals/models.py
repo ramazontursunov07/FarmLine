@@ -3,6 +3,7 @@ from django.db import models
 
 
 class AnimalType(models.Model):
+    """Hayvon turi"""
     name = models.CharField(max_length=50, unique=True)
 
     class Meta:
