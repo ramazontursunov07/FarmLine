@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import Farm, Worker
 
-# Register your models here.
+admin.site.register(Farm)
+admin.site.register(Worker)
