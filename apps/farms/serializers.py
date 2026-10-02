@@ -3,11 +3,10 @@ from .models import Farm, Worker
 
 
 class FarmSerializer(serializers.ModelSerializer):
-    owner_username = serializers.CharField(source='owner.username', read_only=True)
-
     class Meta:
         model = Farm
-        fields = ['id', 'owner', 'owner_username', 'name', 'location', 'farm_type', 'created_at', 'updated_at']
+        fields = ['id', 'owner', 'name', 'location', 'farm_type', 'created_at', 'updated_at']
+        read_only_fields = ['owner']
 
 
 class WorkerSerializer(serializers.ModelSerializer):
