@@ -9,6 +9,8 @@ from apps.farms.models import Farm
 from apps.users.permissions import is_app_admin
 from .models import Transaction
 from .serializers import TransactionSerializer
+from django.db.models import DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncYear
 
 
 def finance_farms(user):
@@ -31,7 +33,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         else:
             qs = Transaction.objects.filter(farm__in=finance_farms(user))
         return qs.select_related("farm", "recorded_by", "animal_group__animal_type", "animal_group__farm") \
-                 .order_by("-date", "-id")
+            .order_by("-date", "-id")
 
     def filter_queryset(self, queryset):
         """?farm=1&transaction_type=kirim&category=ozuqa&date_from=2026-01-01&date_to=2026-12-31"""
@@ -82,3 +84,32 @@ class TransactionViewSet(viewsets.ModelViewSet):
             "balance": income - expense,
             "by_category": by_category,
         })
+
+    @action(detail=False, methods=["get"])
+    def report(self, request):
+        """Kunlik/oylik/yillik foyda-zarar: ?period=day|month|year (+ summary dagi filtrlar)."""
+        trunc = {"day": TruncDay, "month": TruncMonth, "year": TruncYear}
+        period = request.query_params.get("period", "month")
+        if period not in trunc:
+            return Response({"detail": "period: day, month yoki year bo'lishi kerak"}, status=400)
+
+        zero = Value(0, output_field=DecimalField())
+        qs = self.filter_queryset(self.get_queryset()).order_by()
+        rows = (
+            qs.annotate(p=trunc[period]("date"))
+            .values("p")
+            .annotate(
+                income=Coalesce(Sum("amount", filter=Q(transaction_type="kirim")), zero),
+                expense=Coalesce(Sum("amount", filter=Q(transaction_type="chiqim")), zero),
+            )
+            .order_by("-p")
+        )
+        return Response([
+            {
+                "period": r["p"].isoformat(),
+                "income": r["income"],
+                "expense": r["expense"],
+                "profit": r["income"] - r["expense"],
+            }
+            for r in rows
+        ])

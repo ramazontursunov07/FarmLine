@@ -551,3 +551,47 @@
         align-items: flex-start;
     }
 }
+
+.period-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.period-tabs .is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.report-wrap {
+    overflow-x: auto;
+    margin-bottom: 32px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 14px;
+}
+
+.report-table th,
+.report-table td {
+    padding: 10px 14px;
+    text-align: right;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.report-table th:first-child,
+.report-table td:first-child {
+    text-align: left;
+}
+
+.report-table th {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    font-weight: 600;
+}

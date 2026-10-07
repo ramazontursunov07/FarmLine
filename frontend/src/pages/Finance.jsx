@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../utils/errors";
-import { formatMoney, today } from "../utils/format";
+import { formatMoney, formatPeriod, today } from "../utils/format";
 
 const TYPES = { kirim: "Kirim", chiqim: "Chiqim" };
 
@@ -42,6 +42,10 @@ function Finance() {
 
     const [filters, setFilters] = useState(EMPTY_FILTERS);
     const [reloadKey, setReloadKey] = useState(0);
+
+    const [reportPeriod, setReportPeriod] = useState("month");
+    const [report, setReport] = useState([]);
+    const [reportError, setReportError] = useState("");
 
     const [form, setForm] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState("");
@@ -84,6 +88,27 @@ function Finance() {
             cancelled = true;
         };
     }, [farmId, filters, reloadKey]);
+
+    // Kunlik/oylik/yillik hisobot (filtrlar va yangi yozuvlar bilan birga yangilanadi)
+    useEffect(() => {
+        let cancelled = false;
+        const params = { farm: farmId, period: reportPeriod };
+        Object.entries(filters).forEach(([k, v]) => {
+            if (v) params[k] = v;
+        });
+
+        api.get("finance/report/", { params })
+            .then(({ data }) => {
+                if (cancelled) return;
+                setReport(data);
+                setReportError("");
+            })
+            .catch((err) => !cancelled && setReportError(getErrorMessage(err, "Hisobotni yuklab bo'lmadi")));
+
+        return () => {
+            cancelled = true;
+        };
+    }, [farmId, filters, reloadKey, reportPeriod]);
 
     const reload = () => {
         setLoading(true);
@@ -179,6 +204,50 @@ function Finance() {
                                 <span className="stat-label">Balans</span>
                             </div>
                         </div>
+
+                        {/* Foyda / zarar hisoboti */}
+                        <h3 className="section-title">Foyda va zarar</h3>
+                        <div className="period-tabs">
+                            {[["day", "Kunlik"], ["month", "Oylik"], ["year", "Yillik"]].map(([v, l]) => (
+                                <button key={v} type="button"
+                                    className={`btn-ghost ${reportPeriod === v ? "is-active" : ""}`}
+                                    onClick={() => setReportPeriod(v)}>
+                                    {l}
+                                </button>
+                            ))}
+                        </div>
+                        {reportError ? (
+                            <p className="error-text">{reportError}</p>
+                        ) : report.length === 0 ? (
+                            <p className="empty-state">Hisobot uchun yozuvlar yo'q</p>
+                        ) : (
+                            <div className="report-wrap">
+                                <table className="report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Davr</th>
+                                            <th>Kirim</th>
+                                            <th>Chiqim</th>
+                                            <th>Foyda / zarar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {report.map((r) => (
+                                            <tr key={r.period}>
+                                                <td>{formatPeriod(r.period, reportPeriod)}</td>
+                                                <td className="amount-in">{formatMoney(r.income)}</td>
+                                                <td className="amount-out">{formatMoney(r.expense)}</td>
+                                                <td className={Number(r.profit) < 0 ? "amount-out" : "amount-in"}>
+                                                    <strong>
+                                                        {Number(r.profit) > 0 ? "+" : ""}{formatMoney(r.profit)}
+                                                    </strong>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
                         {/* Yangi yozuv */}
                         <form className="farm-form" onSubmit={handleSubmit}>
