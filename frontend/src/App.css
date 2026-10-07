@@ -50,6 +50,49 @@
     background: var(--color-surface);
 }
 
+/* ===== Parol maydoni + ko'z tugmasi ===== */
+
+.form-field .password-field {
+    position: relative;
+    width: 100%;
+}
+
+.form-field .password-field input {
+    padding-right: 46px; /* ko'z tugmasi uchun joy */
+}
+
+.form-field .password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    box-shadow: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.form-field .password-toggle:hover {
+    color: var(--color-primary);
+}
+
+.form-field .password-toggle:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+/* ===== Tugmalar ===== */
+
 .btn-primary {
     width: 100%;
     padding: 12px;
@@ -209,4 +252,142 @@
 .farm-form .btn-primary {
     width: auto;
     padding: 10px 24px;
+}
+
+/* ===== Admin panel ===== */
+
+.farm-item-name {
+    display: block;
+}
+
+.farm-item-type {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+}
+
+.empty-state .error-text {
+    margin-bottom: 12px;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent);
+}
+
+.stat-value {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--color-primary);
+    line-height: 1.1;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
+.section-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-radius: 2px;
+}
+
+.search-input:focus {
+    border-color: var(--color-primary);
+}
+
+.farmer-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.farmer-item {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    margin-bottom: 10px;
+}
+
+.farmer-head {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    color: var(--color-text);
+}
+
+.farmer-head:hover {
+    background: var(--color-bg);
+}
+
+.farmer-name {
+    display: block;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.farmer-meta {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.farmer-count {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.farmer-body {
+    padding: 4px 20px 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.farmer-empty {
+    margin: 12px 0 0;
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+.farm-list--inner {
+    margin-top: 12px;
+}
+
+.farm-list--inner .farm-item:last-child {
+    margin-bottom: 0;
 }

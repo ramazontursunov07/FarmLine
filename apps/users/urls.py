@@ -6,6 +6,7 @@ from .views import (
     UserUpdateView,
     ForgotPasswordView,
     ResetPasswordView,
+    AdminUserListView
 )
 from .views import CustomTokenObtainPairView
 
@@ -17,4 +18,5 @@ urlpatterns = [
     path('profile/', UserUpdateView.as_view(), name='profile'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset_password'),
+    path('list/', AdminUserListView.as_view(), name='admin_user_list'),
 ]

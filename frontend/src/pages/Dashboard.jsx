@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import FarmForm from '../components/FarmForm';
+import AdminPanel from '../components/AdminPanel';
 
 function Dashboard() {
     const { user, logout } = useAuth();
@@ -45,7 +46,8 @@ function Dashboard() {
                 {user.role === 'admin' && (
                     <div className="panel">
                         <h2 className="panel-title">Admin Panel</h2>
-                        <p className="panel-subtitle">Barcha fermalar va foydalanuvchilarni boshqarish</p>
+                        <p className="panel-subtitle">Barcha fermerlar va ularning fermalari</p>
+                        <AdminPanel />
                     </div>
                 )}
 

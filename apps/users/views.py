@@ -10,7 +10,9 @@ from .models import User
 from rest_framework import viewsets
 from .serializers import UserSerializer, RegisterSerializer, ChangePasswordSerializer, UserUpdateSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import CustomTokenObtainPairSerializer
+from .serializers import CustomTokenObtainPairSerializer, AdminUserListSerializer
+from .permissions import IsAppAdmin
+from django.db.models import Count
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -122,3 +124,18 @@ class ResetPasswordView(APIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+class AdminUserListView(generics.ListAPIView):
+    """Admin uchun foydalanuvchilar ro'yxati. ?role=fermer bilan filtrlash mumkin."""
+    serializer_class = AdminUserListSerializer
+    permission_classes = [IsAppAdmin]
+
+    def get_queryset(self):
+        qs = User.objects.annotate(
+            farms_count=Count('owned_farms', distinct=True)
+        ).order_by('-date_joined')
+        role = self.request.query_params.get('role')
+        if role:
+            qs = qs.filter(role=role)
+        return qs

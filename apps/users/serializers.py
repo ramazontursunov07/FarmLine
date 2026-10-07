@@ -93,3 +93,13 @@ class ResetPasswordSerializer(serializers.Serializer):
     """Token orqali yangi parol o'rnatish"""
     token = serializers.UUIDField()
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    """Admin panel uchun foydalanuvchilar ro'yxati"""
+    farms_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone_number',
+                  'role', 'date_joined', 'farms_count']

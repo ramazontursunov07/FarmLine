@@ -4,6 +4,7 @@ from .models import Farm, Worker
 from .serializers import FarmSerializer, WorkerSerializer
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied
+from apps.users.permissions import is_app_admin
 
 
 class WorkerViewSet(viewsets.ModelViewSet):
@@ -33,7 +34,9 @@ class FarmViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Farm.objects.filter(
+        if is_app_admin(user):
+            return Farm.objects.select_related('owner').all()
+        return Farm.objects.select_related('owner').filter(
             Q(owner=user) | Q(workers__user=user)
         ).distinct()
 
