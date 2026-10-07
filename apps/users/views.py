@@ -9,6 +9,8 @@ from rest_framework import generics, status
 from .models import User
 from rest_framework import viewsets
 from .serializers import UserSerializer, RegisterSerializer, ChangePasswordSerializer, UserUpdateSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -116,3 +118,7 @@ class ResetPasswordView(APIView):
         reset_token.save()
 
         return Response({'detail': 'Parol muvaffaqiyatli yangilandi'}, status=status.HTTP_200_OK)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
