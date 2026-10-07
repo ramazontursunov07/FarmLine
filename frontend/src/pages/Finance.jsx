@@ -208,7 +208,7 @@ function Finance() {
                         {/* Foyda / zarar hisoboti */}
                         <h3 className="section-title">Foyda va zarar</h3>
                         <div className="period-tabs">
-                            {[["day", "Kunlik"], ["month", "Oylik"], ["year", "Yillik"]].map(([v, l]) => (
+                            {[["day", "Kunlik"], ["week", "Haftalik"], ["month", "Oylik"], ["year", "Yillik"]].map(([v, l]) => (
                                 <button key={v} type="button"
                                     className={`btn-ghost ${reportPeriod === v ? "is-active" : ""}`}
                                     onClick={() => setReportPeriod(v)}>

@@ -552,8 +552,10 @@
     }
 }
 
+/* ---- Foyda / zarar hisoboti ---- */
 .period-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 12px;
 }
@@ -594,4 +596,46 @@
     font-size: 13px;
     color: var(--color-text-muted);
     font-weight: 600;
+}
+
+/* ---- Fermani tahrirlash / o'chirish ---- */
+.farm-item-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.farm-item-action {
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    text-decoration: underline;
+}
+
+.farm-item-action:hover {
+    color: var(--color-primary);
+}
+
+.farm-item-action--danger:hover {
+    color: var(--color-error);
+}
+
+.farm-item--editing {
+    display: block;
+}
+
+.farm-edit-form .form-field {
+    margin-bottom: 14px;
+}
+
+.farm-edit-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.farm-edit-actions .btn-primary {
+    width: auto;
+    padding: 10px 24px;
 }

@@ -42,3 +42,16 @@ class FarmViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    # --- faqat ferma egasi tahrirlay va o'chira oladi (ishchi va admin faqat ko'radi) ---
+    def _ensure_owner(self, farm):
+        if farm.owner != self.request.user:
+            raise PermissionDenied("Faqat ferma egasi uni o'zgartira yoki o'chira oladi.")
+
+    def perform_update(self, serializer):
+        self._ensure_owner(serializer.instance)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_owner(instance)
+        instance.delete()

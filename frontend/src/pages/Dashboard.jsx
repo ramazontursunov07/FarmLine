@@ -12,24 +12,130 @@ const FARM_TYPES = {
     aralash: 'Aralash',
 };
 
-function FarmList({ farms, showFinance }) {
+function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
+    const [editing, setEditing] = useState(false);
+    const [formData, setFormData] = useState({
+        name: farm.name,
+        location: farm.location,
+        farm_type: farm.farm_type,
+    });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const startEdit = () => {
+        setFormData({ name: farm.name, location: farm.location, farm_type: farm.farm_type });
+        setError('');
+        setEditing(true);
+    };
+
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError('');
+        try {
+            const { data } = await api.patch(`farms/${farm.id}/`, formData);
+            onUpdated(data);
+            setEditing(false);
+        } catch (err) {
+            setError(getErrorMessage(err, "Fermani saqlab bo'lmadi"));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        const ok = window.confirm(
+            `"${farm.name}" fermasini o'chirmoqchimisiz?\n\n` +
+            "Fermaning barcha ma'lumotlari (kirim-chiqim, hayvonlar, ishchilar) ham o'chib ketadi. " +
+            "Buni qaytarib bo'lmaydi."
+        );
+        if (!ok) return;
+        try {
+            await api.delete(`farms/${farm.id}/`);
+            onDeleted(farm.id);
+        } catch (err) {
+            window.alert(getErrorMessage(err, "Fermani o'chirib bo'lmadi"));
+        }
+    };
+
+    if (editing) {
+        return (
+            <li className="farm-item farm-item--editing">
+                <form className="farm-edit-form" onSubmit={handleSave}>
+                    <div className="form-field">
+                        <label>Nomi</label>
+                        <input type="text" name="name" value={formData.name} onChange={handleChange} required />
+                    </div>
+                    <div className="form-field">
+                        <label>Joylashuvi</label>
+                        <input type="text" name="location" value={formData.location} onChange={handleChange} required />
+                    </div>
+                    <div className="form-field">
+                        <label>Turi</label>
+                        <select name="farm_type" value={formData.farm_type} onChange={handleChange}>
+                            <option value="chorvachilik">Chorvachilik</option>
+                            <option value="parrandachilik">Parrandachilik</option>
+                            <option value="aralash">Aralash</option>
+                        </select>
+                    </div>
+                    {error && <p className="error-text">{error}</p>}
+                    <div className="farm-edit-actions">
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Kuting...' : 'Saqlash'}
+                        </button>
+                        <button type="button" className="btn-ghost" onClick={() => setEditing(false)} disabled={saving}>
+                            Bekor qilish
+                        </button>
+                    </div>
+                </form>
+            </li>
+        );
+    }
+
+    return (
+        <li className="farm-item">
+            <div>
+                <span className="farm-item-name">{farm.name}</span>
+                <span className="farm-item-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
+            </div>
+            <div className="farm-item-side">
+                <span className="farm-item-location">{farm.location}</span>
+                {showFinance && (
+                    <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
+                        Kirim-chiqim →
+                    </Link>
+                )}
+                {canManage && (
+                    <div className="farm-item-actions">
+                        <button type="button" className="farm-item-action" onClick={startEdit}>
+                            Tahrirlash
+                        </button>
+                        <button type="button" className="farm-item-action farm-item-action--danger" onClick={handleDelete}>
+                            O'chirish
+                        </button>
+                    </div>
+                )}
+            </div>
+        </li>
+    );
+}
+
+function FarmList({ farms, showFinance, currentUsername, onUpdated, onDeleted }) {
     return (
         <ul className="farm-list">
             {farms.map((farm) => (
-                <li key={farm.id} className="farm-item">
-                    <div>
-                        <span className="farm-item-name">{farm.name}</span>
-                        <span className="farm-item-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
-                    </div>
-                    <div className="farm-item-side">
-                        <span className="farm-item-location">{farm.location}</span>
-                        {showFinance && (
-                            <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
-                                Kirim-chiqim →
-                            </Link>
-                        )}
-                    </div>
-                </li>
+                <FarmItem
+                    key={farm.id}
+                    farm={farm}
+                    showFinance={showFinance}
+                    canManage={showFinance && farm.owner_username === currentUsername}
+                    onUpdated={onUpdated}
+                    onDeleted={onDeleted}
+                />
             ))}
         </ul>
     );
@@ -75,6 +181,14 @@ function Dashboard() {
         setFarms((prev) => [newFarm, ...prev]);
     };
 
+    const handleFarmUpdated = (updated) => {
+        setFarms((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+    };
+
+    const handleFarmDeleted = (id) => {
+        setFarms((prev) => prev.filter((f) => f.id !== id));
+    };
+
     const renderFarms = () => {
         if (loading) return <p className="empty-state">Yuklanmoqda...</p>;
         if (error) {
@@ -86,7 +200,15 @@ function Dashboard() {
             );
         }
         if (farms.length === 0) return <p className="empty-state">Hali fermangiz yo'q</p>;
-        return <FarmList farms={farms} showFinance={user.role === 'fermer'} />;
+        return (
+            <FarmList
+                farms={farms}
+                showFinance={user.role === 'fermer'}
+                currentUsername={user.username}
+                onUpdated={handleFarmUpdated}
+                onDeleted={handleFarmDeleted}
+            />
+        );
     };
 
     return (

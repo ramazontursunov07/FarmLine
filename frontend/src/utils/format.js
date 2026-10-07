@@ -15,10 +15,21 @@ const MONTHS = [
     "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr",
 ];
 
-// "2026-10-01" -> kunlik: "07.10.2026", oylik: "Oktabr 2026", yillik: "2026"
+const pad2 = (n) => String(n).padStart(2, "0");
+const ddmmyyyy = (date) =>
+    `${pad2(date.getUTCDate())}.${pad2(date.getUTCMonth() + 1)}.${date.getUTCFullYear()}`;
+
+// kunlik: "07.10.2026" | haftalik: "05.10.2026 – 11.10.2026"
+// oylik: "Oktabr 2026" | yillik: "2026"
 export function formatPeriod(iso, period) {
-    const [y, m, d] = iso.slice(0, 10).split("-");
-    if (period === "year") return y;
-    if (period === "month") return `${MONTHS[Number(m) - 1]} ${y}`;
-    return `${d}.${m}.${y}`;
+    const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+    if (period === "year") return String(y);
+    if (period === "month") return `${MONTHS[m - 1]} ${y}`;
+
+    const start = new Date(Date.UTC(y, m - 1, d));
+    if (period === "week") {
+        const end = new Date(Date.UTC(y, m - 1, d + 6));
+        return `${ddmmyyyy(start)} – ${ddmmyyyy(end)}`;
+    }
+    return ddmmyyyy(start);
 }

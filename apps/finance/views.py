@@ -1,4 +1,5 @@
-from django.db.models import Q, Sum
+from django.db.models import DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncWeek, TruncYear
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -9,8 +10,6 @@ from apps.farms.models import Farm
 from apps.users.permissions import is_app_admin
 from .models import Transaction
 from .serializers import TransactionSerializer
-from django.db.models import DecimalField, Q, Sum, Value
-from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncYear
 
 
 def finance_farms(user):
@@ -87,11 +86,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def report(self, request):
-        """Kunlik/oylik/yillik foyda-zarar: ?period=day|month|year (+ summary dagi filtrlar)."""
-        trunc = {"day": TruncDay, "month": TruncMonth, "year": TruncYear}
+        """Kunlik/haftalik/oylik/yillik foyda-zarar: ?period=day|week|month|year
+        (+ summary dagi filtrlar: farm, date_from, date_to, ...)."""
+        trunc = {"day": TruncDay, "week": TruncWeek, "month": TruncMonth, "year": TruncYear}
         period = request.query_params.get("period", "month")
         if period not in trunc:
-            return Response({"detail": "period: day, month yoki year bo'lishi kerak"}, status=400)
+            return Response({"detail": "period: day, week, month yoki year bo'lishi kerak"}, status=400)
 
         zero = Value(0, output_field=DecimalField())
         qs = self.filter_queryset(self.get_queryset()).order_by()
