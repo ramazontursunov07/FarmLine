@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import FarmForm from '../components/FarmForm';
 import AdminPanel from '../components/AdminPanel';
+import WorkersPanel from '../components/WorkersPanel';
 import { getErrorMessage } from '../utils/errors';
 
 const FARM_TYPES = {
@@ -14,6 +15,7 @@ const FARM_TYPES = {
 
 function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
     const [editing, setEditing] = useState(false);
+    const [showWorkers, setShowWorkers] = useState(false);
     const [formData, setFormData] = useState({
         name: farm.name,
         location: farm.location,
@@ -104,13 +106,21 @@ function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
             </div>
             <div className="farm-item-side">
                 <span className="farm-item-location">{farm.location}</span>
-                {showFinance && (
+                <Link className="farm-item-link" to={`/farms/${farm.id}/work`}>
+                    Ferma ishlari →
+                </Link>
+                {showFinance ? (
                     <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
                         Kirim-chiqim →
                     </Link>
+                ) : (
+                    <span className="farm-item-note">Kirim-chiqimni ko'rishga ruxsat yo'q</span>
                 )}
                 {canManage && (
                     <div className="farm-item-actions">
+                        <button type="button" className="farm-item-action" onClick={() => setShowWorkers((v) => !v)}>
+                            {showWorkers ? 'Ishchilarni yopish' : 'Ishchilar'}
+                        </button>
                         <button type="button" className="farm-item-action" onClick={startEdit}>
                             Tahrirlash
                         </button>
@@ -120,19 +130,20 @@ function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
                     </div>
                 )}
             </div>
+            {canManage && showWorkers && <WorkersPanel farmId={farm.id} />}
         </li>
     );
 }
 
-function FarmList({ farms, showFinance, currentUsername, onUpdated, onDeleted }) {
+function FarmList({ farms, currentUsername, onUpdated, onDeleted }) {
     return (
         <ul className="farm-list">
             {farms.map((farm) => (
                 <FarmItem
                     key={farm.id}
                     farm={farm}
-                    showFinance={showFinance}
-                    canManage={showFinance && farm.owner_username === currentUsername}
+                    showFinance={farm.can_view_finance}
+                    canManage={farm.owner_username === currentUsername}
                     onUpdated={onUpdated}
                     onDeleted={onDeleted}
                 />
@@ -203,7 +214,6 @@ function Dashboard() {
         return (
             <FarmList
                 farms={farms}
-                showFinance={user.role === 'fermer'}
                 currentUsername={user.username}
                 onUpdated={handleFarmUpdated}
                 onDeleted={handleFarmDeleted}

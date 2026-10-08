@@ -639,3 +639,202 @@
     width: auto;
     padding: 10px 24px;
 }
+
+/* ---- Ishchilar paneli ---- */
+.farm-item {
+    flex-wrap: wrap;
+}
+
+.workers-panel {
+    flex-basis: 100%;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.workers-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.workers-head h4 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.workers-empty {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+.workers-hint {
+    margin: 10px 0 14px;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.worker-form {
+    margin-bottom: 16px;
+    padding: 16px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+}
+
+.worker-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 14px;
+}
+
+.worker-form .form-field input {
+    background: var(--color-surface);
+}
+
+.check-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.worker-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.worker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.worker-item:last-child {
+    border-bottom: none;
+}
+
+.worker-name {
+    display: block;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.worker-meta {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.worker-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+@media (max-width: 600px) {
+    .worker-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.farm-item-note {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+/* ---- Ferma ishlari ---- */
+.btn-auto {
+    width: auto;
+    padding: 10px 24px;
+}
+
+.work-card {
+    padding: 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    margin-bottom: 32px;
+}
+
+.work-list {
+    list-style: none;
+    margin: 0 0 32px;
+    padding: 0;
+}
+
+.work-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-border);
+    margin-bottom: 10px;
+}
+
+.work-item--boshlangan,
+.work-item--davom_etmoqda {
+    border-left-color: var(--color-accent);
+}
+
+.work-item--yakunlangan {
+    border-left-color: var(--color-primary);
+}
+
+.work-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.work-title {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.work-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+}
+
+.work-meta {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.work-desc {
+    font-size: 14px;
+}
+
+.work-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.work-side select {
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-radius: 2px;
+    font-size: 14px;
+}

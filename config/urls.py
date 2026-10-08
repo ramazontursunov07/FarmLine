@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/users/', include('apps.users.urls')),
     path('api/', include('apps.farms.urls')),
     path('api/', include('apps.finance.urls')),
+    path('api/', include('apps.animals.urls')),
 
     path('api/v1/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     # bu ikkita token yaratib beradi.

@@ -9,6 +9,15 @@ const FIELD_LABELS = {
     name: 'Nomi',
     location: 'Joylashuvi',
     farm_type: 'Turi',
+    animal_group: 'Hayvon guruhi',
+    animal_type: 'Hayvon turi',
+    event_type: 'Ish turi',
+    title: 'Sarlavha',
+    description: 'Izoh',
+    start_date: 'Boshlangan sana',
+    end_date: 'Tugash sanasi',
+    breed: 'Zoti',
+    count: 'Soni',
 };
 
 export function getErrorMessage(err, fallback = "Xatolik yuz berdi, qayta urinib ko'ring") {

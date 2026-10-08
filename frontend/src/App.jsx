@@ -2,7 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Finance from './pages/Finance';              // <-- 1. shu importni qo'shing
+import Finance from './pages/Finance';
+import FarmWork from './pages/FarmWork';
 import PrivateRoute from './components/PrivateRoute';
 import PublicRoute from './components/PublicRoute';
 import './App.css';
@@ -22,7 +23,15 @@ function App() {
                 }
             />
 
-            {/* 2. shu blokni qo'shing */}
+            <Route
+                path="/farms/:farmId/work"
+                element={
+                    <PrivateRoute>
+                        <FarmWork />
+                    </PrivateRoute>
+                }
+            />
+
             <Route
                 path="/farms/:farmId/finance"
                 element={
