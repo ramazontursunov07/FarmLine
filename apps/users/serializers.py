@@ -64,6 +64,16 @@ class ChangePasswordSerializer(serializers.ModelSerializer):
         model = User
         fields = ['old_password', 'new_password']
 
+    def validate_new_password(self, value):
+        # Django parol qoidalari: kamida 8 belgi, oddiy/faqat raqamli bo'lmasin, username'ga o'xshamasin
+        validate_password(value, user=self.context['request'].user)
+        return value
+
+    def validate(self, attrs):
+        if attrs['old_password'] == attrs['new_password']:
+            raise serializers.ValidationError({'new_password': "Yangi parol eskisidan farq qilishi kerak"})
+        return attrs
+
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Profilni yangilash"""

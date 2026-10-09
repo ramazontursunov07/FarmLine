@@ -871,3 +871,40 @@
     color: var(--color-error);
     font-weight: 600;
 }
+
+/* ---- Ombor ---- */
+.stock-amount {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--font-display);
+}
+
+/* ---- Profil ---- */
+.user-link {
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.user-link:hover {
+    text-decoration: underline;
+}
+
+.success-text {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.profile-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 48px;
+}
+
+.profile-info > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}

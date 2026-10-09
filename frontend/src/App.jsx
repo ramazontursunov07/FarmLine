@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
 import FarmWork from './pages/FarmWork';
 import Tasks from './pages/Tasks';
+import Inventory from './pages/Inventory';
+import Profile from './pages/Profile';
 import PrivateRoute from './components/PrivateRoute';
 import PublicRoute from './components/PublicRoute';
 import './App.css';
@@ -38,6 +40,24 @@ function App() {
                 element={
                     <PrivateRoute>
                         <Tasks />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/inventory"
+                element={
+                    <PrivateRoute>
+                        <Inventory />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/profile"
+                element={
+                    <PrivateRoute>
+                        <Profile />
                     </PrivateRoute>
                 }
             />

@@ -21,6 +21,17 @@ const FIELD_LABELS = {
     due_date: 'Muddat',
     priority: 'Muhimlik',
     count: 'Soni',
+    item_name: 'Mahsulot nomi',
+    item_type: 'Turi',
+    unit: "O'lchov birligi",
+    quantity: 'Miqdor',
+    low_stock_threshold: 'Kam qolish chegarasi',
+    inventory_item: 'Mahsulot',
+    transaction_type: 'Harakat turi',
+    date: 'Sana',
+    note: 'Izoh',
+    old_password: 'Hozirgi parol',
+    new_password: 'Yangi parol',
 };
 
 export function getErrorMessage(err, fallback = "Xatolik yuz berdi, qayta urinib ko'ring") {

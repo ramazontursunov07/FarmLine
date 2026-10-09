@@ -13,7 +13,7 @@ const FARM_TYPES = {
     aralash: 'Aralash',
 };
 
-function FarmItem({ farm, showFinance, canManage, tasks, onUpdated, onDeleted }) {
+function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, onDeleted }) {
     const [editing, setEditing] = useState(false);
     const [showWorkers, setShowWorkers] = useState(false);
     const [formData, setFormData] = useState({
@@ -113,6 +113,10 @@ function FarmItem({ farm, showFinance, canManage, tasks, onUpdated, onDeleted })
                     Vazifalar{tasks.open > 0 ? ` (${tasks.open})` : ''} →
                     {tasks.overdue > 0 && <span className="task-overdue"> · {tasks.overdue} ta muddati o'tgan</span>}
                 </Link>
+                <Link className="farm-item-link" to={`/farms/${farm.id}/inventory`}>
+                    Ombor →
+                    {lowStock > 0 && <span className="task-overdue"> · {lowStock} ta kam qolgan</span>}
+                </Link>
                 {showFinance ? (
                     <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
                         Kirim-chiqim →
@@ -139,7 +143,7 @@ function FarmItem({ farm, showFinance, canManage, tasks, onUpdated, onDeleted })
     );
 }
 
-function FarmList({ farms, currentUsername, taskCounts, onUpdated, onDeleted }) {
+function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdated, onDeleted }) {
     return (
         <ul className="farm-list">
             {farms.map((farm) => (
@@ -149,6 +153,7 @@ function FarmList({ farms, currentUsername, taskCounts, onUpdated, onDeleted }) 
                     showFinance={farm.can_view_finance}
                     canManage={farm.owner_username === currentUsername}
                     tasks={taskCounts[farm.id] || { open: 0, overdue: 0 }}
+                    lowStock={lowStockCounts[farm.id] || 0}
                     onUpdated={onUpdated}
                     onDeleted={onDeleted}
                 />
@@ -162,6 +167,7 @@ function Dashboard() {
     const navigate = useNavigate();
     const [farms, setFarms] = useState([]);
     const [taskCounts, setTaskCounts] = useState({});
+    const [lowStockCounts, setLowStockCounts] = useState({});
     const isAdmin = user.role === 'admin';
     const [loading, setLoading] = useState(!isAdmin);
     const [error, setError] = useState('');
@@ -206,6 +212,26 @@ function Dashboard() {
         };
     }, [isAdmin]);
 
+    // Zaxirasi kam qolgan mahsulotlar soni (har bir ferma uchun)
+    useEffect(() => {
+        if (isAdmin) return;
+        let cancelled = false;
+        api.get('inventory-item/', { params: { low: 1 } })
+            .then(({ data }) => {
+                if (cancelled) return;
+                const list = Array.isArray(data) ? data : data.results ?? [];
+                const counts = {};
+                list.forEach((i) => {
+                    counts[i.farm] = (counts[i.farm] || 0) + 1;
+                });
+                setLowStockCounts(counts);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [isAdmin]);
+
     const handleRetry = () => {
         setLoading(true);
         fetchFarms();
@@ -244,6 +270,7 @@ function Dashboard() {
                 farms={farms}
                 currentUsername={user.username}
                 taskCounts={taskCounts}
+                lowStockCounts={lowStockCounts}
                 onUpdated={handleFarmUpdated}
                 onDeleted={handleFarmDeleted}
             />
@@ -256,6 +283,7 @@ function Dashboard() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <Link to="/profile" className="user-link">Profil</Link>
                     <button className="btn-ghost" onClick={handleLogout}>Chiqish</button>
                 </div>
             </header>

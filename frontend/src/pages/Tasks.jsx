@@ -187,6 +187,7 @@ function Tasks() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <Link to="/profile" className="user-link">Profil</Link>
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>
