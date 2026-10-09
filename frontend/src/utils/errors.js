@@ -17,6 +17,9 @@ const FIELD_LABELS = {
     start_date: 'Boshlangan sana',
     end_date: 'Tugash sanasi',
     breed: 'Zoti',
+    assigned_to: 'Kimga',
+    due_date: 'Muddat',
+    priority: 'Muhimlik',
     count: 'Soni',
 };
 

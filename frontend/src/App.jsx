@@ -4,6 +4,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
 import FarmWork from './pages/FarmWork';
+import Tasks from './pages/Tasks';
 import PrivateRoute from './components/PrivateRoute';
 import PublicRoute from './components/PublicRoute';
 import './App.css';
@@ -28,6 +29,15 @@ function App() {
                 element={
                     <PrivateRoute>
                         <FarmWork />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/tasks"
+                element={
+                    <PrivateRoute>
+                        <Tasks />
                     </PrivateRoute>
                 }
             />

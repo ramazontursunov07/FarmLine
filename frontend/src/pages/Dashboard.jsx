@@ -13,7 +13,7 @@ const FARM_TYPES = {
     aralash: 'Aralash',
 };
 
-function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
+function FarmItem({ farm, showFinance, canManage, tasks, onUpdated, onDeleted }) {
     const [editing, setEditing] = useState(false);
     const [showWorkers, setShowWorkers] = useState(false);
     const [formData, setFormData] = useState({
@@ -109,6 +109,10 @@ function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
                 <Link className="farm-item-link" to={`/farms/${farm.id}/work`}>
                     Ferma ishlari →
                 </Link>
+                <Link className="farm-item-link" to={`/farms/${farm.id}/tasks`}>
+                    Vazifalar{tasks.open > 0 ? ` (${tasks.open})` : ''} →
+                    {tasks.overdue > 0 && <span className="task-overdue"> · {tasks.overdue} ta muddati o'tgan</span>}
+                </Link>
                 {showFinance ? (
                     <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
                         Kirim-chiqim →
@@ -135,7 +139,7 @@ function FarmItem({ farm, showFinance, canManage, onUpdated, onDeleted }) {
     );
 }
 
-function FarmList({ farms, currentUsername, onUpdated, onDeleted }) {
+function FarmList({ farms, currentUsername, taskCounts, onUpdated, onDeleted }) {
     return (
         <ul className="farm-list">
             {farms.map((farm) => (
@@ -144,6 +148,7 @@ function FarmList({ farms, currentUsername, onUpdated, onDeleted }) {
                     farm={farm}
                     showFinance={farm.can_view_finance}
                     canManage={farm.owner_username === currentUsername}
+                    tasks={taskCounts[farm.id] || { open: 0, overdue: 0 }}
                     onUpdated={onUpdated}
                     onDeleted={onDeleted}
                 />
@@ -156,6 +161,7 @@ function Dashboard() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [farms, setFarms] = useState([]);
+    const [taskCounts, setTaskCounts] = useState({});
     const isAdmin = user.role === 'admin';
     const [loading, setLoading] = useState(!isAdmin);
     const [error, setError] = useState('');
@@ -177,6 +183,28 @@ function Dashboard() {
         // admin fermalarni AdminPanel ichida yuklaydi
         if (!isAdmin) fetchFarms();
     }, [fetchFarms, isAdmin]);
+
+    // Bajarilmagan vazifalar soni (har bir ferma uchun)
+    useEffect(() => {
+        if (isAdmin) return;
+        let cancelled = false;
+        api.get('tasks/', { params: { open: 1 } })
+            .then(({ data }) => {
+                if (cancelled) return;
+                const list = Array.isArray(data) ? data : data.results ?? [];
+                const counts = {};
+                list.forEach((t) => {
+                    const c = counts[t.farm] || (counts[t.farm] = { open: 0, overdue: 0 });
+                    c.open += 1;
+                    if (t.is_overdue) c.overdue += 1;
+                });
+                setTaskCounts(counts);
+            })
+            .catch(() => {}); // sanagich ko'rinmasa ham asosiy sahifa ishlayveradi
+        return () => {
+            cancelled = true;
+        };
+    }, [isAdmin]);
 
     const handleRetry = () => {
         setLoading(true);
@@ -215,6 +243,7 @@ function Dashboard() {
             <FarmList
                 farms={farms}
                 currentUsername={user.username}
+                taskCounts={taskCounts}
                 onUpdated={handleFarmUpdated}
                 onDeleted={handleFarmDeleted}
             />

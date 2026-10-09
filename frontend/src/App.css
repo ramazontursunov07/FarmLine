@@ -838,3 +838,36 @@
     border-radius: 2px;
     font-size: 14px;
 }
+
+/* ---- Vazifalar ---- */
+.btn-small {
+    padding: 7px 16px;
+    font-size: 14px;
+}
+
+.work-item--yangi,
+.work-item--jarayonda {
+    border-left-color: var(--color-accent);
+}
+
+.work-item--bajarildi {
+    border-left-color: var(--color-primary);
+}
+
+.work-item--overdue {
+    border-left-color: var(--color-error);
+}
+
+.work-badge--muhim {
+    border-color: var(--color-accent);
+}
+
+.work-badge--shoshilinch {
+    color: var(--color-error);
+    border-color: var(--color-error);
+}
+
+.task-overdue {
+    color: var(--color-error);
+    font-weight: 600;
+}

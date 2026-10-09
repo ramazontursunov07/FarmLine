@@ -101,6 +101,9 @@ function FarmWork() {
     const isOwner = farm ? farm.owner_username === user.username : false;
     const canModify = (ev) => isOwner || ev.recorded_by === user.id;
 
+    // Yozuvni fermer yozganmi yoki ishchi
+    const roleLabel = (userId) => (farm && userId === farm.owner ? 'Fermer' : 'Ishchi');
+
     const activeGroups = useMemo(() => groups.filter((g) => g.status === 'faol'), [groups]);
     const selectedGroup = eventForm.animal_group || (activeGroups[0] ? String(activeGroups[0].id) : '');
 
@@ -237,7 +240,10 @@ function FarmWork() {
                 </span>
                 {ev.description && <span className="work-desc">{ev.description}</span>}
                 <span className="work-meta">
-                    {ev.status_display} · Yozgan: <strong>{ev.recorded_by_name || "noma'lum"}</strong>
+                    {ev.status_display} · Yozgan:{' '}
+                    <strong>
+                        {ev.recorded_by ? `${roleLabel(ev.recorded_by)} ${ev.recorded_by_name}` : "noma'lum"}
+                    </strong>
                 </span>
             </div>
             {showActions && canModify(ev) && (
@@ -437,7 +443,9 @@ function FarmWork() {
                             </select>
                             <select value={filters.recorded_by} onChange={(e) => setFilters({ ...filters, recorded_by: e.target.value })}>
                                 <option value="">Kim yozgan: hammasi</option>
-                                {workers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                                {workers.map(([id, name]) => (
+                                    <option key={id} value={id}>{roleLabel(id)}: {name}</option>
+                                ))}
                             </select>
                         </div>
                         {history.length === 0 ? (
