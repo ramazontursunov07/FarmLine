@@ -1,11 +1,13 @@
+from django.db import transaction as db_transaction
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncWeek, TruncYear
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.animals.models import AnimalGroup
 from apps.farms.models import Farm
 from apps.users.permissions import is_app_admin
 from .models import Transaction
@@ -56,7 +58,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._ensure_can_write(serializer.validated_data["farm"])
-        serializer.save(recorded_by=self.request.user)
+        count = serializer.validated_data.get("animal_count")
+        if not count:
+            serializer.save(recorded_by=self.request.user)
+            return
+
+        # Sotuv: sotilgan hayvonlar soni guruhdan avtomatik ayriladi
+        with db_transaction.atomic():
+            group = AnimalGroup.objects.select_for_update().get(pk=serializer.validated_data["animal_group"].pk)
+            if count > group.count:
+                raise ValidationError({"animal_count": f"Guruhda faqat {group.count} ta hayvon bor"})
+            group.count -= count
+            if group.count == 0:
+                group.status = "sotilgan"
+            group.save(update_fields=["count", "status", "updated_at"])
+            serializer.save(recorded_by=self.request.user)
 
     def perform_update(self, serializer):
         self._ensure_can_write(serializer.instance.farm)
@@ -66,7 +82,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_can_write(instance.farm)
-        instance.delete()
+        if not (instance.animal_count and instance.animal_group_id):
+            instance.delete()
+            return
+
+        # Sotuv yozuvi o'chirilsa, hayvonlar soni guruhga qaytariladi
+        with db_transaction.atomic():
+            group = AnimalGroup.objects.select_for_update().get(pk=instance.animal_group_id)
+            group.count += instance.animal_count
+            if group.status == "sotilgan":
+                group.status = "faol"
+            group.save(update_fields=["count", "status", "updated_at"])
+            instance.delete()
 
     @action(detail=False, methods=["get"])
     def summary(self, request):

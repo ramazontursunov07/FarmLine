@@ -30,6 +30,7 @@ const FIELD_LABELS = {
     transaction_type: 'Harakat turi',
     date: 'Sana',
     note: 'Izoh',
+    animal_count: 'Hayvonlar soni',
     old_password: 'Hozirgi parol',
     new_password: 'Yangi parol',
 };

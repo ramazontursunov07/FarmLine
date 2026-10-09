@@ -22,6 +22,8 @@ const EMPTY_FORM = {
     amount: "",
     date: today(),
     description: "",
+    animal_group: "",
+    animal_count: "",
 };
 
 const EMPTY_FILTERS = { transaction_type: "", category: "", date_from: "", date_to: "" };
@@ -46,6 +48,8 @@ function Finance() {
     const [reportPeriod, setReportPeriod] = useState("month");
     const [report, setReport] = useState([]);
     const [reportError, setReportError] = useState("");
+
+    const [groups, setGroups] = useState([]);
 
     const [form, setForm] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState("");
@@ -89,6 +93,17 @@ function Finance() {
         };
     }, [farmId, filters, reloadKey]);
 
+    // Hayvon guruhlari (sotuvda sotilgan hayvonlar sonini guruhdan ayirish uchun)
+    useEffect(() => {
+        let cancelled = false;
+        api.get("animals-group/", { params: { farm: farmId, status: "faol" } })
+            .then(({ data }) => !cancelled && setGroups(asList(data)))
+            .catch(() => {}); // guruhlar yuklanmasa ham kirim-chiqim ishlayveradi
+        return () => {
+            cancelled = true;
+        };
+    }, [farmId, reloadKey]);
+
     // Kunlik/oylik/yillik hisobot (filtrlar va yangi yozuvlar bilan birga yangilanadi)
     useEffect(() => {
         let cancelled = false;
@@ -131,21 +146,30 @@ function Finance() {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
+    // Hayvon sotuvi: faqat "Kirim" + "Sotuv" bo'lsa va fermada hayvon guruhi bo'lsa
+    const isSale = form.transaction_type === "kirim" && form.category === "sotuv";
+    const selectedGroup = groups.find((g) => String(g.id) === form.animal_group);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setFormError("");
         setSaving(true);
         try {
-            await api.post("finance/", {
+            const payload = {
                 farm: Number(farmId),
                 transaction_type: form.transaction_type,
                 category: form.category,
                 amount: form.amount,
                 date: form.date,
                 description: form.description.trim(),
-            });
+            };
+            if (isSale && form.animal_group) {
+                payload.animal_group = Number(form.animal_group);
+                if (form.animal_count) payload.animal_count = Number(form.animal_count);
+            }
+            await api.post("finance/", payload);
             // tur va kategoriya saqlanadi, summa va izoh tozalanadi (ketma-ket kiritish qulay bo'lsin)
-            setForm((prev) => ({ ...prev, amount: "", description: "" }));
+            setForm((prev) => ({ ...prev, amount: "", description: "", animal_group: "", animal_count: "" }));
             reload();
         } catch (err) {
             setFormError(getErrorMessage(err, "Saqlashda xatolik yuz berdi"));
@@ -156,7 +180,10 @@ function Finance() {
 
     const handleDelete = async (tx) => {
         const label = `${TYPES[tx.transaction_type]}: ${formatMoney(tx.amount)}`;
-        if (!window.confirm(`Bu yozuv o'chirilsinmi?\n${label}`)) return;
+        const back = tx.animal_count
+            ? `\n\n${tx.animal_count} ta ${tx.animal_group_label || "hayvon"} guruhga qaytariladi.`
+            : "";
+        if (!window.confirm(`Bu yozuv o'chirilsinmi?\n${label}${back}`)) return;
         try {
             await api.delete(`finance/${tx.id}/`);
             reload();
@@ -285,6 +312,35 @@ function Finance() {
                                         onChange={handleFormChange} required />
                                 </div>
                             </div>
+                            {isSale && groups.length > 0 && (
+                                <div className="form-row">
+                                    <div className="form-field">
+                                        <label htmlFor="tx-group">Qaysi hayvonlar sotildi (ixtiyoriy)</label>
+                                        <select id="tx-group" name="animal_group" value={form.animal_group}
+                                            onChange={handleFormChange}>
+                                            <option value="">Hayvon sonini hisobga olmaslik</option>
+                                            {groups.map((g) => (
+                                                <option key={g.id} value={g.id}>
+                                                    {g.animal_type_name}{g.breed ? ` (${g.breed})` : ""} — {g.count} ta
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {selectedGroup && (
+                                        <div className="form-field">
+                                            <label htmlFor="tx-count">Sotilgan soni</label>
+                                            <input id="tx-count" type="number" name="animal_count" min="1" step="1"
+                                                max={selectedGroup.count} value={form.animal_count}
+                                                onChange={handleFormChange} required />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {isSale && selectedGroup && (
+                                <p className="workers-hint">
+                                    Guruhda hozir {selectedGroup.count} ta bor. Saqlaganingizda sotilgan soni avtomatik ayriladi.
+                                </p>
+                            )}
                             <div className="form-field">
                                 <label htmlFor="tx-desc">Izoh (ixtiyoriy)</label>
                                 <input id="tx-desc" type="text" name="description" value={form.description}
@@ -342,6 +398,7 @@ function Finance() {
                                             <span className="tx-category">{CATEGORIES[tx.category] || tx.category}</span>
                                             <span className="tx-meta">
                                                 {tx.date}
+                                                {tx.animal_count ? ` · ${tx.animal_count} ta ${tx.animal_group_label || "hayvon"} sotildi` : ""}
                                                 {tx.description ? ` · ${tx.description}` : ""}
                                             </span>
                                         </div>

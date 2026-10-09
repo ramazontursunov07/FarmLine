@@ -908,3 +908,90 @@
     flex-direction: column;
     gap: 3px;
 }
+
+/* ---- Fermer uchun umumiy ko'rinish ---- */
+.overview {
+    margin-bottom: 40px;
+}
+
+.overview-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.overview-head select {
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-radius: 2px;
+    font-size: 14px;
+}
+
+.stat-grid--auto {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.stat-card--warn {
+    border-left-color: var(--color-error);
+}
+
+.stat-card--warn .stat-value {
+    color: var(--color-error);
+}
+
+.stat-value--sm {
+    font-size: 22px;
+}
+
+.stat-sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.overview-box {
+    padding: 16px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.overview-box-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.overview-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.overview-list li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 14px;
+}
+
+.overview-list li:last-child {
+    border-bottom: none;
+}
+
+.overview-ok {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-text-muted);
+}

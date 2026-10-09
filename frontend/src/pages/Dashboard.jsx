@@ -5,6 +5,7 @@ import api from '../api/axios';
 import FarmForm from '../components/FarmForm';
 import AdminPanel from '../components/AdminPanel';
 import WorkersPanel from '../components/WorkersPanel';
+import FarmerOverview from '../components/FarmerOverview';
 import { getErrorMessage } from '../utils/errors';
 
 const FARM_TYPES = {
@@ -296,6 +297,8 @@ function Dashboard() {
                         <AdminPanel />
                     </div>
                 )}
+
+                {user.role === 'fermer' && <FarmerOverview refreshKey={farms.length} />}
 
                 {user.role === 'fermer' && (
                     <div className="panel">

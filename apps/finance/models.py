@@ -32,6 +32,8 @@ class Transaction(models.Model):
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    # Sotuvda: nechta hayvon sotilgani (hayvon guruhidan avtomatik ayriladi)
+    animal_count = models.PositiveIntegerField(null=True, blank=True)
     description = models.TextField(blank=True)
     date = models.DateField()
     recorded_by = models.ForeignKey(
