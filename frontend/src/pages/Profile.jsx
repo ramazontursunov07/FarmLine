@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -15,6 +15,65 @@ function Profile() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Telegram ulanishi
+    const [telegramLinked, setTelegramLinked] = useState(null); // null: hali yuklanmagan
+    const [telegramLink, setTelegramLink] = useState('');
+    const [telegramBusy, setTelegramBusy] = useState(false);
+    const [telegramError, setTelegramError] = useState('');
+
+    const loadTelegramStatus = useCallback(async () => {
+        try {
+            const { data } = await api.get('users/profile/');
+            const linked = Boolean(data.telegram_linked);
+            setTelegramLinked(linked);
+            setTelegramError('');
+            if (linked) setTelegramLink('');
+        } catch (err) {
+            setTelegramError(getErrorMessage(err, "Telegram holatini olib bo'lmadi"));
+        }
+    }, []);
+
+    useEffect(() => {
+        loadTelegramStatus();
+    }, [loadTelegramStatus]);
+
+    // Havola ochilgandan keyin ulanish holatini har 3 soniyada tekshiramiz
+    useEffect(() => {
+        if (!telegramLink || telegramLinked) return undefined;
+        const timer = setInterval(loadTelegramStatus, 3000);
+        return () => clearInterval(timer);
+    }, [telegramLink, telegramLinked, loadTelegramStatus]);
+
+    const handleLinkTelegram = async () => {
+        setTelegramError('');
+        setTelegramBusy(true);
+        try {
+            const { data } = await api.post('users/telegram/link/');
+            setTelegramLink(data.telegram_link);
+        } catch (err) {
+            setTelegramError(getErrorMessage(err, "Havola yaratib bo'lmadi"));
+        } finally {
+            setTelegramBusy(false);
+        }
+    };
+
+    const handleUnlinkTelegram = async () => {
+        if (!window.confirm("Telegram ulanishini o'chirasizmi? Parolni tiklash havolalari endi kelmaydi.")) {
+            return;
+        }
+        setTelegramError('');
+        setTelegramBusy(true);
+        try {
+            await api.delete('users/telegram/link/');
+            setTelegramLinked(false);
+            setTelegramLink('');
+        } catch (err) {
+            setTelegramError(getErrorMessage(err, "Ulanishni o'chirib bo'lmadi"));
+        } finally {
+            setTelegramBusy(false);
+        }
+    };
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -78,6 +137,62 @@ function Profile() {
                         <span className="work-meta">Rol</span>
                         <span className="work-title">{ROLES[user.role] || user.role}</span>
                     </div>
+                </div>
+
+                <h3 className="section-title">Telegram</h3>
+                <div className="work-card">
+                    {telegramLinked === null && !telegramError && (
+                        <p className="workers-hint">Yuklanmoqda...</p>
+                    )}
+
+                    {telegramLinked === null && telegramError && (
+                        <button type="button" className="btn-ghost" onClick={loadTelegramStatus}>
+                            Qayta urinish
+                        </button>
+                    )}
+
+                    {telegramLinked === true && (
+                        <>
+                            <p className="success-text">Telegram ulangan ✓</p>
+                            <p className="workers-hint">
+                                Parolni tiklash havolalari shu Telegramga yuboriladi.
+                            </p>
+                            <button type="button" className="btn-ghost" onClick={handleUnlinkTelegram}
+                                disabled={telegramBusy}>
+                                Ulanishni o'chirish
+                            </button>
+                        </>
+                    )}
+
+                    {telegramLinked === false && (
+                        <>
+                            <p className="workers-hint">
+                                Telegram ulanmagan. Parolni unutsangiz, tiklash havolasi faqat ulangan
+                                Telegramga yuboriladi, shuning uchun hozir ulab qo'ying.
+                            </p>
+
+                            {telegramLink ? (
+                                <>
+                                    <a href={telegramLink} target="_blank" rel="noreferrer"
+                                        className="btn-primary btn-auto"
+                                        style={{ display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>
+                                        Telegramda ochish
+                                    </a>
+                                    <p className="workers-hint">
+                                        Botda "Start" tugmasini bosing. Havola 10 daqiqa amal qiladi,
+                                        ulanish avtomatik aniqlanadi.
+                                    </p>
+                                </>
+                            ) : (
+                                <button type="button" className="btn-primary btn-auto"
+                                    onClick={handleLinkTelegram} disabled={telegramBusy}>
+                                    {telegramBusy ? 'Kuting...' : 'Telegramni ulash'}
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    {telegramError && <p className="error-text" role="alert">{telegramError}</p>}
                 </div>
 
                 <h3 className="section-title">Parolni o'zgartirish</h3>

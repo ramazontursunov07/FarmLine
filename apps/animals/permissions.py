@@ -9,7 +9,7 @@ class IsFarmOwnerOrWorker(BasePermission):
     """
 
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
+        return request.user and request.user.is_authenticated  #user bo'lsa va u authenticateddan o'tgan bo'lsa.
 
     def has_object_permission(self, request, view, obj):
         # AnimalGroup uchun farm to'g'ridan-to'g'ri bor,
@@ -22,11 +22,11 @@ class IsFarmOwnerOrWorker(BasePermission):
             return False
 
         # Fermer (xo'jalik egasi) bo'lsa
-        if farm.owner == request.user:
+        if farm.owner == request.user: #Agar fermer bo'lsa True.
             return True
 
         # Ishchi sifatida shu fermaga tayinlangan bo'lsa
-        if Worker.objects.filter(farm=farm, user=request.user).exists():
+        if Worker.objects.filter(farm=farm, user=request.user).exists(): #fermadagi ishchilar bo'lsa
             return True
 
-        return False
+        return False #Aks holda False

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class AnimalType(models.Model):
@@ -32,12 +33,12 @@ class AnimalGroup(models.Model):
         on_delete=models.PROTECT,
         related_name='groups'
     )
-    breed = models.CharField(max_length=100, blank=True)
-    count = models.PositiveIntegerField(default=0)
-    birth_date = models.DateField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    breed = models.CharField(max_length=100, blank=True)  #nasl
+    count = models.PositiveIntegerField(default=0) #soni
+    birth_date = models.DateField(null=True, blank=True) #tug'ilgan sanasi
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol') #status
+    created_at = models.DateTimeField(auto_now_add=True) #yaratilganligi.
+    updated_at = models.DateTimeField(auto_now=True) #yangilangan sanasi.
 
     class Meta:
         ordering = ['-created_at']
@@ -48,7 +49,7 @@ class AnimalGroup(models.Model):
         return f"{self.animal_type} - {self.count} ta ({self.farm.name})"
 
 
-class AnimalEvent(models.Model):
+class AnimalEvent(models.Model):  #ishlar
     EVENT_TYPE_CHOICES = (
         ('kasallik', 'Kasallik'),
         ('davolash', 'Davolash'),
@@ -93,6 +94,5 @@ class AnimalEvent(models.Model):
     @property
     def days_since_start(self):
         """Voqea boshlangandan beri necha kun o'tgani (masalan davolanish davomiyligi)"""
-        from django.utils import timezone
         end = self.end_date or timezone.now().date()
         return (end - self.start_date).days

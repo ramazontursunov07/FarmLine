@@ -1,7 +1,8 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from .models import User
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from .models import User
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -20,24 +21,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
-class UserSerializer(serializers.ModelSerializer):
-    """User yaratish"""
-
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'password', 'role', 'phone_number',
-                  'telegram_chat_id']
-
-        extra_kwargs = {
-            'password': {'write_only': True},
-        }
-
-    def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
-
-
 class RegisterSerializer(serializers.ModelSerializer):
-    """Registratsiya"""
+    """Ro'yxatdan o'tish. 'role' kiritilmaydi, hamma fermer bo'lib ro'yxatdan o'tadi."""
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True)
 
@@ -65,7 +50,6 @@ class ChangePasswordSerializer(serializers.ModelSerializer):
         fields = ['old_password', 'new_password']
 
     def validate_new_password(self, value):
-        # Django parol qoidalari: kamida 8 belgi, oddiy/faqat raqamli bo'lmasin, username'ga o'xshamasin
         validate_password(value, user=self.context['request'].user)
         return value
 
@@ -76,27 +60,24 @@ class ChangePasswordSerializer(serializers.ModelSerializer):
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
-    """Profilni yangilash"""
+    """Profilni yangilash. 'telegram_linked' faqat o'qish uchun: Telegram ulanganmi?"""
+    telegram_linked = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['username', 'role', 'first_name', 'last_name', 'email', 'phone_number']
-        read_only_fields = ['username', 'role']
+        fields = ['username', 'role', 'first_name', 'last_name', 'email', 'phone_number', 'telegram_linked']
+        read_only_fields = ['username', 'role', 'telegram_linked']
 
-
-from rest_framework import serializers
-from django.contrib.auth.password_validation import validate_password
-from .models import User
+    def get_telegram_linked(self, obj):
+        return bool(obj.telegram_chat_id)
 
 
 class ForgotPasswordSerializer(serializers.Serializer):
-    """Parolni unutganda - foydalanuvchini aniqlash uchun"""
+    """
+    Faqat username qabul qiladi. Foydalanuvchi bor-yo'qligi bu yerda TEKSHIRILMAYDI,
+    aks holda begona odam username'larni aniqlab olishi mumkin.
+    """
     username = serializers.CharField()
-
-    def validate_username(self, value):
-        if not User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("Bunday foydalanuvchi topilmadi")
-        return value
 
 
 class ResetPasswordSerializer(serializers.Serializer):

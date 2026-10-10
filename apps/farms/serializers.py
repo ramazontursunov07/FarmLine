@@ -7,7 +7,7 @@ from .models import Farm, Worker
 
 
 class FarmSerializer(serializers.ModelSerializer):
-    owner_username = serializers.CharField(source='owner.username', read_only=True)
+    owner_username = serializers.CharField(source='owner.username', read_only=True) #fermerni usernamemi
     can_view_finance = serializers.SerializerMethodField()
 
     class Meta:
@@ -20,11 +20,11 @@ class FarmSerializer(serializers.ModelSerializer):
         """Fermer o'z fermasida har doim True; ishchida esa unga berilgan huquq."""
         request = self.context.get('request')
         user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
+        if not user or not user.is_authenticated: #user bo'lmasa yoki Authenticateddan o'tmagan bo'lsa False qaytaradi.Ya'ni ruxsat yo'q.
             return False
-        if obj.owner_id == user.id:
+        if obj.owner_id == user.id:  #Agar ferma egasi bo'lsa unga ruxsat.
             return True
-        return obj.workers.filter(user=user, can_view_finance=True).exists()
+        return obj.workers.filter(user=user, can_view_finance=True).exists() #Agar ruxsat berilgan ishchi bo'lsa.
 
 
 class WorkerSerializer(serializers.ModelSerializer):

@@ -12,7 +12,7 @@ from .serializers import AnimalTypeSerializer, AnimalGroupSerializer, AnimalEven
 
 def is_farm_member(user, farm):
     """Ferma egasi yoki shu fermaga biriktirilgan ishchimi?"""
-    return farm.owner_id == user.id or Worker.objects.filter(farm=farm, user=user).exists()
+    return farm.owner_id == user.id or Worker.objects.filter(farm=farm, user=user).exists() #fermer bo'lsa yokida shu fermada ishchi bo'lsa
 
 
 class AnimalTypeViewSet(viewsets.ModelViewSet):
@@ -21,9 +21,9 @@ class AnimalTypeViewSet(viewsets.ModelViewSet):
     serializer_class = AnimalTypeSerializer
 
     def get_permissions(self):
-        if self.action in ('update', 'partial_update', 'destroy'):
+        if self.action in ('update', 'partial_update', 'destroy'): #bu yerda shu amallarni bajarish faqat admin uchun ruxsat beriladi.
             return [IsAppAdmin()]
-        return [IsAuthenticated()]
+        return [IsAuthenticated()] #boshqa amallar authenticateddan o'tgan barcha.
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -36,7 +36,7 @@ class AnimalGroupViewSet(viewsets.ModelViewSet):
     """Hayvon guruhlari. Ko'rish: ferma egasi va ishchilar. Qo'shish/o'zgartirish/o'chirish: faqat ferma egasi."""
     queryset = AnimalGroup.objects.all()
     serializer_class = AnimalGroupSerializer
-    permission_classes = [IsAuthenticated, IsFarmOwnerOrWorker]
+    permission_classes = [IsAuthenticated, IsFarmOwnerOrWorker] #Authenticateddan o'tgan,admin va ishchi bo'lsa ruxsat.
 
     def get_queryset(self):
         user = self.request.user
