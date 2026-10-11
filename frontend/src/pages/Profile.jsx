@@ -197,21 +197,28 @@ function Profile() {
 
                 <h3 className="section-title">Parolni o'zgartirish</h3>
                 <div className="work-card">
+                    <p className="workers-hint">
+                        Hozirgi parolingizni bilsangiz, uni shu yerda yangisiga almashtiring.
+                        Parolni unutgan bo'lsangiz, avval "Chiqish" tugmasini bosing, so'ng kirish
+                        sahifasida "Parolni unutdingizmi?" havolasini tanlang.
+                    </p>
                     <form onSubmit={handleSubmit}>
                         <div className="form-field">
                             <label>Hozirgi parol</label>
                             <input type={inputType} name="old_password" value={form.old_password}
-                                onChange={handleChange} autoComplete="current-password" required />
+                                onChange={handleChange} autoComplete="current-password" placeholder="Hozirgi parolingizni kiriting" required />
                         </div>
                         <div className="form-field">
                             <label>Yangi parol</label>
                             <input type={inputType} name="new_password" value={form.new_password}
-                                onChange={handleChange} autoComplete="new-password" minLength={8} required />
+                                onChange={handleChange} autoComplete="new-password" minLength={8}
+                                placeholder="Kamida 8 ta belgi" required />
                         </div>
                         <div className="form-field">
                             <label>Yangi parolni takrorlang</label>
                             <input type={inputType} name="confirm" value={form.confirm}
-                                onChange={handleChange} autoComplete="new-password" minLength={8} required />
+                                onChange={handleChange} autoComplete="new-password" minLength={8}
+                                placeholder="Yangi parolni qayta yozing" required />
                         </div>
 
                         <label className="check-field">

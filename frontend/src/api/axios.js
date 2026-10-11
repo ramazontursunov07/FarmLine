@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Odatda nisbiy yo'l: so'rovlar frontend manzilining o'ziga yuboriladi (Vite proxy yoki nginx Django'ga uzatadi).
+// Kerak bo'lsa, frontend/.env faylida VITE_API_URL=https://api.sizning-domen.uz/api/ deb o'zgartirish mumkin.
+const API_URL = import.meta.env.VITE_API_URL || '/api/';
+
 const api = axios.create({
-    baseURL: 'http://127.0.0.1:8000/api/',
+    baseURL: API_URL,
 });
 
 api.interceptors.request.use(
@@ -29,7 +33,7 @@ api.interceptors.response.use(
                 const refreshToken = localStorage.getItem('refresh');
 
                 const response = await axios.post(
-                    'http://127.0.0.1:8000/api/users/token/refresh/',
+                    `${API_URL}users/token/refresh/`,
                     { refresh: refreshToken }
                 );
 

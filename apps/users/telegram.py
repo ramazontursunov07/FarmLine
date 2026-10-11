@@ -40,7 +40,7 @@ def build_bot_link(code):
     return f"https://t.me/{get_bot_username()}?start={code}"
 
 
-def send_message(chat_id, text):
+def send_message(chat_id, text, parse_mode=None):
     """
     Telegram Bot API orqali xabar yuboradi (qo'shimcha kutubxonasiz).
     Muvaffaqiyatli bo'lsa True, aks holda False qaytaradi va xatoni tashlamaydi.
@@ -49,9 +49,13 @@ def send_message(chat_id, text):
     if not token or not chat_id:
         return False
 
+    payload = {'chat_id': chat_id, 'text': text}
+    if parse_mode:
+        payload['parse_mode'] = parse_mode
+
     request = urllib.request.Request(
         f"https://api.telegram.org/bot{token}/sendMessage",
-        data=json.dumps({'chat_id': chat_id, 'text': text}).encode('utf-8'),
+        data=json.dumps(payload).encode('utf-8'),
         headers={'Content-Type': 'application/json'},
     )
     try:

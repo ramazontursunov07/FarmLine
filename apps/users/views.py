@@ -1,3 +1,7 @@
+import html
+import ipaddress
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
@@ -118,6 +122,34 @@ class TelegramLinkView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _is_local_host(hostname):
+    """localhost yoki lokal tarmoq IP'si (192.168.x.x va h.k.) bo'lsa True. Oddiy domen uchun False."""
+    if not hostname or hostname == "localhost":
+        return True
+    try:
+        return not ipaddress.ip_address(hostname).is_global
+    except ValueError:
+        return False
+
+
+def build_reset_message(reset_link):
+    """
+    Telegramga yuboriladigan xabar (HTML). Telegram localhost va lokal IP manzillarni havola deb tanimaydi,
+    shuning uchun ishlab chiqishda havola bir bosishda nusxalanadigan <code> ko'rinishida yuboriladi.
+    Haqiqiy domen bo'lsa, odatiy bosiladigan havola yuboriladi.
+    """
+    safe_link = html.escape(reset_link)
+    if _is_local_host(urlparse(reset_link).hostname):
+        link_part = f"Havolani bosib nusxalang va brauzerga qo'ying:\n<code>{safe_link}</code>"
+    else:
+        link_part = f'<a href="{safe_link}">Parolni tiklash</a>'
+    return (
+        "FarmLine: parolni tiklash havolasi (15 daqiqa amal qiladi).\n\n"
+        f"{link_part}\n\n"
+        "Agar buni siz so'ramagan bo'lsangiz, xabarni e'tiborsiz qoldiring."
+    )
+
+
 class ForgotPasswordView(APIView):
     """
     Parolni unutgan foydalanuvchi uchun. Token API javobida HECH QACHON qaytarilmaydi:
@@ -140,11 +172,7 @@ class ForgotPasswordView(APIView):
             PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
             reset_token = PasswordResetToken.objects.create(user=user)
             reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token.token}"
-            send_message(
-                user.telegram_chat_id,
-                f"FarmLine: parolni tiklash havolasi (15 daqiqa amal qiladi):\n{reset_link}\n\n"
-                f"Agar buni siz so'ramagan bo'lsangiz, xabarni e'tiborsiz qoldiring.",
-            )
+            send_message(user.telegram_chat_id, build_reset_message(reset_link), parse_mode='HTML')
 
         return Response({'detail': FORGOT_PASSWORD_DETAIL}, status=status.HTTP_200_OK)
 
