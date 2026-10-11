@@ -5,6 +5,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from apps.farms.models import Worker
+from apps.users.notify import display_name, notify_users
 from .models import InventoryItem, InventoryTransaction
 from .serializers import InventoryItemSerializer, InventoryTransactionSerializer
 
@@ -96,6 +97,7 @@ class InventoryTransactionViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             locked = InventoryItem.objects.select_for_update().get(pk=item.pk)
+            before = locked.quantity
             if kind == 'sarf':
                 if qty > locked.quantity:
                     raise ValidationError({
@@ -106,6 +108,15 @@ class InventoryTransactionViewSet(viewsets.ModelViewSet):
                 locked.quantity += qty
             locked.save(update_fields=['quantity', 'updated_at'])
             serializer.save(recorded_by=user)
+
+            # Faqat zaxira chegaradan YUQORIDAN pastga o'tgan paytda ogohlantiramiz (har sarfda emas)
+            if kind == 'sarf' and before > locked.low_stock_threshold and locked.is_low_stock:
+                notify_users([item.farm.owner], (
+                    f"⚠️ Ombor: «{locked.item_name}» kam qoldi!\n"
+                    f"Qoldi: {fmt(locked.quantity)} {locked.unit} (chegara: {fmt(locked.low_stock_threshold)} {locked.unit})\n"
+                    f"Ferma: {item.farm.name}\n"
+                    f"Oxirgi sarfni kiritdi: {display_name(user)}"
+                ))
 
     def perform_destroy(self, instance):
         item = instance.inventory_item

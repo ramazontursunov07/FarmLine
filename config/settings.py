@@ -23,6 +23,8 @@ ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'FarmLineBot')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+# Telegram ogohlantirishlari alohida oqimda yuboriladi (testlarda False qilinadi)
+TELEGRAM_ASYNC = os.getenv('TELEGRAM_ASYNC', 'True') == 'True'
 
 # Application definition
 
