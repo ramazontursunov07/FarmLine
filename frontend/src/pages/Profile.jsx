@@ -5,16 +5,9 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 
 const ROLES = { fermer: 'Fermer', ishchi: 'Ishchi', admin: 'Admin' };
-const EMPTY = { old_password: '', new_password: '', confirm: '' };
 
 function Profile() {
     const { user, logout } = useAuth();
-
-    const [form, setForm] = useState(EMPTY);
-    const [showPasswords, setShowPasswords] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [saving, setSaving] = useState(false);
 
     // Telegram ulanishi
     const [telegramLinked, setTelegramLinked] = useState(null); // null: hali yuklanmagan
@@ -59,7 +52,7 @@ function Profile() {
     };
 
     const handleUnlinkTelegram = async () => {
-        if (!window.confirm("Telegram ulanishini o'chirasizmi? Parolni tiklash havolalari endi kelmaydi.")) {
+        if (!window.confirm("Telegram ulanishini o'chirasizmi? Parolni tiklash havolalari va ogohlantirishlar endi kelmaydi.")) {
             return;
         }
         setTelegramError('');
@@ -75,38 +68,7 @@ function Profile() {
         }
     };
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-        setSuccess('');
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-
-        if (form.new_password !== form.confirm) {
-            setError('Yangi parollar bir xil emas');
-            return;
-        }
-
-        setSaving(true);
-        try {
-            await api.put('users/change-password/', {
-                old_password: form.old_password,
-                new_password: form.new_password,
-            });
-            setForm(EMPTY);
-            setSuccess("Parol muvaffaqiyatli o'zgartirildi");
-        } catch (err) {
-            setError(getErrorMessage(err, "Parolni o'zgartirib bo'lmadi"));
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-    const inputType = showPasswords ? 'text' : 'password';
 
     return (
         <div className="app-shell">
@@ -155,7 +117,7 @@ function Profile() {
                         <>
                             <p className="success-text">Telegram ulangan ✓</p>
                             <p className="workers-hint">
-                                Parolni tiklash havolalari shu Telegramga yuboriladi.
+                                Parolni tiklash havolalari va ogohlantirishlar shu Telegramga yuboriladi.
                             </p>
                             <button type="button" className="btn-ghost" onClick={handleUnlinkTelegram}
                                 disabled={telegramBusy}>
@@ -167,7 +129,7 @@ function Profile() {
                     {telegramLinked === false && (
                         <>
                             <p className="workers-hint">
-                                Telegram ulanmagan. Parolni unutsangiz, tiklash havolasi faqat ulangan
+                                Telegram ulanmagan. Parolni tiklash havolasi va ogohlantirishlar faqat ulangan
                                 Telegramga yuboriladi, shuning uchun hozir ulab qo'ying.
                             </p>
 
@@ -193,50 +155,6 @@ function Profile() {
                     )}
 
                     {telegramError && <p className="error-text" role="alert">{telegramError}</p>}
-                </div>
-
-                <h3 className="section-title">Parolni o'zgartirish</h3>
-                <div className="work-card">
-                    <p className="workers-hint">
-                        Hozirgi parolingizni bilsangiz, uni shu yerda yangisiga almashtiring.
-                        Parolni unutgan bo'lsangiz, avval "Chiqish" tugmasini bosing, so'ng kirish
-                        sahifasida "Parolni unutdingizmi?" havolasini tanlang.
-                    </p>
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-field">
-                            <label>Hozirgi parol</label>
-                            <input type={inputType} name="old_password" value={form.old_password}
-                                onChange={handleChange} autoComplete="current-password" placeholder="Hozirgi parolingizni kiriting" required />
-                        </div>
-                        <div className="form-field">
-                            <label>Yangi parol</label>
-                            <input type={inputType} name="new_password" value={form.new_password}
-                                onChange={handleChange} autoComplete="new-password" minLength={8}
-                                placeholder="Kamida 8 ta belgi" required />
-                        </div>
-                        <div className="form-field">
-                            <label>Yangi parolni takrorlang</label>
-                            <input type={inputType} name="confirm" value={form.confirm}
-                                onChange={handleChange} autoComplete="new-password" minLength={8}
-                                placeholder="Yangi parolni qayta yozing" required />
-                        </div>
-
-                        <label className="check-field">
-                            <input type="checkbox" checked={showPasswords}
-                                onChange={(e) => setShowPasswords(e.target.checked)} />
-                            Parollarni ko'rsatish
-                        </label>
-                        <p className="workers-hint">
-                            Kamida 8 ta belgi bo'lsin, faqat raqamlardan iborat bo'lmasin va username'ga o'xshamasin.
-                        </p>
-
-                        {error && <p className="error-text" role="alert">{error}</p>}
-                        {success && <p className="success-text" role="status">{success}</p>}
-
-                        <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                            {saving ? 'Kuting...' : "Parolni o'zgartirish"}
-                        </button>
-                    </form>
                 </div>
             </main>
         </div>

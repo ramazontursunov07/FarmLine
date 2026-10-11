@@ -995,3 +995,117 @@
     font-size: 14px;
     color: var(--color-text-muted);
 }
+
+/* ---- Ferma kartasi: bo'limlar alohida kartochkalarda ---- */
+.farm-card {
+    margin-bottom: 16px;
+    padding: 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent);
+}
+
+.farm-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.farm-card-name {
+    display: block;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 1.25;
+    color: var(--color-primary);
+}
+
+.farm-card-location {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+.farm-card-head .farm-item-type {
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+.farm-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.farm-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+a.farm-tile:hover {
+    background: var(--color-surface);
+    border-color: var(--color-primary);
+}
+
+.farm-tile-icon {
+    margin-bottom: 8px;
+    color: var(--color-primary);
+}
+
+.farm-tile-title {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.farm-tile-status {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.farm-tile-status--alert {
+    color: var(--color-error);
+    font-weight: 600;
+}
+
+.farm-tile--alert {
+    border-color: var(--color-error);
+}
+
+.farm-tile--alert .farm-tile-icon {
+    color: var(--color-error);
+}
+
+.farm-tile--locked {
+    background: transparent;
+    border-style: dashed;
+}
+
+.farm-tile--locked .farm-tile-icon,
+.farm-tile--locked .farm-tile-title {
+    color: var(--color-text-muted);
+}
+
+.farm-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+@media (min-width: 640px) {
+    .farm-tiles {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

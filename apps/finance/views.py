@@ -9,6 +9,8 @@ from rest_framework.response import Response
 
 from apps.animals.models import AnimalGroup
 from apps.farms.models import Farm
+from apps.users.digest import money
+from apps.users.notify import display_name, notify_users
 from apps.users.permissions import is_app_admin
 from .models import Transaction
 from .serializers import TransactionSerializer
@@ -56,11 +58,32 @@ class TransactionViewSet(viewsets.ModelViewSet):
         if not finance_farms(self.request.user).filter(pk=farm.pk).exists():
             raise PermissionDenied("Siz bu fermaning kirim-chiqimini o'zgartira olmaysiz.")
 
+    def _notify_owner(self, tx, action):
+        """Kirim-chiqimni ferma egasiga Telegramda bildiradi (egasining o'z amallari haqida xabar yuborilmaydi)."""
+        user = self.request.user
+        owner = tx.farm.owner
+        if user.id == owner.id:
+            return
+        icon = "💰" if tx.transaction_type == "kirim" else "💸"
+        lines = [
+            f"{icon} {tx.get_transaction_type_display()} {action} ({tx.farm.name})",
+            f"Summa: {money(tx.amount)} so'm",
+            f"Kategoriya: {tx.get_category_display()}",
+            f"Sana: {tx.date:%d.%m.%Y}",
+        ]
+        if tx.animal_count:
+            lines.append(f"Hayvon soni: {tx.animal_count} ta")
+        if tx.description:
+            lines.append(f"Izoh: {tx.description}")
+        lines.append(f"Kim: {display_name(user)}")
+        notify_users([owner], "\n".join(lines))
+
     def perform_create(self, serializer):
         self._ensure_can_write(serializer.validated_data["farm"])
         count = serializer.validated_data.get("animal_count")
         if not count:
-            serializer.save(recorded_by=self.request.user)
+            tx = serializer.save(recorded_by=self.request.user)
+            self._notify_owner(tx, "qo'shildi")
             return
 
         # Sotuv: sotilgan hayvonlar soni guruhdan avtomatik ayriladi
@@ -72,16 +95,19 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if group.count == 0:
                 group.status = "sotilgan"
             group.save(update_fields=["count", "status", "updated_at"])
-            serializer.save(recorded_by=self.request.user)
+            tx = serializer.save(recorded_by=self.request.user)
+            self._notify_owner(tx, "qo'shildi")
 
     def perform_update(self, serializer):
         self._ensure_can_write(serializer.instance.farm)
         if "farm" in serializer.validated_data:
             self._ensure_can_write(serializer.validated_data["farm"])
-        serializer.save()
+        tx = serializer.save()
+        self._notify_owner(tx, "o'zgartirildi")
 
     def perform_destroy(self, instance):
         self._ensure_can_write(instance.farm)
+        self._notify_owner(instance, "o'chirildi")  # o'chirishdan oldin: ma'lumotlar hali bor
         if not (instance.animal_count and instance.animal_group_id):
             instance.delete()
             return

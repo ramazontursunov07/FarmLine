@@ -14,6 +14,52 @@ const FARM_TYPES = {
     aralash: 'Aralash',
 };
 
+const ICONS = {
+    work: (
+        <path d="M5 4h11l3 3v13H5V4zm3 6h8M8 14h8M8 18h5" />
+    ),
+    tasks: (
+        <path d="M4 6l2 2 3-3M4 14l2 2 3-3M12 7h8M12 15h8" />
+    ),
+    stock: (
+        <path d="M3 8l9-4 9 4-9 4-9-4zm0 0v8l9 4 9-4V8M12 12v8" />
+    ),
+    money: (
+        <path d="M3 7h18v12H3V7zm0 4h18M16 15h2" />
+    ),
+    lock: (
+        <path d="M6 11h12v9H6v-9zm3 0V8a3 3 0 016 0v3" />
+    ),
+};
+
+function TileIcon({ name }) {
+    return (
+        <svg className="farm-tile-icon" viewBox="0 0 24 24" width="22" height="22" fill="none"
+            stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {ICONS[name]}
+        </svg>
+    );
+}
+
+// Ferma ichidagi bo'limga o'tish kartochkasi. to bo'lmasa, kartochka bosilmaydi (ruxsat yo'q).
+function FarmTile({ to, icon, title, status, alert }) {
+    const body = (
+        <>
+            <TileIcon name={icon} />
+            <span className="farm-tile-title">{title}</span>
+            <span className={`farm-tile-status${alert ? ' farm-tile-status--alert' : ''}`}>{status}</span>
+        </>
+    );
+    if (!to) {
+        return <div className="farm-tile farm-tile--locked" aria-disabled="true">{body}</div>;
+    }
+    return (
+        <Link className={`farm-tile${alert ? ' farm-tile--alert' : ''}`} to={to}>
+            {body}
+        </Link>
+    );
+}
+
 function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, onDeleted }) {
     const [editing, setEditing] = useState(false);
     const [showWorkers, setShowWorkers] = useState(false);
@@ -99,46 +145,63 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
         );
     }
 
+    const taskStatus = tasks.overdue > 0
+        ? `${tasks.overdue} ta muddati o'tgan`
+        : tasks.open > 0 ? `${tasks.open} ta ochiq` : "Ochiq vazifa yo'q";
+    const stockStatus = lowStock > 0 ? `${lowStock} ta kam qolgan` : 'Zaxira yetarli';
+
     return (
-        <li className="farm-item">
-            <div>
-                <span className="farm-item-name">{farm.name}</span>
+        <li className="farm-card">
+            <div className="farm-card-head">
+                <div>
+                    <span className="farm-card-name">{farm.name}</span>
+                    <span className="farm-card-location">{farm.location}</span>
+                </div>
                 <span className="farm-item-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
             </div>
-            <div className="farm-item-side">
-                <span className="farm-item-location">{farm.location}</span>
-                <Link className="farm-item-link" to={`/farms/${farm.id}/work`}>
-                    Ferma ishlari →
-                </Link>
-                <Link className="farm-item-link" to={`/farms/${farm.id}/tasks`}>
-                    Vazifalar{tasks.open > 0 ? ` (${tasks.open})` : ''} →
-                    {tasks.overdue > 0 && <span className="task-overdue"> · {tasks.overdue} ta muddati o'tgan</span>}
-                </Link>
-                <Link className="farm-item-link" to={`/farms/${farm.id}/inventory`}>
-                    Ombor →
-                    {lowStock > 0 && <span className="task-overdue"> · {lowStock} ta kam qolgan</span>}
-                </Link>
-                {showFinance ? (
-                    <Link className="farm-item-link" to={`/farms/${farm.id}/finance`}>
-                        Kirim-chiqim →
-                    </Link>
-                ) : (
-                    <span className="farm-item-note">Kirim-chiqimni ko'rishga ruxsat yo'q</span>
-                )}
-                {canManage && (
-                    <div className="farm-item-actions">
-                        <button type="button" className="farm-item-action" onClick={() => setShowWorkers((v) => !v)}>
-                            {showWorkers ? 'Ishchilarni yopish' : 'Ishchilar'}
-                        </button>
-                        <button type="button" className="farm-item-action" onClick={startEdit}>
-                            Tahrirlash
-                        </button>
-                        <button type="button" className="farm-item-action farm-item-action--danger" onClick={handleDelete}>
-                            O'chirish
-                        </button>
-                    </div>
-                )}
+
+            <div className="farm-tiles">
+                <FarmTile
+                    to={`/farms/${farm.id}/work`}
+                    icon="work"
+                    title="Ferma ishlari"
+                    status="Hayvonlar va davolash"
+                />
+                <FarmTile
+                    to={`/farms/${farm.id}/tasks`}
+                    icon="tasks"
+                    title="Vazifalar"
+                    status={taskStatus}
+                    alert={tasks.overdue > 0}
+                />
+                <FarmTile
+                    to={`/farms/${farm.id}/inventory`}
+                    icon="stock"
+                    title="Ombor"
+                    status={stockStatus}
+                    alert={lowStock > 0}
+                />
+                <FarmTile
+                    to={showFinance ? `/farms/${farm.id}/finance` : null}
+                    icon={showFinance ? 'money' : 'lock'}
+                    title="Kirim-chiqim"
+                    status={showFinance ? 'Hisob-kitob' : "Ko'rishga ruxsat yo'q"}
+                />
             </div>
+
+            {canManage && (
+                <div className="farm-card-actions">
+                    <button type="button" className="farm-item-action" onClick={() => setShowWorkers((v) => !v)}>
+                        {showWorkers ? 'Ishchilarni yopish' : 'Ishchilar'}
+                    </button>
+                    <button type="button" className="farm-item-action" onClick={startEdit}>
+                        Tahrirlash
+                    </button>
+                    <button type="button" className="farm-item-action farm-item-action--danger" onClick={handleDelete}>
+                        O'chirish
+                    </button>
+                </div>
+            )}
             {canManage && showWorkers && <WorkersPanel farmId={farm.id} />}
         </li>
     );
