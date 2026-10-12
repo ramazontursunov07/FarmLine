@@ -1193,3 +1193,23 @@ a.farm-tile:hover {
         width: 100%;
     }
 }
+
+/* "Ilovani o'rnatish" tugmasi */
+.btn-install {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-primary);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-install:hover {
+    background: var(--color-primary-light);
+}

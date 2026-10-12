@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import InstallButton from '../components/InstallButton';
 
 const PRIORITIES = { oddiy: 'Oddiy', muhim: 'Muhim', shoshilinch: 'Shoshilinch' };
 
@@ -188,6 +189,7 @@ function Tasks() {
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
                     <Link to="/profile" className="user-link">Profil</Link>
+                    <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>

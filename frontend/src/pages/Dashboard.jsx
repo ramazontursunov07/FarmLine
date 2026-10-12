@@ -8,6 +8,7 @@ import WorkersPanel from '../components/WorkersPanel';
 import FarmerOverview from '../components/FarmerOverview';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
+import InstallButton from '../components/InstallButton';
 
 const FARM_TYPES = {
     chorvachilik: 'Chorvachilik',
@@ -349,6 +350,7 @@ function Dashboard() {
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
                     <Link to="/profile" className="user-link">Profil</Link>
+                    <InstallButton />
                     <button className="btn-ghost" onClick={handleLogout}>Chiqish</button>
                 </div>
             </header>

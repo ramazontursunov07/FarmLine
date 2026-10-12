@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
+import InstallButton from '../components/InstallButton';
 
 const ITEM_TYPES = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
 const TX_TYPES = { sarf: 'Sarf (ishlatildi)', kirim: 'Kirim (olib kelindi)' };
@@ -186,6 +187,7 @@ function Inventory() {
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
                     <Link to="/profile" className="user-link">Profil</Link>
+                    <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>

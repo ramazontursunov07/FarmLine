@@ -21,7 +21,7 @@ def fmt(value):
     return format(value.normalize(), 'f')
 
 
-class InventoryItemViewSet(viewsets.ModelViewSet):
+class InventoryItemViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """
     Ombor mahsulotlari (ozuqa, dori...).
     Ko'rish: ferma egasi va ishchilar. Qo'shish/tahrirlash/o'chirish: faqat ferma egasi.

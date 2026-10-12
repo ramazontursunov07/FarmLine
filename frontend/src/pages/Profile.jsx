@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import InstallButton from '../components/InstallButton';
 
 const ROLES = { fermer: 'Fermer', ishchi: 'Ishchi', admin: 'Admin' };
 
@@ -76,6 +77,7 @@ function Profile() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>

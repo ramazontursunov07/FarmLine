@@ -11,11 +11,16 @@ import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import PrivateRoute from './components/PrivateRoute';
 import PublicRoute from './components/PublicRoute';
+import OfflineBanner from './components/OfflineBanner';
+import { useOfflineState } from './offline/state';
 import './App.css';
 
 function App() {
+    // Navbatdagi o'zgarishlar serverga yuborilgach, sahifalar yangi ma'lumotni qayta yuklashi uchun qayta ochiladi
+    const { syncVersion } = useOfflineState();
     return (
-        <Routes>
+        <>
+        <Routes key={syncVersion}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
@@ -78,6 +83,8 @@ function App() {
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <OfflineBanner />
+        </>
     );
 }
 

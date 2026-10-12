@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearOfflineCache, installOffline } from '../offline';
 
 // Odatda nisbiy yo'l: so'rovlar frontend manzilining o'ziga yuboriladi (Vite proxy yoki nginx Django'ga uzatadi).
 // Kerak bo'lsa, frontend/.env faylida VITE_API_URL=https://api.sizning-domen.uz/api/ deb o'zgartirish mumkin.
@@ -68,7 +69,14 @@ api.interceptors.response.use(
                 const status = refreshError.response?.status;
                 if (status === 400 || status === 401 || status === 403) {
                     localStorage.clear();
-                    window.location.href = '/login';
+                    clearOfflineCache().finally(() => {
+                        window.location.href = '/login';
+                    });
+                }
+                if (!refreshError.response) {
+                    // Token yangilash paytida internet uzildi: asl so'rov offline qatlamiga (kesh/navbat) o'tadi
+                    error.isRefreshNetworkError = true;
+                    return Promise.reject(error);
                 }
                 return Promise.reject(refreshError);
             }
@@ -77,5 +85,8 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+// Eng oxirida: offline qatlami yuqoridagi interceptorlardan keyin ishlashi kerak
+installOffline(api);
 
 export default api;

@@ -15,18 +15,20 @@ from .serializers import AnimalTypeSerializer, AnimalGroupSerializer, AnimalEven
 
 def is_farm_member(user, farm):
     """Ferma egasi yoki shu fermaga biriktirilgan ishchimi?"""
-    return farm.owner_id == user.id or Worker.objects.filter(farm=farm, user=user).exists() #fermer bo'lsa yokida shu fermada ishchi bo'lsa
+    return farm.owner_id == user.id or Worker.objects.filter(farm=farm,
+                                                             user=user).exists()  # fermer bo'lsa yokida shu fermada ishchi bo'lsa
 
 
-class AnimalTypeViewSet(viewsets.ModelViewSet):
+class AnimalTypeViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """Hayvon turlari umumiy. Ko'rish: hamma. Qo'shish: fermer/admin. O'zgartirish/o'chirish: admin."""
     queryset = AnimalType.objects.all().order_by('name')
     serializer_class = AnimalTypeSerializer
 
     def get_permissions(self):
-        if self.action in ('update', 'partial_update', 'destroy'): #bu yerda shu amallarni bajarish faqat admin uchun ruxsat beriladi.
+        if self.action in ('update', 'partial_update',
+                           'destroy'):  # bu yerda shu amallarni bajarish faqat admin uchun ruxsat beriladi.
             return [IsAppAdmin()]
-        return [IsAuthenticated()] #boshqa amallar authenticateddan o'tgan barcha.
+        return [IsAuthenticated()]  # boshqa amallar authenticateddan o'tgan barcha.
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -35,11 +37,12 @@ class AnimalTypeViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
-class AnimalGroupViewSet(viewsets.ModelViewSet):
+class AnimalGroupViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """Hayvon guruhlari. Ko'rish: ferma egasi va ishchilar. Qo'shish/o'zgartirish/o'chirish: faqat ferma egasi."""
     queryset = AnimalGroup.objects.all()
     serializer_class = AnimalGroupSerializer
-    permission_classes = [IsAuthenticated, IsFarmOwnerOrWorker] #Authenticateddan o'tgan,admin va ishchi bo'lsa ruxsat.
+    permission_classes = [IsAuthenticated,
+                          IsFarmOwnerOrWorker]  # Authenticateddan o'tgan,admin va ishchi bo'lsa ruxsat.
 
     def get_queryset(self):
         user = self.request.user

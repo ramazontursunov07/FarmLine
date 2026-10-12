@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from apps.animals.models import AnimalEvent, AnimalGroup
 from apps.animals.serializers import AnimalEventSerializer
+from apps.core.mixins import IdempotentCreateMixin
 from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem, InventoryTransaction
 from apps.inventory.serializers import InventoryItemSerializer
@@ -70,7 +71,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
             user.save(update_fields=['is_active'])
 
 
-class FarmViewSet(viewsets.ModelViewSet):
+class FarmViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     queryset = Farm.objects.all()
     serializer_class = FarmSerializer
     permission_classes = [IsAuthenticated]

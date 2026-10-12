@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
+import InstallButton from '../components/InstallButton';
 
 const EVENT_TYPES = {
     kasallik: 'Kasallik',
@@ -284,6 +285,7 @@ function FarmWork() {
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
                     <Link to="/profile" className="user-link">Profil</Link>
+                    <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>

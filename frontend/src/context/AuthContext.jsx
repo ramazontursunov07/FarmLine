@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react';
+import { clearOfflineCache } from '../offline';
 
 const AuthContext = createContext();
 
@@ -17,6 +18,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         localStorage.clear();
+        clearOfflineCache(); // telefondagi ma'lumot nusxasi o'chadi; yuborilmagan o'zgarishlar saqlanib qoladi
         setUser(null);
     };
 
