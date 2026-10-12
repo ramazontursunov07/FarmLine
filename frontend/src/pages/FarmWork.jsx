@@ -14,6 +14,12 @@ const EVENT_TYPES = {
     vazn_olchash: "Vazn o'lchash",
 };
 
+// Guruhdagi hayvonlar sonini o'zgartiradigan ish turlari: nechta ekani majburiy
+const COUNT_HINTS = {
+    olim: "Guruhdagi hayvonlar soni shuncha kamayadi.",
+    tugilish: "Guruhdagi hayvonlar soni shuncha ko'payadi.",
+};
+
 const EVENT_STATUSES = {
     boshlangan: 'Boshlangan',
     davom_etmoqda: 'Davom etmoqda',
@@ -32,6 +38,7 @@ const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 const makeEventForm = () => ({
     animal_group: '',
     event_type: 'davolash',
+    animal_count: '',
     title: '',
     description: '',
     start_date: today(),
@@ -135,7 +142,11 @@ function FarmWork() {
         setSavingEvent(true);
         setEventError('');
         try {
-            await api.post('animals-event/', { ...eventForm, animal_group: Number(selectedGroup) });
+            await api.post('animals-event/', {
+                ...eventForm,
+                animal_group: Number(selectedGroup),
+                animal_count: eventForm.animal_count ? Number(eventForm.animal_count) : null,
+            });
             setEventForm(makeEventForm());
             reload();
         } catch (err) {
@@ -155,7 +166,10 @@ function FarmWork() {
     };
 
     const handleDeleteEvent = async (ev) => {
-        if (!window.confirm(`"${ev.title}" yozuvini o'chirasizmi?`)) return;
+        const undo = ev.animal_count && COUNT_HINTS[ev.event_type]
+            ? `\n\nGuruhdagi hayvonlar soni ham ${ev.event_type === 'olim' ? 'qaytib ko\'payadi' : 'kamayadi'} (${ev.animal_count} ta).`
+            : '';
+        if (!window.confirm(`"${ev.title}" yozuvini o'chirasizmi?${undo}`)) return;
         try {
             await api.delete(`animals-event/${ev.id}/`);
             reload();
@@ -231,7 +245,9 @@ function FarmWork() {
             <div className="work-main">
                 <span className="work-title">
                     {ev.title}
-                    <span className="work-badge">{ev.event_type_display}</span>
+                    <span className="work-badge">
+                        {ev.event_type_display}{ev.animal_count ? `: ${ev.animal_count} ta` : ''}
+                    </span>
                 </span>
                 <span className="work-meta">
                     {ev.animal_group_label} · {ev.animal_group_count} ta · {formatDate(ev.start_date)}
@@ -327,6 +343,17 @@ function FarmWork() {
                                         </div>
                                     </div>
                                     <div className="form-field">
+                                        <label>
+                                            {COUNT_HINTS[eventForm.event_type] ? 'Nechta hayvon' : 'Nechta hayvon (ixtiyoriy)'}
+                                        </label>
+                                        <input type="number" name="animal_count" min="1" step="1"
+                                            value={eventForm.animal_count} onChange={handleEventChange}
+                                            required={Boolean(COUNT_HINTS[eventForm.event_type])} />
+                                        {COUNT_HINTS[eventForm.event_type] && (
+                                            <p className="workers-hint">{COUNT_HINTS[eventForm.event_type]}</p>
+                                        )}
+                                    </div>
+                                    <div className="form-field">
                                         <label>Sarlavha</label>
                                         <input type="text" name="title" value={eventForm.title} onChange={handleEventChange}
                                             placeholder="Masalan: 10 ta tovuq antibiotik bilan davolanyapti" required />
@@ -340,14 +367,16 @@ function FarmWork() {
                                             <label>Boshlangan sana</label>
                                             <input type="date" name="start_date" value={eventForm.start_date} onChange={handleEventChange} required />
                                         </div>
-                                        <div className="form-field">
-                                            <label>Holati</label>
-                                            <select name="status" value={eventForm.status} onChange={handleEventChange}>
-                                                {Object.entries(EVENT_STATUSES).map(([v, l]) => (
-                                                    <option key={v} value={v}>{l}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        {!COUNT_HINTS[eventForm.event_type] && (
+                                            <div className="form-field">
+                                                <label>Holati</label>
+                                                <select name="status" value={eventForm.status} onChange={handleEventChange}>
+                                                    {Object.entries(EVENT_STATUSES).map(([v, l]) => (
+                                                        <option key={v} value={v}>{l}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                     {eventError && <p className="error-text" role="alert">{eventError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingEvent}>

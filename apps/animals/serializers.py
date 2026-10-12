@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import AnimalType, AnimalGroup, AnimalEvent
+from .models import COUNT_EVENT_TYPES, AnimalType, AnimalGroup, AnimalEvent
 
 
 class AnimalTypeSerializer(serializers.ModelSerializer):
@@ -38,7 +38,7 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnimalEvent
         fields = ['id', 'farm', 'animal_group', 'animal_group_label', 'animal_group_count',
-                  'event_type', 'event_type_display', 'title', 'description',
+                  'event_type', 'event_type_display', 'animal_count', 'title', 'description',
                   'status', 'status_display', 'start_date', 'end_date',
                   'recorded_by', 'recorded_by_username', 'recorded_by_name',
                   'days_since_start', 'created_at', 'updated_at']
@@ -54,10 +54,30 @@ class AnimalEventSerializer(serializers.ModelSerializer):
         group = obj.animal_group
         return f"{group.animal_type.name} ({group.breed})" if group.breed else group.animal_type.name
 
+    def validate_animal_count(self, value):
+        if value is not None and value < 1:
+            raise serializers.ValidationError("Hayvonlar soni kamida 1 bo'lishi kerak")
+        return value
+
     def validate(self, attrs):
         start = attrs.get('start_date', getattr(self.instance, 'start_date', None))
         end = attrs.get('end_date', getattr(self.instance, 'end_date', None))
         status = attrs.get('status', getattr(self.instance, 'status', None))
+
+        if self.instance is None:
+            event_type = attrs.get('event_type')
+            count = attrs.get('animal_count')
+            group = attrs.get('animal_group')
+            if event_type in COUNT_EVENT_TYPES:
+                if not count:
+                    raise serializers.ValidationError({'animal_count': "Nechta hayvon ekanini kiriting"})
+                # O'lim va tug'ilish bir lahzalik hodisa: darhol yakunlangan hisoblanadi
+                attrs['status'] = status = 'yakunlangan'
+                attrs.setdefault('end_date', start)
+                end = attrs['end_date']
+            if count and event_type != 'tugilish' and group and count > group.count:
+                raise serializers.ValidationError(
+                    {'animal_count': f"Guruhda faqat {group.count} ta hayvon bor"})
 
         # Yakunlangan ishga tugash sanasi avtomatik qo'yiladi
         if status == 'yakunlangan' and not end:

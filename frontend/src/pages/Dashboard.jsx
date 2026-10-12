@@ -6,6 +6,7 @@ import FarmForm from '../components/FarmForm';
 import AdminPanel from '../components/AdminPanel';
 import WorkersPanel from '../components/WorkersPanel';
 import FarmerOverview from '../components/FarmerOverview';
+import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 
 const FARM_TYPES = {
@@ -353,6 +354,8 @@ function Dashboard() {
             </header>
 
             <main className="app-main">
+                <TelegramBanner />
+
                 {user.role === 'admin' && (
                     <div className="panel">
                         <h2 className="panel-title">Admin Panel</h2>

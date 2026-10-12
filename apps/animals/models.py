@@ -49,6 +49,10 @@ class AnimalGroup(models.Model):
         return f"{self.animal_type} - {self.count} ta ({self.farm.name})"
 
 
+# Guruhdagi hayvonlar sonini o'zgartiradigan ish turlari (nechta ekani majburiy)
+COUNT_EVENT_TYPES = ('olim', 'tugilish')
+
+
 class AnimalEvent(models.Model):  #ishlar
     EVENT_TYPE_CHOICES = (
         ('kasallik', 'Kasallik'),
@@ -76,6 +80,8 @@ class AnimalEvent(models.Model):  #ishlar
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='boshlangan')
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
+    # Nechta hayvonga tegishli. O'lim/tug'ilishda majburiy va guruh sonini o'zgartiradi
+    animal_count = models.PositiveIntegerField(null=True, blank=True)
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

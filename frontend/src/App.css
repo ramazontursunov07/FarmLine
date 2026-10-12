@@ -1109,3 +1109,87 @@ a.farm-tile:hover {
         grid-template-columns: repeat(4, 1fr);
     }
 }
+
+/* ---- Telegramni ulash banneri ---- */
+.tg-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.tg-banner-icon {
+    flex-shrink: 0;
+}
+
+.tg-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.tg-banner-text strong {
+    font-size: 16px;
+}
+
+.tg-banner-text a {
+    color: #fff;
+    font-weight: 600;
+}
+
+.tg-banner-error {
+    margin-top: 4px;
+    font-weight: 600;
+    color: #FFD7CF;
+}
+
+.tg-banner-button {
+    flex-shrink: 0;
+    padding: 10px 18px;
+    border: 0;
+    background: #fff;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tg-banner-button:hover:not(:disabled) {
+    background: var(--color-bg);
+}
+
+.tg-banner-button:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.tg-banner--done {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    font-size: 14px;
+}
+
+@media (max-width: 639px) {
+    .tg-banner {
+        flex-wrap: wrap;
+    }
+
+    .tg-banner-text {
+        flex-basis: calc(100% - 44px);
+    }
+
+    .tg-banner-button {
+        width: 100%;
+    }
+}

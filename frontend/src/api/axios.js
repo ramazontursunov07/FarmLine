@@ -4,8 +4,12 @@ import axios from 'axios';
 // Kerak bo'lsa, frontend/.env faylida VITE_API_URL=https://api.sizning-domen.uz/api/ deb o'zgartirish mumkin.
 const API_URL = import.meta.env.VITE_API_URL || '/api/';
 
+// Qishloqda tarmoq sust bo'lishi mumkin: javob kelmasa, so'rov abadiy osilib qolmasin
+const TIMEOUT_MS = 20000;
+
 const api = axios.create({
     baseURL: API_URL,
+    timeout: TIMEOUT_MS,
 });
 
 api.interceptors.request.use(
@@ -21,30 +25,51 @@ api.interceptors.request.use(
     }
 );
 
+// Bir vaqtda ko'p so'rov 401 olsa (masalan, internet qaytganda), token faqat BIR marta yangilanadi
+let refreshPromise = null;
+
+function refreshAccessToken() {
+    if (!refreshPromise) {
+        refreshPromise = axios
+            .post(
+                `${API_URL}users/token/refresh/`,
+                { refresh: localStorage.getItem('refresh') },
+                { timeout: TIMEOUT_MS }
+            )
+            .then(({ data }) => {
+                localStorage.setItem('access', data.access);
+                // Server har safar yangi refresh token beradi: sessiya foydalanish davomida uzayib boradi
+                if (data.refresh) localStorage.setItem('refresh', data.refresh);
+                return data.access;
+            })
+            .finally(() => {
+                refreshPromise = null;
+            });
+    }
+    return refreshPromise;
+}
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Yangilanadigan token bo'lmasa (masalan, login paytida noto'g'ri parol), 401 ni o'zidek qaytaramiz
+        if (error.response?.status === 401 && !originalRequest._retry && localStorage.getItem('refresh')) {
             originalRequest._retry = true;
 
             try {
-                const refreshToken = localStorage.getItem('refresh');
-
-                const response = await axios.post(
-                    `${API_URL}users/token/refresh/`,
-                    { refresh: refreshToken }
-                );
-
-                const newAccessToken = response.data.access;
-                localStorage.setItem('access', newAccessToken);
-
+                const newAccessToken = await refreshAccessToken();
                 originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                 return api(originalRequest);
             } catch (refreshError) {
-                localStorage.clear();
-                window.location.href = '/login';
+                // Faqat server "sessiya yaroqsiz" desa chiqaramiz. Internet yo'qligi yoki server xatosi
+                // sessiya tugaganini bildirmaydi: foydalanuvchi tizimda qoladi, so'rov oddiy xato bilan tugaydi.
+                const status = refreshError.response?.status;
+                if (status === 400 || status === 401 || status === 403) {
+                    localStorage.clear();
+                    window.location.href = '/login';
+                }
                 return Promise.reject(refreshError);
             }
         }

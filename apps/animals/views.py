@@ -1,11 +1,14 @@
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
+from apps.core.mixins import IdempotentCreateMixin
 from apps.farms.models import Worker
+from apps.users.notify import display_name, notify_users
 from apps.users.permissions import IsAppAdmin, is_app_admin
-from .models import AnimalGroup, AnimalEvent, AnimalType
+from .models import COUNT_EVENT_TYPES, AnimalGroup, AnimalEvent, AnimalType
 from .permissions import IsFarmOwnerOrWorker
 from .serializers import AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer
 
@@ -67,7 +70,7 @@ class AnimalGroupViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-class AnimalEventViewSet(viewsets.ModelViewSet):
+class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """
     Ferma ishlari (kasallik, davolash, vaksinatsiya...). Ferma egasi ham, ishchi ham yoza oladi.
     Filtrlar: ?farm= ?animal_group= ?event_type= ?status= ?active=1 (yakunlanmaganlar)
@@ -105,14 +108,51 @@ class AnimalEventViewSet(viewsets.ModelViewSet):
         raise PermissionDenied("Bu yozuvni faqat ferma egasi yoki uni yozgan ishchi o'zgartira oladi.")
 
     def perform_create(self, serializer):
+        user = self.request.user
         group = serializer.validated_data['animal_group']
-        if not is_farm_member(self.request.user, group.farm):
+        if not is_farm_member(user, group.farm):
             raise PermissionDenied("Siz bu fermaga yozuv qo'sha olmaysiz.")
-        serializer.save(recorded_by=self.request.user)
+
+        event_type = serializer.validated_data['event_type']
+        if event_type not in COUNT_EVENT_TYPES:
+            serializer.save(recorded_by=user)
+            return
+
+        # O'lim/tug'ilish: guruh soni avtomatik yangilanadi (sotuvdagi kabi, qulflab)
+        count = serializer.validated_data['animal_count']
+        with transaction.atomic():
+            locked = AnimalGroup.objects.select_for_update().get(pk=group.pk)
+            if event_type == 'olim':
+                if count > locked.count:
+                    raise ValidationError({'animal_count': f"Guruhda faqat {locked.count} ta hayvon bor"})
+                locked.count -= count
+                if locked.count == 0:
+                    locked.status = 'olgan'
+            else:
+                if locked.status != 'faol':
+                    raise ValidationError({'animal_group': "Faol bo'lmagan guruhga tug'ilish yozib bo'lmaydi"})
+                locked.count += count
+            locked.save(update_fields=['count', 'status', 'updated_at'])
+            serializer.save(recorded_by=user)
+
+            if event_type == 'olim' and user.id != group.farm.owner_id:
+                notify_users([group.farm.owner], (
+                    f"⚠️ O'lim yozildi ({group.farm.name}):\n"
+                    f"{group.animal_type.name}: {count} ta\n"
+                    f"Guruhda qoldi: {locked.count} ta\n"
+                    f"Kim: {display_name(user)}"
+                ))
 
     def perform_update(self, serializer):
         event = serializer.instance
         self._ensure_can_modify(event)
+        data = serializer.validated_data
+        if event.event_type in COUNT_EVENT_TYPES or data.get('event_type') in COUNT_EVENT_TYPES:
+            for field in ('event_type', 'animal_group', 'animal_count'):
+                if field in data and data[field] != getattr(event, field):
+                    raise ValidationError(
+                        "O'lim va tug'ilish yozuvining turi, guruhi va sonini o'zgartirib bo'lmaydi. "
+                        "Uni o'chirib, qaytadan kiriting.")
         new_group = serializer.validated_data.get('animal_group')
         if new_group and new_group.farm_id != event.animal_group.farm_id:
             raise PermissionDenied("Yozuvni boshqa fermaga ko'chirib bo'lmaydi.")
@@ -120,4 +160,21 @@ class AnimalEventViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_can_modify(instance)
-        instance.delete()
+        # Eski yozuvlarda (animal_count yo'q) guruh soniga ta'sir bo'lmagan, shuning uchun qaytariladigan narsa ham yo'q
+        if instance.event_type not in COUNT_EVENT_TYPES or not instance.animal_count:
+            instance.delete()
+            return
+
+        with transaction.atomic():
+            locked = AnimalGroup.objects.select_for_update().get(pk=instance.animal_group_id)
+            if instance.event_type == 'olim':
+                locked.count += instance.animal_count  # o'lgan hayvonlar guruhga qaytadi
+            else:
+                if instance.animal_count > locked.count:
+                    raise ValidationError(
+                        "Bu tug'ilishni o'chirib bo'lmaydi: undan keyin hayvonlar kamaygan, soni yetmay qoladi.")
+                locked.count -= instance.animal_count
+            if locked.count > 0 and locked.status in ('olgan', 'sotilgan'):
+                locked.status = 'faol'
+            locked.save(update_fields=['count', 'status', 'updated_at'])
+            instance.delete()

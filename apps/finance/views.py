@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from apps.animals.models import AnimalGroup
 from apps.farms.models import Farm
+from apps.core.mixins import IdempotentCreateMixin
 from apps.users.digest import money
 from apps.users.notify import display_name, notify_users
 from apps.users.permissions import is_app_admin
@@ -24,7 +25,7 @@ def finance_farms(user):
     ).distinct()
 
 
-class TransactionViewSet(viewsets.ModelViewSet):
+class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]

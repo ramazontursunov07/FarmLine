@@ -4,6 +4,7 @@ from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
+from apps.core.mixins import IdempotentCreateMixin
 from apps.farms.models import Worker
 from apps.users.notify import display_name, notify_users
 from .models import InventoryItem, InventoryTransaction
@@ -61,7 +62,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-class InventoryTransactionViewSet(viewsets.ModelViewSet):
+class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """
     Ombor harakatlari (kirim/sarf). Ferma egasi ham, ishchi ham yozadi; zaxira avtomatik yangilanadi.
     Yozuvni tahrirlab bo'lmaydi (xato bo'lsa, ferma egasi o'chirib, qaytadan kiritadi).

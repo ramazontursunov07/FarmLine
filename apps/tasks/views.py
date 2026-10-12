@@ -4,6 +4,7 @@ from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
+from apps.core.mixins import IdempotentCreateMixin
 from apps.users.models import User
 from apps.users.notify import display_name, notify_users
 
@@ -14,7 +15,7 @@ from .serializers import TaskSerializer
 WORKER_EDITABLE = {'status', 'result_note'}
 
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     """
     Vazifalar.
     - Ferma egasi: o'z fermalaridagi hamma vazifani ko'radi, qo'shadi, tahrirlaydi, o'chiradi.

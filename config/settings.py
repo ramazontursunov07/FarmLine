@@ -1,5 +1,7 @@
 import os
+from datetime import timedelta
 from pathlib import Path
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 load_dotenv(override=True)  # .env qiymatlari tizim/IDE muhit o'zgaruvchilaridan ustun bo'lsin
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
 
+    'apps.core',
     'apps.animals',
     'apps.farms',
     'apps.finance',
@@ -138,6 +141,16 @@ REST_FRAMEWORK = {
         'telegram_link': '10/hour',
     },
 }
+
+# Qishloqda internet kunlab uzilishi mumkin: sessiya uzoq saqlanadi va har yangilanganda yana uzayadi
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_DAYS', '60'))),
+    'ROTATE_REFRESH_TOKENS': True,
+}
+
+# Takroriy yuborishdan himoya sarlavhasi (offline navbatdan keladi); aks holda brauzer uni to'sib qo'yadi
+CORS_ALLOW_HEADERS = (*default_headers, 'idempotency-key')
 
 CORS_ALLOWED_ORIGINS = env_list(
     'CORS_ALLOWED_ORIGINS',
