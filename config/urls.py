@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import FileResponse, HttpResponseNotFound
 from django.urls import path, include, re_path
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
@@ -30,6 +31,17 @@ schema_view = get_schema_view(
     generator_class=JWTSchemaGenerator
 )
 
+
+def spa_index(request, *args, **kwargs):
+    """React ilovasining kirish sahifasi: /dashboard kabi manzillarni brauzerdagi React o'zi boshqaradi."""
+    index = settings.BASE_DIR / 'frontend' / 'dist' / 'index.html'
+    if not index.is_file():
+        return HttpResponseNotFound('Frontend yig\'ilmagan: frontend papkasida "npm run build" ni ishga tushiring.')
+    response = FileResponse(open(index, 'rb'), content_type='text/html; charset=utf-8')
+    response['Cache-Control'] = 'no-cache'  # yangi versiya chiqqanda eski sahifa ko'rinib qolmasin
+    return response
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('apps.users.urls')),
@@ -48,3 +60,8 @@ if settings.DEBUG:
         path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Boshqa hamma manzil React ilovasiga (API, admin va static bundan mustasno). Eng oxirida turishi kerak.
+urlpatterns += [
+    re_path(r'^(?!api/|admin/|static/|media/|swagger|redoc).*$', spa_index),
+]
