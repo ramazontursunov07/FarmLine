@@ -168,6 +168,7 @@ REST_FRAMEWORK = {
         'forgot_password': '5/hour',
         'reset_password': '10/hour',
         'telegram_link': '10/hour',
+        'export': '60/hour',
         'assistant': '60/hour',
     },
 }

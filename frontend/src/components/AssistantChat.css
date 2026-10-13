@@ -213,3 +213,105 @@
         padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 }
+
+/* AI taklif qilgan amalni tasdiqlash kartasi */
+.ai-action {
+    align-self: stretch;
+    padding: 12px 14px;
+    background: var(--color-surface);
+    border: 2px solid var(--color-accent);
+    border-radius: 12px;
+}
+
+.ai-action-item + .ai-action-item {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--color-border);
+}
+
+.ai-action-item strong {
+    font-size: 15px;
+}
+
+.ai-action-item ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ai-action-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ai-confirm,
+.ai-cancel {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.ai-confirm {
+    border: none;
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.ai-cancel {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: inherit;
+}
+
+.ai-confirm:disabled,
+.ai-cancel:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Ovoz bilan yozish */
+.ai-mic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-primary);
+}
+
+.ai-mic:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.ai-mic--on {
+    border-color: var(--color-error);
+    background: var(--color-error);
+    color: #fff;
+    animation: ai-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes ai-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.ai-voice-error {
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--color-error);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+}

@@ -29,15 +29,18 @@ class AIError(Exception):
         self.code = code
 
 
-def build_system(context=''):
-    if not context:
-        return SYSTEM
-    return (
-        SYSTEM
-        + "\n\nFoydalanuvchining hozirgi ferma holati (faqat shu ma'lumotga tayan, "
-        + "raqamlarni o'ylab topma; ma'lumot yetmasa, shuni ayt):\n"
-        + context
-    )
+def build_system(context='', extra=''):
+    """extra -- qo'shimcha ko'rsatma (masalan, AI harakatlari qoidalari): ferma holatidan keyin qo'shiladi."""
+    system = SYSTEM
+    if context:
+        system += (
+            "\n\nFoydalanuvchining hozirgi ferma holati (faqat shu ma'lumotga tayan, "
+            "raqamlarni o'ylab topma; ma'lumot yetmasa, shuni ayt):\n"
+            + context
+        )
+    if extra:
+        system += "\n\n" + extra
+    return system
 
 
 def _model(provider):
@@ -91,9 +94,9 @@ def _chat_openai(messages, system):
 PROVIDERS = {'gemini': _chat_gemini, 'openai': _chat_openai}
 
 
-def chat(messages, context=''):
+def chat(messages, context='', extra_system=''):
     provider = (getattr(settings, 'AI_PROVIDER', None) or 'gemini').lower()
     if provider not in PROVIDERS:
         raise AIError(f"Noma'lum AI_PROVIDER: {provider}")
-    answer = PROVIDERS[provider](messages, build_system(context))
+    answer = PROVIDERS[provider](messages, build_system(context, extra_system))
     return answer.strip() or EMPTY_ANSWER

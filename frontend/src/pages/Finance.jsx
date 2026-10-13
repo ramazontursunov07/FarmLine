@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../utils/errors";
 import { formatMoney, formatPeriod, today } from "../utils/format";
 import InstallButton from '../components/InstallButton';
+import ReportDownload from '../components/ReportDownload';
 
 const TYPES = { kirim: "Kirim", chiqim: "Chiqim" };
 
@@ -278,6 +279,9 @@ function Finance() {
                                 </table>
                             </div>
                         )}
+
+                        {/* Oylik hisobotni Excel/PDF qilib yuklab olish */}
+                        <ReportDownload farmId={farmId} />
 
                         {/* Yangi yozuv */}
                         <form className="farm-form" onSubmit={handleSubmit}>

@@ -1,12 +1,17 @@
+import re
+
 from django.db import transaction as db_transaction
+from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncWeek, TruncYear
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.animals.models import AnimalGroup
 from apps.farms.models import Farm
@@ -14,6 +19,7 @@ from apps.core.mixins import IdempotentCreateMixin
 from apps.users.digest import money
 from apps.users.notify import display_name, notify_users
 from apps.users.permissions import is_app_admin
+from . import report as report_builder
 from .models import Transaction
 from .serializers import TransactionSerializer
 
@@ -61,6 +67,13 @@ class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     raise ValidationError({key: "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak."})
                 queryset = queryset.filter(**{lookup: value})
         return queryset
+
+    def get_throttles(self):
+        # Hisobot fayli og'ir (PDF/Excel yasaydi): faqat shu amalga soatiga cheklov
+        if self.action == "export":
+            self.throttle_scope = "export"
+            return [ScopedRateThrottle()]
+        return super().get_throttles()
 
     # --- yozish huquqi: faqat ferma egasi yoki moliya huquqi bor ishchi (admin faqat ko'radi) ---
     def _ensure_can_write(self, farm):
@@ -175,3 +188,39 @@ class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             }
             for r in rows
         ])
+
+    @action(detail=False, methods=["get"])
+    def export(self, request):
+        """Oylik hisobotni fayl qilib beradi: ?farm=1&month=2026-10&file=xlsx|pdf
+        (month bo'lmasa -- shu oy). Kirim-chiqim huquqi bor foydalanuvchi yoki admin ko'ra oladi."""
+        p = request.query_params
+        if not (p.get("farm") or "").isdigit():
+            raise ValidationError({"farm": "Ferma raqami kerak."})
+
+        user = request.user
+        farms = Farm.objects.all() if is_app_admin(user) else finance_farms(user)
+        farm = farms.filter(pk=p["farm"]).first()
+        if farm is None:
+            raise NotFound("Ferma topilmadi.")
+
+        file_type = (p.get("file") or "xlsx").lower()
+        if file_type not in ("xlsx", "pdf"):
+            raise ValidationError({"file": "file: xlsx yoki pdf bo'lishi kerak."})
+
+        month_value = p.get("month") or timezone.localdate().strftime("%Y-%m")
+        match = re.fullmatch(r"(\d{4})-(\d{2})", month_value)
+        if not match or not (1 <= int(match.group(2)) <= 12) or not (2000 <= int(match.group(1)) <= 2100):
+            raise ValidationError({"month": "Oy YYYY-MM ko'rinishida bo'lishi kerak (masalan, 2026-10)."})
+        year, month = int(match.group(1)), int(match.group(2))
+
+        data = report_builder.collect(farm, year, month, generated_by=user)
+        if file_type == "pdf":
+            content, content_type = report_builder.build_pdf(data), "application/pdf"
+        else:
+            content = report_builder.build_xlsx(data)
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        response = HttpResponse(content, content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="farmline-{farm.pk}-{month_value}.{file_type}"'
+        response["Cache-Control"] = "no-store"
+        return response

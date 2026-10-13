@@ -108,6 +108,7 @@ function cachePut(response) {
     const user = currentUser();
     const { config } = response;
     if (!user || !config) return;
+    if (config.responseType === 'blob') return; // yuklab olingan fayllar (Excel/PDF) keshga saqlanmaydi
     const { path } = parseUrl(config.url, config.baseURL);
     idbPut('cache', {
         key: `${user.id}|${api.getUri(config)}`,

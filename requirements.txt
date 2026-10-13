@@ -12,3 +12,5 @@ dj-database-url>=2.3
 psycopg[binary]>=3.2
 setuptools<81
 google-genai
+openpyxl>=3.1
+reportlab>=4.2

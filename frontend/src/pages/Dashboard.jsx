@@ -235,6 +235,7 @@ function Dashboard() {
     const [farms, setFarms] = useState([]);
     const [taskCounts, setTaskCounts] = useState({});
     const [lowStockCounts, setLowStockCounts] = useState({});
+    const [dataVersion, setDataVersion] = useState(0); // AI amal bajargach oshadi: raqamlar qayta yuklanadi
     const isAdmin = user.role === 'admin';
     const [loading, setLoading] = useState(!isAdmin);
     const [error, setError] = useState('');
@@ -277,7 +278,7 @@ function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [isAdmin]);
+    }, [isAdmin, dataVersion]);
 
     // Zaxirasi kam qolgan mahsulotlar soni (har bir ferma uchun)
     useEffect(() => {
@@ -297,7 +298,7 @@ function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [isAdmin]);
+    }, [isAdmin, dataVersion]);
 
     const handleRetry = () => {
         setLoading(true);
@@ -367,7 +368,7 @@ function Dashboard() {
                     </div>
                 )}
 
-                {user.role === 'fermer' && <FarmerOverview refreshKey={farms.length} />}
+                {user.role === 'fermer' && <FarmerOverview refreshKey={`${farms.length}-${dataVersion}`} />}
 
                 {user.role === 'fermer' && (
                     <div className="panel">
@@ -385,7 +386,7 @@ function Dashboard() {
                     </div>
                 )}
             </main>
-            <AssistantChat />
+            <AssistantChat onActionDone={() => setDataVersion((v) => v + 1)} />
         </div>
     );
 }
