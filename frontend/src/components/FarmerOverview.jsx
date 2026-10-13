@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney } from '../utils/format';
+import FinanceCharts from './FinanceCharts';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 
@@ -91,6 +92,8 @@ function FarmerOverview({ refreshKey }) {
                     <span className="stat-sub">O'tgan oy: {prevProfit > 0 ? '+' : ''}{formatMoney(prevProfit)}</span>
                 </div>
             </div>
+
+            <FinanceCharts farmId={farmId} refreshKey={refreshKey} />
 
             <div className="overview-grid">
                 <section className="overview-box">

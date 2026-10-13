@@ -996,6 +996,127 @@
     color: var(--color-text-muted);
 }
 
+/* ---- Tahlil grafiklari ---- */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.chart-axis {
+    stroke: var(--color-border);
+    stroke-width: 1;
+}
+
+.chart-bar--profit { fill: var(--color-primary-light); }
+.chart-bar--loss { fill: var(--color-error); }
+
+.chart-value {
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--color-text);
+}
+
+.chart-label {
+    font-size: 11px;
+    fill: var(--color-text-muted);
+}
+
+.chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.chart-key {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.chart-key--profit { background: var(--color-primary-light); }
+.chart-key--loss { background: var(--color-error); margin-left: 10px; }
+
+.donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.donut-svg {
+    width: 170px;
+    height: 170px;
+    flex-shrink: 0;
+}
+
+.donut-track {
+    fill: none;
+    stroke: var(--color-border);
+    stroke-width: 6;
+}
+
+.donut-total-label {
+    font-size: 3px;
+    fill: var(--color-text-muted);
+}
+
+.donut-total {
+    font-size: 4.2px;
+    font-weight: 700;
+    fill: var(--color-text);
+}
+
+.donut-legend {
+    flex: 1;
+    min-width: 180px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 13px;
+}
+
+.donut-legend li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.donut-legend li:last-child { border-bottom: none; }
+
+.donut-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.donut-name { flex: 1; }
+
+.donut-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.donut-amount em {
+    margin-left: 4px;
+    font-style: normal;
+    color: var(--color-text-muted);
+}
+
 /* ---- Ferma kartasi: bo'limlar alohida kartochkalarda ---- */
 .farm-card {
     margin-bottom: 16px;

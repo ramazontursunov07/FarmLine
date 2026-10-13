@@ -9,6 +9,8 @@ from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem
 from apps.tasks.models import Task
 
+from .alerts import build_alert_lines
+
 MAX_ITEMS = 5  # har bir ro'yxatdan ko'pi bilan nechta qator ko'rsatiladi
 
 
@@ -57,6 +59,8 @@ def build_farm_section(farm, today):
     overdue = Task.objects.filter(farm=farm, due_date__lt=today).exclude(status='bajarildi').count()
     if overdue:
         lines.append(f"⏰ Muddati o'tgan vazifalar: {overdue} ta")
+
+    lines += build_alert_lines(farm, today)  # aqlli ogohlantirishlar (apps/users/alerts.py)
 
     return "\n".join(lines)
 
