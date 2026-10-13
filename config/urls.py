@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/', include('apps.animals.urls')),
     path('api/', include('apps.tasks.urls')),
     path('api/', include('apps.inventory.urls')),
+    path('api/', include('apps.assistant.urls')),
 ]
 
 # Swagger/Redoc faqat ishlab chiqish (DEBUG) rejimida ochiq bo'ladi

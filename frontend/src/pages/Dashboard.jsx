@@ -9,6 +9,7 @@ import FarmerOverview from '../components/FarmerOverview';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import AssistantChat from '../components/AssistantChat';
 
 const FARM_TYPES = {
     chorvachilik: 'Chorvachilik',
@@ -384,6 +385,7 @@ function Dashboard() {
                     </div>
                 )}
             </main>
+            <AssistantChat />
         </div>
     );
 }

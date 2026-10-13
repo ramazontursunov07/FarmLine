@@ -1,4 +1,5 @@
 from django.db import transaction as db_transaction
+from django.utils.dateparse import parse_date
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth, TruncWeek, TruncYear
 from rest_framework import viewsets
@@ -43,15 +44,22 @@ class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         """?farm=1&transaction_type=kirim&category=ozuqa&date_from=2026-01-01&date_to=2026-12-31"""
         p = self.request.query_params
         if p.get("farm"):
+            if not p["farm"].isdigit():
+                raise ValidationError({"farm": "Ferma raqami noto'g'ri."})
             queryset = queryset.filter(farm_id=p["farm"])
         if p.get("transaction_type"):
             queryset = queryset.filter(transaction_type=p["transaction_type"])
         if p.get("category"):
             queryset = queryset.filter(category=p["category"])
-        if p.get("date_from"):
-            queryset = queryset.filter(date__gte=p["date_from"])
-        if p.get("date_to"):
-            queryset = queryset.filter(date__lte=p["date_to"])
+        for key, lookup in (("date_from", "date__gte"), ("date_to", "date__lte")):
+            if p.get(key):
+                try:
+                    value = parse_date(p[key])
+                except ValueError:
+                    value = None
+                if value is None:
+                    raise ValidationError({key: "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak."})
+                queryset = queryset.filter(**{lookup: value})
         return queryset
 
     # --- yozish huquqi: faqat ferma egasi yoki moliya huquqi bor ishchi (admin faqat ko'radi) ---

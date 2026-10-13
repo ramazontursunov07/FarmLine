@@ -28,6 +28,13 @@ if os.getenv('RENDER_EXTERNAL_HOSTNAME'):
 # Telegram va frontend sozlamalari
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'FarmLineBot')
+# AI sozlamalari: AI_PROVIDER = gemini (standart) yoki openai (Groq, OpenRouter kabi OpenAI-mos API)
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
+AI_MODEL = os.getenv('AI_MODEL')  # bo'sh bo'lsa, provayderning standart modeli olinadi
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+AI_API_KEY = os.getenv('AI_API_KEY')
+AI_BASE_URL = os.getenv('AI_BASE_URL')  # masalan https://api.groq.com/openai/v1
+
 FRONTEND_URL = (os.getenv('FRONTEND_URL') or os.getenv('RENDER_EXTERNAL_URL') or 'http://localhost:5173').rstrip('/')
 # Telegram ogohlantirishlari alohida oqimda yuboriladi (testlarda False qilinadi)
 TELEGRAM_ASYNC = os.getenv('TELEGRAM_ASYNC', 'True') == 'True'
@@ -53,7 +60,8 @@ INSTALLED_APPS = [
     'apps.finance',
     'apps.inventory',
     'apps.tasks',
-    'apps.users'
+    'apps.users',
+    'apps.assistant',
 ]
 
 MIDDLEWARE = [
@@ -160,6 +168,7 @@ REST_FRAMEWORK = {
         'forgot_password': '5/hour',
         'reset_password': '10/hour',
         'telegram_link': '10/hour',
+        'assistant': '60/hour',
     },
 }
 
