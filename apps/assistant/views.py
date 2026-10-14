@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from . import actions
 from .context import build_context
+from .rag import build_knowledge_prompt
 from .models import PendingAction
 from .services import AIError, chat
 
@@ -74,11 +75,18 @@ class ChatView(APIView):
         messages = clean_history(request.data.get('history'))
         messages.append({'role': 'user', 'content': text})
 
+        # Bilimlar bazasi: oxirgi 2 ta foydalanuvchi savoli bo'yicha mos hujjat bo'laklari
+        user_texts = [m['content'] for m in messages if m['role'] == 'user'][-2:]
+        knowledge = build_knowledge_prompt(user_texts)
+        extra = actions.build_action_prompt(request.user)
+        if knowledge:
+            extra = f"{extra}\n\n{knowledge}" if extra else knowledge
+
         try:
             answer = chat(
                 messages,
                 build_context(request.user),
-                extra_system=actions.build_action_prompt(request.user),
+                extra_system=extra,
             )
         except AIError as exc:
             # Xatoning aniq sababi (kalit, limit va hokazo) faqat logda, foydalanuvchiga umumiy xabar
@@ -120,3 +128,4 @@ class ActionCancelView(APIView):
         if not updated and not PendingAction.objects.filter(pk=pk, user=request.user).exists():
             return Response({'detail': "Amal topilmadi."}, status=404)
         return Response({'detail': "Bekor qilindi"})
+    
