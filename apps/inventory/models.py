@@ -51,6 +51,16 @@ class InventoryTransaction(models.Model):
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField()
     note = models.TextField(blank=True)
+    # Kirimning jami narxi (so'm). Kiritilsa, moliyada shu summaga avtomatik "Chiqim" yoziladi.
+    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    finance_transaction = models.OneToOneField(
+        'finance.Transaction',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name='inventory_purchase'
+    )
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -66,3 +76,4 @@ class InventoryTransaction(models.Model):
 
     def __str__(self):
         return f"{self.get_transaction_type_display()} - {self.quantity} ({self.inventory_item.item_name})"
+    

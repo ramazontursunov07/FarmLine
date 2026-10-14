@@ -7,12 +7,16 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     farm_name = serializers.CharField(source='farm.name', read_only=True)
     item_type_display = serializers.CharField(source='get_item_type_display', read_only=True)
     is_low_stock = serializers.ReadOnlyField()
+    # Yangi mahsulot boshlang'ich zaxira bilan qo'shilsa: shu zaxiraning JAMI narxi (moliyada "Chiqim" bo'ladi)
+    initial_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True, write_only=True
+    )
 
     class Meta:
         model = InventoryItem
         fields = [
             'id', 'farm', 'farm_name', 'item_name', 'item_type', 'item_type_display',
-            'quantity', 'unit', 'low_stock_threshold', 'is_low_stock',
+            'quantity', 'unit', 'low_stock_threshold', 'is_low_stock', 'initial_amount',
             'updated_at', 'created_at',
         ]
 
@@ -26,7 +30,18 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Chegara manfiy bo'lishi mumkin emas")
         return value
 
+    def validate_initial_amount(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Narx 0 dan katta bo'lishi kerak")
+        return value
+
+    def validate(self, attrs):
+        if self.instance is None and attrs.get('initial_amount') is not None and not (attrs.get('quantity') or 0) > 0:
+            raise serializers.ValidationError({'initial_amount': "Narx faqat boshlang'ich miqdor bilan kiritiladi"})
+        return attrs
+
     def update(self, instance, validated_data):
+        validated_data.pop('initial_amount', None)  # narx faqat yangi mahsulot yaratilganda
         validated_data.pop('farm', None)  # mahsulotni boshqa fermaga ko'chirib bo'lmaydi
         # Miqdor faqat kirim/sarf yozuvlari orqali o'zgaradi
         if 'quantity' in validated_data and validated_data['quantity'] != instance.quantity:
@@ -48,10 +63,11 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         model = InventoryTransaction
         fields = [
             'id', 'farm', 'inventory_item', 'inventory_name', 'inventory_unit',
-            'transaction_type', 'transaction_type_display', 'quantity', 'date', 'note',
+            'transaction_type', 'transaction_type_display', 'quantity', 'amount', 'finance_transaction',
+            'date', 'note',
             'recorded_by', 'recorded_by_name', 'created_at',
         ]
-        read_only_fields = ['recorded_by']
+        read_only_fields = ['recorded_by', 'finance_transaction']
 
     def get_recorded_by_name(self, obj):
         user = obj.recorded_by
@@ -63,3 +79,22 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Miqdor noldan katta bo'lishi kerak")
         return value
+
+    def validate_amount(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Narx 0 dan katta bo'lishi kerak")
+        return value
+
+    def validate(self, attrs):
+        if attrs.get('amount') is not None and attrs.get('transaction_type') != 'kirim':
+            raise serializers.ValidationError({'amount': "Narxni faqat kirimda ko'rsatish mumkin"})
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Narx moliyaviy ma'lumot: faqat moliyani ko'rish huquqi borlarga ko'rsatiladi
+        allowed = self.context.get('finance_farm_ids', set())
+        if instance.inventory_item.farm_id not in allowed:
+            data.pop('amount', None)
+            data.pop('finance_transaction', None)
+        return data

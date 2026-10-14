@@ -1,0 +1,54 @@
+/* "Ilovani yuklab olish" tugmasi va qo'llanma oynasi (InstallButton.jsx ishlatadi) */
+.install-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.install-btn--link {
+    padding: 8px;
+    border: 0;
+    background: none;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.auth-install {
+    margin-top: 8px;
+    text-align: center;
+}
+
+.install-guide {
+    width: calc(100% - 32px);
+    max-width: 440px;
+    padding: 24px;
+    text-align: left;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.install-guide::backdrop {
+    background: rgba(26, 36, 32, 0.55);
+}
+
+.install-guide h3 {
+    margin: 0 0 12px;
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.install-guide ol {
+    margin: 0 0 20px;
+    padding-left: 20px;
+    line-height: 1.5;
+}
+
+.install-guide li {
+    margin-bottom: 8px;
+}

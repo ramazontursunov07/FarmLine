@@ -1,42 +1,72 @@
-import { useSyncExternalStore } from 'react';
-
-// "Ilovani o'rnatish" tugmasi uchun: brauzer `beforeinstallprompt` hodisasini ilova yuklanishi bilan
-// bir marta yuboradi, shuning uchun uni main.jsx da darhol ushlab, shu yerda saqlab turamiz.
+// Ilovani telefonga o'rnatish holati. Brauzerning "beforeinstallprompt" hodisasi sahifa yuklanishining
+// boshida bir marta keladi, shuning uchun uni React'dan OLDIN (main.jsx'da) ushlab qo'yamiz,
+// aks holda keyin ochilgan komponent uni o'tkazib yuboradi.
+ 
 let deferredPrompt = null;
-let installed = false;
+let installedFlag = false;
 const listeners = new Set();
-const emit = () => listeners.forEach((l) => l());
-
-export const isStandalone = () =>
-    typeof window !== 'undefined'
-    && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
-
-export function listenForInstall() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); // brauzerning o'z oynasini emas, bizning tugmani ko'rsatamiz
-        deferredPrompt = e;
-        emit();
+ 
+function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+ 
+function isIos() {
+    const ua = navigator.userAgent;
+    // iPadOS 13+ o'zini Mac deb tanishtiradi, lekin sensorli ekrani bor
+    return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+ 
+// Telegram, Instagram, Facebook ichida ochilgan sahifada o'rnatish ishlamaydi: oddiy brauzer kerak
+function isInAppBrowser() {
+    return /Telegram|Instagram|FBAN|FBAV|Line\/|; wv\)/i.test(navigator.userAgent);
+}
+ 
+function compute() {
+    return {
+        canPrompt: Boolean(deferredPrompt),
+        installed: installedFlag || isStandalone(),
+        ios: isIos(),
+        inApp: isInAppBrowser(),
+        secure: window.isSecureContext,
+    };
+}
+ 
+let state = compute();
+ 
+function update() {
+    state = compute();
+    listeners.forEach((listener) => listener());
+}
+ 
+export function initInstallCapture() {
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault(); // brauzerning o'z oynasi o'rniga o'zimizning tugmani ishlatamiz
+        deferredPrompt = event;
+        update();
     });
     window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
-        installed = true;
-        emit();
+        installedFlag = true;
+        update();
     });
 }
-
-export async function promptInstall() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null; // bir prompt faqat bir marta ishlatiladi
-    emit();
+ 
+export function subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
 }
-
-const subscribe = (l) => {
-    listeners.add(l);
-    return () => listeners.delete(l);
-};
-
-// 'available' - o'rnatish mumkin, tugma ko'rsatiladi
-export const useCanInstall = () =>
-    useSyncExternalStore(subscribe, () => deferredPrompt !== null && !installed && !isStandalone());
+ 
+export function getSnapshot() {
+    return state;
+}
+ 
+// 'accepted' | 'dismissed' | 'unavailable' (brauzer bir marta ishlatiladigan hodisa beradi)
+export async function promptInstall() {
+    if (!deferredPrompt) return 'unavailable';
+    const event = deferredPrompt;
+    deferredPrompt = null;
+    update();
+    event.prompt();
+    const { outcome } = await event.userChoice;
+    return outcome;
+}

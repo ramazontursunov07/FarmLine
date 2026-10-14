@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import InstallButton from '../components/InstallButton';
 
 function EyeIcon() {
     return (
@@ -96,6 +97,9 @@ function Login() {
                 <p className="auth-footer">
                     Hisobingiz yo'qmi? <Link to="/register">Ro'yxatdan o'tish</Link>
                 </p>
+                <div className="auth-install">
+                    <InstallButton className="install-btn install-btn--link">Ilovani yuklab olish</InstallButton>
+                </div>
             </div>
         </div>
     );

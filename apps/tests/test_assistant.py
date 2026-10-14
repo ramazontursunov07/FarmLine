@@ -1,3 +1,168 @@
+from datetime import date
+from unittest.mock import patch
+
+from django.test import TestCase, override_settings
+
+from apps.assistant import actions
+from apps.assistant.context import build_context
+from apps.assistant.models import PendingAction
+from apps.assistant.services import build_system, chat, AIError
+
+CHAT_URL = '/api/assistant/chat/'
+
+
+def make_user(username, role):
+    return User.objects.create_user(username=username, password='Kuchli-Parol-2026', role=role)
+
+
+class AssistantTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.owner = make_user('fermer1', 'fermer')
+        self.farm = Farm.objects.create(owner=self.owner, name='Baraka', location='Qarshi', farm_type='aralash')
+        self.client_api = APIClient()
+        self.client_api.force_authenticate(self.owner)
+
+    def test_requires_login(self):
+        self.assertEqual(APIClient().post(CHAT_URL, {'message': 'salom'}, format='json').status_code, 401)
+
+    def test_empty_and_long_message_rejected(self):
+        self.assertEqual(self.client_api.post(CHAT_URL, {'message': '  '}, format='json').status_code, 400)
+        self.assertEqual(self.client_api.post(CHAT_URL, {'message': 'a' * 1001}, format='json').status_code, 400)
+
+    @patch('apps.assistant.views.chat', return_value='Yaxshi')
+    def test_answer_and_context_passed(self, mocked):
+        Transaction.objects.create(
+            farm=self.farm, transaction_type='kirim', category='sotuv', amount=500000,
+            date=date.today(), recorded_by=self.owner,
+        )
+        r = self.client_api.post(CHAT_URL, {'message': 'Bugun qanday?'}, format='json')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['answer'], 'Yaxshi')
+        messages, context = mocked.call_args.args
+        self.assertEqual(messages[-1], {'role': 'user', 'content': 'Bugun qanday?'})
+        self.assertIn('Baraka', context)
+
+    @patch('apps.assistant.views.chat', side_effect=RuntimeError('tarmoq uzildi'))
+    def test_unexpected_error_hidden_from_user(self, _):
+        r = self.client_api.post(CHAT_URL, {'message': 'salom'}, format='json')
+        self.assertEqual(r.status_code, 502)
+        self.assertNotIn('tarmoq', r.json()['detail'])
+
+    @patch('apps.assistant.views.chat', return_value='ok')
+    def test_rate_limit(self, _):
+        with patch('rest_framework.throttling.ScopedRateThrottle.THROTTLE_RATES', {'assistant': '2/hour'}):
+            codes = [self.client_api.post(CHAT_URL, {'message': 'salom'}, format='json').status_code for _ in range(3)]
+        self.assertEqual(codes, [200, 200, 429])
+
+
+class ContextPrivacyTests(TestCase):
+    def setUp(self):
+        self.owner = make_user('egasi', 'fermer')
+        self.other = make_user('boshqa', 'fermer')
+        self.farm = Farm.objects.create(owner=self.owner, name='Ozoda', location='Toshkent', farm_type='chorvachilik')
+        self.other_farm = Farm.objects.create(owner=self.other, name='Yashirin', location='Buxoro', farm_type='aralash')
+
+    def test_owner_sees_only_own_farms(self):
+        ctx = build_context(self.owner)
+        self.assertIn('Ozoda', ctx)
+        self.assertNotIn('Yashirin', ctx)
+
+    def test_low_stock_in_context(self):
+        InventoryItem.objects.create(farm=self.farm, item_name='Omuxta yem', item_type='ozuqa', quantity=3, unit='kg',
+                                     low_stock_threshold=10)
+        self.assertIn('Omuxta yem', build_context(self.owner))
+
+    def test_worker_gets_no_finance(self):
+        worker = make_user('ishchi1', 'ishchi')
+        Worker.objects.create(user=worker, farm=self.farm)
+        Transaction.objects.create(
+            farm=self.farm, transaction_type='kirim', category='sotuv', amount=123456,
+            date=date.today(), recorded_by=self.owner,
+        )
+        ctx = build_context(worker)
+        self.assertNotIn('123 456', ctx)
+        self.assertNotIn('Ozoda', ctx.split('\n')[0] if ctx else '')
+
+    def test_month_totals_and_loss(self):
+        today = date(2026, 10, 13)
+        Transaction.objects.create(farm=self.farm, transaction_type='kirim', category='sotuv',
+                                   amount=1000000, date=date(2026, 10, 2), recorded_by=self.owner)
+        Transaction.objects.create(farm=self.farm, transaction_type='chiqim', category='ozuqa',
+                                   amount=1500000, date=date(2026, 10, 5), recorded_by=self.owner)
+        Transaction.objects.create(farm=self.farm, transaction_type='chiqim', category='ozuqa',
+                                   amount=700000, date=date(2026, 9, 20), recorded_by=self.owner)
+        ctx = build_context(self.owner, today)
+        self.assertIn('Shu oy', ctx)
+        self.assertIn('zarar 500 000', ctx)
+        self.assertIn("O'tgan oy: kirim 0, chiqim 700 000", ctx)
+
+    def test_animals_in_context(self):
+        from apps.animals.models import AnimalGroup, AnimalType
+        t = AnimalType.objects.create(name='Sigir')
+        AnimalGroup.objects.create(farm=self.farm, animal_type=t, count=100)
+        self.assertIn('Sigir — 100 ta', build_context(self.owner))
+
+    def test_admin_gets_empty_context(self):
+        self.assertEqual(build_context(make_user('adm', 'admin')), '')
+
+    def test_system_prompt(self):
+        self.assertNotIn('ferma holati', build_system(''))
+        self.assertIn('Ozoda', build_system('Ozoda'))
+
+
+class ProviderTests(TestCase):
+    """AI_PROVIDER=openai (Groq/OpenRouter): tarmoqsiz, requests.post soxtalashtirilgan."""
+
+    @staticmethod
+    def _resp(status, body):
+        class R:
+            status_code = status
+            text = str(body)
+
+            @staticmethod
+            def json():
+                return body
+
+        return R()
+
+    @override_settings(AI_PROVIDER='openai', AI_API_KEY='k', AI_BASE_URL='https://x.test/v1', AI_MODEL=None)
+    def test_openai_success_and_payload(self):
+        ok = self._resp(200, {'choices': [{'message': {'content': ' Salom! '}}]})
+        with patch('apps.assistant.services.requests.post', return_value=ok) as post:
+            answer = chat([{'role': 'user', 'content': 'Salom'}], context='Ozoda ferma')
+        self.assertEqual(answer, 'Salom!')
+        url = post.call_args.args[0]
+        body = post.call_args.kwargs['json']
+        self.assertEqual(url, 'https://x.test/v1/chat/completions')
+        self.assertEqual(body['messages'][0]['role'], 'system')
+        self.assertIn('Ozoda ferma', body['messages'][0]['content'])
+        self.assertEqual(body['messages'][-1], {'role': 'user', 'content': 'Salom'})
+        self.assertEqual(post.call_args.kwargs['headers']['Authorization'], 'Bearer k')
+
+    @override_settings(AI_PROVIDER='openai', AI_API_KEY='k')
+    def test_openai_rate_limit_becomes_ai_error(self):
+        with patch('apps.assistant.services.requests.post', return_value=self._resp(429, {'error': 'limit'})):
+            with self.assertRaises(AIError) as ctx:
+                chat([{'role': 'user', 'content': 'Salom'}])
+        self.assertEqual(ctx.exception.code, 429)
+
+    @override_settings(AI_PROVIDER='openai', AI_API_KEY='k')
+    def test_view_shows_limit_message_for_429(self):
+        owner = make_user('f2', 'fermer')
+        c = APIClient()
+        c.force_authenticate(owner)
+        with patch('apps.assistant.services.requests.post', return_value=self._resp(429, {})):
+            r = c.post(CHAT_URL, {'message': 'salom'}, format='json')
+        self.assertEqual(r.status_code, 502)
+        self.assertIn('limit', r.json()['detail'].lower())
+
+    @override_settings(AI_PROVIDER='nomalum')
+    def test_unknown_provider(self):
+        with self.assertRaises(AIError):
+            chat([{'role': 'user', 'content': 'Salom'}])
+
+
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -12,8 +177,8 @@ from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem, InventoryTransaction
 from apps.users.models import User
 
-from apps.assistant import actions
-from apps.assistant.models import PendingAction
+# from . import actions
+# from .models import PendingAction
 
 CHAT_URL = '/api/assistant/chat/'
 
@@ -308,3 +473,107 @@ class PermissionTests(ActionBase):
         body = self.propose('[{"type": "finance", "kind": "chiqim", "amount": 5000, "farm": "nur"}]').json()
         self.assertIn('Nur', ' '.join(body['action']['items'][0]['details']))
         self.assertEqual(Farm.objects.filter(pk=second.pk).count(), 1)
+
+
+class InventoryPurchaseAITests(ActionBase):
+    """AI omborga kirim yozganda narxni so'raydi; tasdiqlangach moliyada chiqim yoziladi."""
+
+    ADD = '[{"type": "inventory_add", "item": "omuxta yem", "quantity": 50%s}]'
+
+    def add(self, amount=None, who=None):
+        extra = '' if amount is None else f', "amount": {amount}'
+        return self.propose(self.ADD % extra, who)
+
+    def make_worker(self, can_view_finance=False):
+        worker = make_user('ishchi2', 'ishchi')
+        Worker.objects.create(user=worker, farm=self.farm, can_view_finance=can_view_finance)
+        return worker, client_for(worker)
+
+    def test_add_without_price_asks_for_it(self):
+        body = self.add().json()
+        self.assertNotIn('action', body)
+        self.assertIn("necha so'mga", body['answer'])
+        self.assertNotIn('Buni bajara olmayman', body['answer'])
+        self.assertEqual(PendingAction.objects.count(), 0)
+
+    def test_add_with_price_creates_expense_on_confirm(self):
+        card = self.add(450000).json()['action']
+        self.assertIn("450 000 so'm", ' '.join(card['items'][0]['details']))
+
+        r = self.api.post(confirm_url(card['id']))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Moliyada chiqim', r.json()['results'][0])
+        self.feed.refresh_from_db()
+        self.assertEqual(self.feed.quantity, 250)
+        tx = Transaction.objects.get()
+        self.assertEqual((tx.transaction_type, tx.category, tx.amount), ('chiqim', 'ozuqa', Decimal('450000')))
+        self.assertEqual(tx.recorded_by, self.owner)
+
+    def test_zero_price_means_no_expense(self):
+        card = self.add(0).json()['action']
+        self.assertIn('kiritilmadi', ' '.join(card['items'][0]['details']))
+        self.assertEqual(self.api.post(confirm_url(card['id'])).status_code, 200)
+        self.feed.refresh_from_db()
+        self.assertEqual(self.feed.quantity, 250)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_negative_price_rejected(self):
+        body = self.add(-5).json()
+        self.assertNotIn('action', body)
+        self.assertIn('narx aniq emas', body['answer'])
+
+    def test_worker_without_finance_right_is_not_asked_for_price(self):
+        _, w = self.make_worker()
+        card = self.add(who=w).json()['action']
+        self.assertEqual(w.post(confirm_url(card['id'])).status_code, 200)
+        self.feed.refresh_from_db()
+        self.assertEqual(self.feed.quantity, 250)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_worker_without_finance_right_cannot_give_price(self):
+        _, w = self.make_worker()
+        body = self.add(450000, who=w).json()
+        self.assertNotIn('action', body)
+        self.assertIn('moliya huquqi', body['answer'])
+
+    def test_worker_with_finance_right_is_asked_and_pays(self):
+        worker, w = self.make_worker(can_view_finance=True)
+        self.assertIn("necha so'mga", self.add(who=w).json()['answer'])
+        card = self.add(120000, who=w).json()['action']
+        self.assertEqual(w.post(confirm_url(card['id'])).status_code, 200)
+        self.assertEqual(Transaction.objects.get().recorded_by, worker)
+
+    def test_prompt_asks_for_price_only_if_user_can_pay(self):
+        worker, _ = self.make_worker()
+        self.assertIn("Necha so'mga oldingiz", actions.build_action_prompt(self.owner))
+        self.assertNotIn("Necha so'mga oldingiz", actions.build_action_prompt(worker))
+
+
+class DuplicatePurchaseTests(ActionBase):
+    """AI bitta xarid uchun ham «inventory_add» (narxi bilan), ham «finance» chiqim yozsa, balans ikki marta kamaymasin."""
+
+    RAW = (
+        '[{"type": "inventory_add", "item": "omuxta yem", "quantity": 1000, "amount": 15000000},'
+        ' {"type": "finance", "kind": "chiqim", "category": "ozuqa", "amount": %s, "description": "yem sotib olindi"}]'
+    )
+
+    def test_duplicate_finance_expense_is_dropped(self):
+        body = self.propose(self.RAW % 15000000).json()
+        self.assertEqual([i['title'] for i in body['action']['items']], ['📥 Omborga kirim'])
+        self.assertIn('Takror', body['answer'])
+
+    def test_confirm_writes_only_one_expense(self):
+        card = self.propose(self.RAW % 15000000).json()['action']
+        self.assertEqual(self.api.post(confirm_url(card['id'])).status_code, 200)
+        self.assertEqual(Transaction.objects.count(), 1)
+
+    def test_different_amount_is_kept(self):
+        body = self.propose(self.RAW % 500000).json()
+        self.assertEqual(len(body['action']['items']), 2)
+
+    def test_warns_if_same_amount_was_just_recorded_via_inventory(self):
+        card = self.propose('[{"type": "inventory_add", "item": "omuxta yem", "quantity": 10, "amount": 700000}]'
+                            ).json()['action']
+        self.api.post(confirm_url(card['id']))
+        body = self.propose('[{"type": "finance", "kind": "chiqim", "category": "ozuqa", "amount": 700000}]').json()
+        self.assertIn('Diqqat', ' '.join(body['action']['items'][0]['details']))

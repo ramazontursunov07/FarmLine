@@ -41,6 +41,10 @@ ALL_TYPES = set(INVENTORY_TYPES) | {'finance'}
 FINANCE_KINDS = ('kirim', 'chiqim')
 
 
+class Question(str):
+    """Xato emas: yetishmayotgan ma'lumotni (masalan, narxni) so'raydigan xabar. Suhbatda oddiy savol bo'lib chiqadi."""
+
+
 # ---------------------------------------------------------------- AI ga ko'rsatma
 
 def _accessible_items(user):
@@ -82,10 +86,19 @@ def build_action_prompt(user, today=None):
         lines += [
             '  {"type": "inventory_use", "item": "<mahsulot nomi>", "quantity": <son>, "note": "<ixtiyoriy izoh>"}'
             "  -- ombordan chiqarish/sarflash",
-            '  {"type": "inventory_add", "item": "<mahsulot nomi>", "quantity": <son>, "note": "<ixtiyoriy izoh>"}'
-            "  -- omborga kirim (yangi keltirilgan)",
+            '  {"type": "inventory_add", "item": "<mahsulot nomi>", "quantity": <son>, '
+            + ('"amount": <jami narxi, so\'m>, ' if farms else '')
+            + '"note": "<ixtiyoriy izoh>"}  -- omborga kirim (yangi keltirilgan)',
             "  «item» ni quyidagi ro'yxatdan AYNAN ko'chirib yoz. Ro'yxatda yo'q mahsulot uchun harakat yozma.",
         ]
+        if farms:
+            lines.append(
+                "  Omborga kirim (inventory_add) uchun «amount» (JAMI narx, so'mda) kerak. Foydalanuvchi narxni "
+                "aytmagan bo'lsa, harakat qo'shmasdan «Necha so'mga oldingiz?» deb so'ra. Narx kg/tonna/dona "
+                "uchun aytilsa, miqdorga ko'paytirib JAMI summani yoz. Foydalanuvchi narxi yo'q desa "
+                "(bepul, sovg'a, bilmayman), amount: 0 yoz. Narx tizimda avtomatik «Chiqim» bo'lib yoziladi, "
+                "shuning uchun xuddi shu xarid uchun alohida «finance» chiqim YOZMA (balans ikki marta kamayib ketadi)."
+            )
     if farms:
         cats = ", ".join(f"{k} ({v})" for k, v in Transaction.CATEGORY_CHOICES)
         lines += [
@@ -235,6 +248,24 @@ def _resolve_inventory(user, raw, today):
         return None, (f"Omborda «{item.item_name}» yetarli emas: hozir {fmt(item.quantity)} {item.unit}, "
                       f"siz {fmt(quantity)} {item.unit} so'radingiz.")
 
+    # Kirim narxi: u moliyada avtomatik "Chiqim" bo'ladi (balansdan ayriladi)
+    amount, can_pay = None, False
+    if kind == 'kirim':
+        can_pay = finance_farms(user).filter(pk=item.farm_id).exists()
+        raw_amount = raw.get('amount')
+        if can_pay:
+            if raw_amount in (None, ''):
+                return None, Question(
+                    f"«{item.item_name}» kirimi necha so'mga olindi? Jami narxni ayting "
+                    f"(narxi yo'q bo'lsa, «narxsiz» deng)."
+                )
+            amount = _decimal(raw_amount)
+            if amount is None or amount < 0:
+                return None, f"«{item.item_name}»: narx aniq emas."
+        elif (_decimal(raw_amount) or 0) > 0:
+            return None, (f"«{item.item_name}»: narxni yozish uchun moliya huquqi kerak. "
+                          f"Narxsiz kirim qiling, ferma egasi moliyaga qo'shadi.")
+
     note = str(raw.get('note') or '').strip()[:200]
     data = {
         'inventory_item': item.pk,
@@ -243,8 +274,12 @@ def _resolve_inventory(user, raw, today):
         'date': today.isoformat(),
         'note': (note + ' ' if note else '') + '(AI orqali)',
     }
+    if amount:
+        data['amount'] = str(amount)
     serializer = InventoryTransactionSerializer(data=data)
     if not serializer.is_valid():
+        if 'amount' in serializer.errors:
+            return None, f"«{item.item_name}»: narx noto'g'ri (ko'pi bilan 2 ta kasr raqami, 12 ta raqam)."
         return None, f"«{item.item_name}»: miqdor noto'g'ri (ko'pi bilan 2 ta kasr raqami)."
 
     after = item.quantity - quantity if kind == 'sarf' else item.quantity + quantity
@@ -254,6 +289,10 @@ def _resolve_inventory(user, raw, today):
         f"Omborda: {fmt(item.quantity)} → {fmt(after)} {item.unit}",
         f"Ferma: {item.farm.name}",
     ]
+    if amount:
+        details.append(f"Narxi: {money(amount)} so'm (moliyada «Chiqim» bo'lib yoziladi, balansdan ayriladi)")
+    elif kind == 'kirim' and can_pay:
+        details.append("Narxi: kiritilmadi (moliyaga yozilmaydi)")
     if note:
         details.append(f"Izoh: {note}")
     return {
@@ -302,6 +341,14 @@ def _resolve_finance(user, raw, today):
     ]
     if description:
         details.append(f"Izoh: {description}")
+    if kind == 'chiqim' and Transaction.objects.filter(
+        farm=farm, transaction_type='chiqim', amount=amount, inventory_purchase__isnull=False,
+        created_at__gte=timezone.now() - timedelta(hours=24),
+    ).exists():
+        details.append(
+            "⚠️ Diqqat: xuddi shu summa so'nggi 24 soatda ombor kirimi bilan allaqachon chiqim bo'lib yozilgan. "
+            "Bu takror bo'lsa, tasdiqlamang."
+        )
     return {
         'type': 'finance',
         'data': data,
@@ -325,7 +372,34 @@ def resolve_actions(user, raw_actions, today=None):
             resolved.append(action)
         else:
             problems.append(problem)
+    resolved = _drop_duplicate_purchases(resolved, problems)
     return resolved, problems
+
+
+def _drop_duplicate_purchases(resolved, problems):
+    """Omborga kirimning narxi o'zi moliyada «Chiqim» bo'ladi. AI xuddi shu xarid uchun alohida «finance»
+    chiqim ham yozsa, balans ikki marta kamayadi: bunday takror chiqim olib tashlanadi."""
+    paid = set()  # (ferma, summa) -- narxi bor ombor kirimlari
+    for action in resolved:
+        data = action['data']
+        if action['type'] == 'inventory_add' and data.get('amount'):
+            farm_id = InventoryItem.objects.filter(pk=data['inventory_item']).values_list('farm_id', flat=True).first()
+            paid.add((farm_id, Decimal(data['amount'])))
+    if not paid:
+        return resolved
+
+    kept = []
+    for action in resolved:
+        data = action['data']
+        if (action['type'] == 'finance' and data['transaction_type'] == 'chiqim'
+                and (data['farm'], Decimal(data['amount'])) in paid):
+            problems.append(
+                f"Takror chiqim yozilmadi ({money(Decimal(data['amount']))} so'm): ombor kirimining narxi "
+                "moliyada o'zi chiqim bo'ladi."
+            )
+            continue
+        kept.append(action)
+    return kept
 
 
 def create_proposal(user, raw_actions, today=None):
@@ -380,9 +454,10 @@ def execute(request, pending):
             item = InventoryItem.objects.get(pk=rec.inventory_item_id)
             verb = "chiqarildi" if rec.transaction_type == 'sarf' else "kirim qilindi"
             low = " ⚠️ Zaxira kam qoldi!" if item.is_low_stock else ""
+            paid = f" 💸 Moliyada chiqim yozildi: {money(rec.amount)} so'm." if rec.finance_transaction_id else ""
             results.append(
                 f"✅ {item.item_name}: {fmt(rec.quantity)} {item.unit} {verb}. "
-                f"Omborda qoldi: {fmt(item.quantity)} {item.unit}.{low}"
+                f"Omborda qoldi: {fmt(item.quantity)} {item.unit}.{low}{paid}"
             )
         else:
             raise ValidationError({'detail': "Noma'lum amal turi."})

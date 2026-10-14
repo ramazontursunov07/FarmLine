@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
-import { today } from '../utils/format';
+import { today, formatMoney } from '../utils/format';
 import InstallButton from '../components/InstallButton';
 
 const ITEM_TYPES = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
@@ -19,8 +19,8 @@ function formatDate(iso) {
     return `${d}.${m}.${y}`;
 }
 
-const EMPTY_ITEM = { item_name: '', item_type: 'ozuqa', unit: 'kg', quantity: '0', low_stock_threshold: '0' };
-const makeTx = () => ({ inventory_item: '', transaction_type: 'sarf', quantity: '', date: today(), note: '' });
+const EMPTY_ITEM = { item_name: '', item_type: 'ozuqa', unit: 'kg', quantity: '0', low_stock_threshold: '0', initial_amount: '' };
+const makeTx = () => ({ inventory_item: '', transaction_type: 'sarf', quantity: '', date: today(), note: '', amount: '' });
 const EMPTY_FILTERS = { inventory_item: '', transaction_type: '' };
 
 function Inventory() {
@@ -99,10 +99,16 @@ function Inventory() {
 
     const handleAddItem = async (e) => {
         e.preventDefault();
+        const hasStock = Number(itemForm.quantity) > 0;
+        if (hasStock && farm.can_view_finance && itemForm.initial_amount === ''
+            && !window.confirm("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?")) return;
         setSavingItem(true);
         setItemError('');
         try {
-            await api.post('inventory-item/', { ...itemForm, farm: Number(farmId) });
+            const payload = { ...itemForm, farm: Number(farmId) };
+            // Narx faqat boshlang'ich miqdor bo'lganda yuboriladi
+            if (!hasStock || payload.initial_amount === '') delete payload.initial_amount;
+            await api.post('inventory-item/', payload);
             setItemForm(EMPTY_ITEM);
             reload();
         } catch (err) {
@@ -114,10 +120,15 @@ function Inventory() {
 
     const handleAddTx = async (e) => {
         e.preventDefault();
+        if (txForm.transaction_type === 'kirim' && farm.can_view_finance && txForm.amount === ''
+            && !window.confirm("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?")) return;
         setSavingTx(true);
         setTxError('');
         try {
-            await api.post('inventory-transaction/', { ...txForm, inventory_item: Number(selectedItemId) });
+            const payload = { ...txForm, inventory_item: Number(selectedItemId) };
+            // Narx faqat kirimda yuboriladi; bo'sh bo'lsa umuman yuborilmaydi
+            if (payload.transaction_type !== 'kirim' || payload.amount === '') delete payload.amount;
+            await api.post('inventory-transaction/', payload);
             setTxForm({ ...makeTx(), inventory_item: selectedItemId, transaction_type: txForm.transaction_type });
             reload();
         } catch (err) {
@@ -169,7 +180,8 @@ function Inventory() {
     const handleDeleteTx = async (t) => {
         const ok = window.confirm(
             `Bu yozuvni o'chirasizmi?\n\n${t.transaction_type_display}: ${qty(t.quantity)} ${t.inventory_unit} (${t.inventory_name})\n` +
-            'Zaxira avtomatik tuzatiladi.'
+            'Zaxira avtomatik tuzatiladi.' +
+            (t.finance_transaction ? "\nMoliyadagi chiqim yozuvi ham o'chiriladi." : '')
         );
         if (!ok) return;
         try {
@@ -286,6 +298,16 @@ function Inventory() {
                                             <input type="date" name="date" value={txForm.date} onChange={handleTxChange} required />
                                         </div>
                                     </div>
+                                    {txForm.transaction_type === 'kirim' && farm.can_view_finance && (
+                                        <div className="form-field">
+                                            <label>Jami narxi, so'm</label>
+                                            <input type="number" name="amount" min="0.01" step="0.01" value={txForm.amount}
+                                                onChange={handleTxChange} placeholder="Masalan: 450000" />
+                                            <p className="workers-hint">
+                                                Kiritilgan summa moliyada avtomatik "Chiqim" bo'lib yoziladi va balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>
                                         <input type="text" name="note" value={txForm.note} onChange={handleTxChange}
@@ -338,6 +360,17 @@ function Inventory() {
                                             <input type="number" name="low_stock_threshold" min="0" step="0.01"
                                                 value={itemForm.low_stock_threshold} onChange={handleItemChange} required />
                                         </div>
+                                        {farm.can_view_finance && Number(itemForm.quantity) > 0 && (
+                                            <div className="form-field">
+                                                <label>Jami narxi, so'm</label>
+                                                <input type="number" name="initial_amount" min="0.01" step="0.01"
+                                                    value={itemForm.initial_amount} onChange={handleItemChange}
+                                                    placeholder="Masalan: 450000" />
+                                                <p className="workers-hint">
+                                                    Kiritilsa, shu summa balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.
+                                                </p>
+                                            </div>
+                                        )}
                                         {itemError && <p className="error-text" role="alert">{itemError}</p>}
                                         <button type="submit" className="btn-primary btn-auto" disabled={savingItem}>
                                             {savingItem ? 'Kuting...' : "Mahsulot qo'shish"}
@@ -378,6 +411,9 @@ function Inventory() {
                                                 <strong>
                                                     {t.recorded_by ? `${roleLabel(t.recorded_by)} ${t.recorded_by_name}` : "noma'lum"}
                                                 </strong>
+                                                {t.amount && (
+                                                    <> · Moliyada chiqim: <strong>{formatMoney(t.amount)}</strong></>
+                                                )}
                                             </span>
                                             {t.note && <span className="work-desc">{t.note}</span>}
                                         </div>

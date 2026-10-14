@@ -32,6 +32,9 @@ def answer_with_action(user, answer):
     if pending is None:
         if not problems:
             return {'answer': text or NOT_UNDERSTOOD}
+        if all(isinstance(p, actions.Question) for p in problems):
+            # Yetishmayotgan ma'lumot (masalan, narx): xato emas, oddiy savol
+            return {'answer': "\n".join(problems)}
         # Taklif yaroqsiz (mahsulot topilmadi, zaxira yetmaydi va h.k.): AI ning "tasdiqlang" deyishi noto'g'ri bo'lardi
         return {'answer': "Buni bajara olmayman:\n" + notes}
     # Karta server topgan ma'lumotdan tuziladi; AI matni o'rniga doim bir xil, aniq savol turadi

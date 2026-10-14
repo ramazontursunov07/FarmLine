@@ -1,11 +1,14 @@
 from django.db import transaction
 from django.db.models import F, Q
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.mixins import IdempotentCreateMixin
 from apps.farms.models import Worker
+from apps.finance.models import Transaction as FinanceTransaction
+from apps.finance.views import finance_farms
 from apps.users.notify import display_name, notify_users
 from .models import InventoryItem, InventoryTransaction
 from .serializers import InventoryItemSerializer, InventoryTransactionSerializer
@@ -19,6 +22,23 @@ def is_farm_member(user, farm):
 def fmt(value):
     """Decimal ni chiroyli ko'rsatish: 50.00 -> 50"""
     return format(value.normalize(), 'f')
+
+
+def create_purchase_expense(inv_tx, item, user, amount):
+    """Ombor kirimining narxini moliyada "Chiqim" qilib yozadi (balansdan ayriladi) va kirimga bog'laydi."""
+    description = f"Ombor kirimi: {item.item_name}, {fmt(inv_tx.quantity)} {item.unit}"
+    if inv_tx.note:
+        description += f" ({inv_tx.note})"
+    inv_tx.finance_transaction = FinanceTransaction.objects.create(
+        farm=item.farm,
+        transaction_type='chiqim',
+        category=item.item_type,  # ozuqa / dori / boshqa: moliya kategoriyalari bilan bir xil
+        amount=amount,
+        description=description,
+        date=inv_tx.date,
+        recorded_by=user,
+    )
+    inv_tx.save(update_fields=['finance_transaction'])
 
 
 class InventoryItemViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
@@ -51,7 +71,23 @@ class InventoryItemViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._ensure_owner(serializer.validated_data['farm'])
-        serializer.save()
+        amount = serializer.validated_data.pop('initial_amount', None)
+        user = self.request.user
+        with transaction.atomic():
+            item = serializer.save()
+            # Boshlang'ich zaxira ham oddiy kirim sifatida yoziladi: tarixda ko'rinadi, narxi bo'lsa balansdan ayriladi
+            if item.quantity > 0:
+                inv_tx = InventoryTransaction.objects.create(
+                    inventory_item=item,
+                    transaction_type='kirim',
+                    quantity=item.quantity,
+                    date=timezone.localdate(),
+                    note="Boshlang'ich zaxira",
+                    amount=amount,
+                    recorded_by=user,
+                )
+                if amount:
+                    create_purchase_expense(inv_tx, item, user, amount)
 
     def perform_update(self, serializer):
         self._ensure_owner(serializer.instance.farm)
@@ -87,6 +123,16 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             qs = qs.filter(transaction_type=p['transaction_type'])
         return qs
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # Narx faqat moliyani ko'rish huquqi bor fermalar uchun ko'rsatiladi (bir marta hisoblanadi)
+        user = self.request.user
+        if getattr(self, 'swagger_fake_view', False) or not user.is_authenticated:
+            context['finance_farm_ids'] = set()
+        else:
+            context['finance_farm_ids'] = set(finance_farms(user).values_list('pk', flat=True))
+        return context
+
     def perform_create(self, serializer):
         user = self.request.user
         item = serializer.validated_data['inventory_item']
@@ -95,6 +141,14 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
         qty = serializer.validated_data['quantity']
         kind = serializer.validated_data['transaction_type']
+        amount = serializer.validated_data.get('amount')
+
+        # Narx moliyada chiqim bo'lib yoziladi, shuning uchun moliyani o'zgartirish huquqi kerak
+        if amount and not finance_farms(user).filter(pk=item.farm_id).exists():
+            raise ValidationError({
+                'amount': "Narxni kiritish uchun moliya huquqi kerak. "
+                          "Narxsiz yozing, ferma egasi keyin moliyaga qo'shadi."
+            })
 
         with transaction.atomic():
             locked = InventoryItem.objects.select_for_update().get(pk=item.pk)
@@ -108,7 +162,11 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             else:
                 locked.quantity += qty
             locked.save(update_fields=['quantity', 'updated_at'])
-            serializer.save(recorded_by=user)
+            inv_tx = serializer.save(recorded_by=user)
+
+            # Kirim narx bilan yozilsa, shu summa moliyada avtomatik "Chiqim" bo'ladi (balansdan ayriladi)
+            if kind == 'kirim' and amount:
+                create_purchase_expense(inv_tx, locked, user, amount)
 
             # Faqat zaxira chegaradan YUQORIDAN pastga o'tgan paytda ogohlantiramiz (har sarfda emas)
             if kind == 'sarf' and before > locked.low_stock_threshold and locked.is_low_stock:
@@ -135,4 +193,8 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     )
                 locked.quantity -= instance.quantity
             locked.save(update_fields=['quantity', 'updated_at'])
+            finance_tx = instance.finance_transaction
             instance.delete()
+            # Kirim bilan birga yozilgan moliyaviy chiqim ham o'chadi (balans qaytadi)
+            if finance_tx is not None:
+                finance_tx.delete()

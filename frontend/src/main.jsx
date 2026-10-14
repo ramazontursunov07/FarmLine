@@ -4,9 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
-import { listenForInstall } from './offline/install';
+import { initInstallCapture } from './offline/install';
 
-listenForInstall();
+// Brauzerning o'rnatish hodisasi sahifa ochilishi bilan keladi: React'dan oldin ushlab qolamiz
+initInstallCapture();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

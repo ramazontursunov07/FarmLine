@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useInstall from '../hooks/useInstall';
+import InstallButton from '../components/InstallButton';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
-import InstallButton from '../components/InstallButton';
 
 const ROLES = { fermer: 'Fermer', ishchi: 'Ishchi', admin: 'Admin' };
 
 function Profile() {
+    const { installed } = useInstall();
     const { user, logout } = useAuth();
 
     // Telegram ulanishi
@@ -77,7 +79,6 @@ function Profile() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
-                    <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>
@@ -157,6 +158,21 @@ function Profile() {
                     )}
 
                     {telegramError && <p className="error-text" role="alert">{telegramError}</p>}
+                </div>
+
+                <h3 className="section-title">Ilova</h3>
+                <div className="work-card">
+                    {installed ? (
+                        <p className="workers-hint">Ilova telefoningizga o'rnatilgan ✓</p>
+                    ) : (
+                        <>
+                            <p className="workers-hint">
+                                Ilovani telefoningizga yuklab oling: bosh ekrandan bir bosishda ochiladi va
+                                internet yomon joyda ham ishlaydi.
+                            </p>
+                            <InstallButton className="btn-primary btn-auto install-btn">Ilovani yuklab olish</InstallButton>
+                        </>
+                    )}
                 </div>
             </main>
         </div>
