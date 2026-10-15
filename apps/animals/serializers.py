@@ -25,6 +25,14 @@ class AnimalGroupSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class CalfInputSerializer(serializers.Serializer):
+    """Tug'ilish yozuvi bilan birga ochiladigan buzoq kartochkasi (Animal) ma'lumotlari."""
+    tag_number = serializers.CharField(
+        max_length=30, error_messages={'blank': "Quloq raqamini kiriting", 'required': "Quloq raqamini kiriting"})
+    name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    sex = serializers.ChoiceField(choices=Animal.SEX_CHOICES, default='urgochi')
+
+
 class AnimalEventSerializer(serializers.ModelSerializer):
     days_since_start = serializers.ReadOnlyField()
     recorded_by_username = serializers.CharField(source='recorded_by.username', read_only=True, default=None)
@@ -35,11 +43,14 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     animal_group_count = serializers.IntegerField(source='animal_group.count', read_only=True)
     farm = serializers.IntegerField(source='animal_group.farm_id', read_only=True)
     animal_tag = serializers.CharField(source='animal.tag_number', read_only=True, default=None)
+    # Tug'ilish bilan birga ochiladigan buzoq kartochkalari (faqat yozishda; ixtiyoriy)
+    calves = CalfInputSerializer(many=True, write_only=True, required=False)
+    calves_created = serializers.SerializerMethodField()
 
     class Meta:
         model = AnimalEvent
         fields = ['id', 'farm', 'animal_group', 'animal_group_label', 'animal_group_count',
-                  'animal', 'animal_tag',
+                  'animal', 'animal_tag', 'calves', 'calves_created',
                   'event_type', 'event_type_display', 'animal_count', 'title', 'description',
                   'status', 'status_display', 'start_date', 'end_date',
                   'recorded_by', 'recorded_by_username', 'recorded_by_name',
@@ -56,10 +67,40 @@ class AnimalEventSerializer(serializers.ModelSerializer):
         group = obj.animal_group
         return f"{group.animal_type.name} ({group.breed})" if group.breed else group.animal_type.name
 
+    def get_calves_created(self, obj):
+        # View tug'ilishda ochilgan kartochkalarni `_calves_created` ga qo'yadi; boshqa yozuvlarda bo'sh
+        return [{'id': a.id, 'tag_number': a.tag_number} for a in getattr(obj, '_calves_created', [])]
+
+    def create(self, validated_data):
+        validated_data.pop('calves', None)  # kartochkalarni view ochadi, AnimalEvent modeliga bu maydon yo'q
+        return super().create(validated_data)
+
     def validate_animal_count(self, value):
         if value is not None and value < 1:
             raise serializers.ValidationError("Hayvonlar soni kamida 1 bo'lishi kerak")
         return value
+
+    @staticmethod
+    def _validate_calves(calves, event_type, count, group, mother, start):
+        if event_type != 'tugilish':
+            raise serializers.ValidationError({'calves': "Buzoq kartochkalari faqat tug'ilish uchun kiritiladi"})
+        if len(calves) > count:
+            raise serializers.ValidationError({'calves': (
+                f"Kartochkalar soni ({len(calves)}) tug'ilgan hayvonlar sonidan ({count}) ko'p bo'lishi mumkin emas")})
+        if start and start > timezone.localdate():
+            raise serializers.ValidationError(
+                {'start_date': "Kartochka ochish uchun tug'ilgan sana kelajakda bo'lishi mumkin emas"})
+        if mother is not None and mother.sex != 'urgochi':
+            raise serializers.ValidationError({'animal': "Ona urg'ochi bo'lishi kerak"})
+        tags = [c['tag_number'] for c in calves]
+        repeated = sorted({t for t in tags if tags.count(t) > 1})
+        if repeated:
+            raise serializers.ValidationError({'calves': f"Quloq raqami takrorlangan: {', '.join(repeated)}"})
+        taken = sorted(Animal.objects.filter(farm_id=group.farm_id, tag_number__in=tags)
+                       .values_list('tag_number', flat=True))
+        if taken:
+            raise serializers.ValidationError(
+                {'calves': f"Bu quloq raqami fermada allaqachon bor: {', '.join(taken)}"})
 
     def validate(self, attrs):
         start = attrs.get('start_date', getattr(self.instance, 'start_date', None))
@@ -94,6 +135,12 @@ class AnimalEventSerializer(serializers.ModelSerializer):
             if count and event_type != 'tugilish' and group and count > group.count:
                 raise serializers.ValidationError(
                     {'animal_count': f"Guruhda faqat {group.count} ta hayvon bor"})
+            calves = attrs.get('calves')
+            if calves:
+                self._validate_calves(calves, event_type, count, group, animal, start)
+        elif attrs.get('calves'):
+            raise serializers.ValidationError(
+                {'calves': "Buzoq kartochkalarini faqat yangi tug'ilish yozuvida kiritish mumkin"})
 
         # Yakunlangan ishga tugash sanasi avtomatik qo'yiladi
         if status == 'yakunlangan' and not end:

@@ -329,3 +329,154 @@ class DeathEventTests(AnimalCardBase):
         row = self.client.get(f'{CARDS}{cow.pk}/').json()
         self.assertEqual(row['last_calving_date'], str(self.today))
         self.assertEqual(len(rows(self.client.get(EVENTS, {'animal': cow.pk}))), 1)
+
+
+class CalvingWithCardsTests(AnimalCardBase):
+    """Tug'ilish yozuvi bilan birga buzoq kartochkalarini ochish."""
+
+    def calving(self, calves=None, count=2, **extra):
+        data = {'animal_group': self.group.pk, 'event_type': 'tugilish', 'title': "Buzoqlar tug'ildi",
+                'animal_count': count, 'start_date': str(self.today)}
+        if calves is not None:
+            data['calves'] = calves
+        data.update(extra)
+        return self.client.post(EVENTS, data, format='json')
+
+    def assert_nothing_saved(self):
+        """Xato bo'lganda na yozuv, na kartochka, na guruh soni o'zgargan bo'lishi kerak."""
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+        self.assertEqual(AnimalEvent.objects.count(), 0)
+        self.assertEqual(Animal.objects.count(), 0)
+
+    def test_birth_opens_cards_and_updates_group(self):
+        r = self.calving([{'tag_number': '21', 'name': 'Qora'}, {'tag_number': '22', 'sex': 'erkak'}])
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(sorted(c['tag_number'] for c in r.json()['calves_created']), ['21', '22'])
+        self.assertNotIn('calves', r.json())  # faqat yozish uchun
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 5)
+        cards = {a.tag_number: a for a in Animal.objects.all()}
+        self.assertEqual(cards['21'].sex, 'urgochi')  # sex berilmasa
+        self.assertEqual(cards['22'].sex, 'erkak')
+        for card in cards.values():
+            self.assertEqual((card.farm_id, card.group_id, card.status), (self.farm.pk, self.group.pk, 'faol'))
+            self.assertEqual(card.birth_date, self.today)  # buzoq tug'ilgan sana = yozuv sanasi
+
+    def test_cards_linked_to_mother(self):
+        cow = self.make_animal('14')
+        r = self.calving([{'tag_number': '21'}], count=1, animal=cow.pk)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Animal.objects.get(tag_number='21').mother_id, cow.pk)
+        self.assertEqual(self.client.get(f'{CARDS}{cow.pk}/card/').json()['calves'][0]['tag_number'], '21')
+
+    def test_fewer_cards_than_calves_allowed(self):
+        r = self.calving([{'tag_number': '21'}], count=2)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, Animal.objects.count()), (5, 1))
+
+    def test_without_calves_behaves_as_before(self):
+        r = self.calving(None, count=2)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()['calves_created'], [])
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, Animal.objects.count()), (5, 0))
+
+    def test_more_cards_than_calves_rejected(self):
+        r = self.calving([{'tag_number': '21'}, {'tag_number': '22'}], count=1)
+        self.assertEqual(r.status_code, 400)
+        self.assert_nothing_saved()
+
+    def test_duplicate_tags_in_request_rejected(self):
+        r = self.calving([{'tag_number': '21'}, {'tag_number': '21'}])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('takrorlangan', r.json()['calves'][0])
+        self.assert_nothing_saved()
+
+    def test_existing_tag_rejected_and_nothing_saved(self):
+        self.make_animal('21')
+        r = self.calving([{'tag_number': '22'}, {'tag_number': '21'}])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('allaqachon', r.json()['calves'][0])
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, AnimalEvent.objects.count(), Animal.objects.count()), (3, 0, 1))
+
+    def test_blank_tag_rejected(self):
+        r = self.calving([{'tag_number': '   '}], count=1)
+        self.assertEqual(r.status_code, 400)
+        self.assert_nothing_saved()
+
+    def test_cards_only_for_birth(self):
+        r = self.client.post(EVENTS, {'animal_group': self.group.pk, 'event_type': 'kasallik', 'title': 'Shamollash',
+                                      'start_date': str(self.today), 'calves': [{'tag_number': '21'}]}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assert_nothing_saved()
+
+    def test_cards_cannot_be_added_on_update(self):
+        event_id = self.calving(None, count=1).json()['id']
+        r = self.client.patch(f'{EVENTS}{event_id}/', {'calves': [{'tag_number': '21'}]}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(Animal.objects.count(), 0)
+
+    def test_future_birth_date_rejected(self):
+        r = self.calving([{'tag_number': '21'}], count=1, start_date=str(self.today + timedelta(days=2)))
+        self.assertEqual(r.status_code, 400)
+        self.assert_nothing_saved()
+
+    def test_male_mother_rejected(self):
+        bull = self.make_animal('7', sex='erkak')
+        r = self.calving([{'tag_number': '21'}], count=1, animal=bull.pk)
+        self.assertEqual(r.status_code, 400)
+        self.group.refresh_from_db()
+        # Faqat testning o'zi yaratgan buqa qolgan: na yozuv, na buzoq kartochkasi, na guruh soni o'zgargan
+        self.assertEqual((self.group.count, AnimalEvent.objects.count(), list(Animal.objects.values_list('tag_number', flat=True))),
+                         (3, 0, ['7']))
+
+    def test_worker_cannot_open_cards(self):
+        self.client.force_authenticate(self.worker)
+        r = self.calving([{'tag_number': '21'}], count=1)
+        self.assertEqual(r.status_code, 403)
+        self.assert_nothing_saved()
+
+    def test_worker_can_still_record_birth_without_cards(self):
+        self.client.force_authenticate(self.worker)
+        r = self.calving(None, count=1)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, Animal.objects.count()), (4, 0))
+
+    def test_deleting_birth_keeps_cards_consistent(self):
+        """Tug'ilish o'chirilganda guruh soni qaytadi, lekin ochilgan kartochkalar qoladi."""
+        self.make_animal('1')
+        event_id = self.calving([{'tag_number': '21'}], count=1).json()['id']
+        self.assertEqual(self.client.delete(f'{EVENTS}{event_id}/').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+        self.assertEqual(Animal.objects.filter(status='faol').count(), 2)  # 2 <= 3: sig'adi
+
+    def test_cannot_delete_birth_while_its_cards_would_exceed_group_count(self):
+        """3 ta hayvon, 3 ta kartochka bor; tug'ilish +1 va buzoq kartochkasi: o'chirsak kartochkalar soni oshib ketadi."""
+        for tag in ('1', '2', '3'):
+            self.make_animal(tag)
+        event_id = self.calving([{'tag_number': '21'}], count=1).json()['id']
+        r = self.client.delete(f'{EVENTS}{event_id}/')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('kartochkasini o', str(r.json()))
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, AnimalEvent.objects.count(), Animal.objects.count()), (4, 1, 4))
+        # Buzoq kartochkasi o'chirilgach, tug'ilishni o'chirish mumkin
+        Animal.objects.filter(tag_number='21').delete()
+        self.assertEqual(self.client.delete(f'{EVENTS}{event_id}/').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+
+    def test_idempotent_retry_does_not_duplicate_cards(self):
+        body = {'animal_group': self.group.pk, 'event_type': 'tugilish', 'title': 'Buzoq', 'animal_count': 1,
+                'start_date': str(self.today), 'calves': [{'tag_number': '21'}]}
+        first = self.client.post(EVENTS, body, format='json', headers={'Idempotency-Key': 'calf-key-0001'})
+        second = self.client.post(EVENTS, body, format='json', headers={'Idempotency-Key': 'calf-key-0001'})
+        self.assertEqual((first.status_code, second.status_code), (201, 201))
+        self.assertEqual(second.headers.get('Idempotent-Replayed'), 'true')
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, Animal.objects.count(), AnimalEvent.objects.count()), (4, 1, 1))

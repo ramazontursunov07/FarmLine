@@ -36,10 +36,16 @@ const GROUP_STATUSES = {
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
+const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
+const EMPTY_CALF = { tag_number: '', name: '', sex: 'urgochi' };
+// Tug'ilishda shuncha buzoqqacha kartochkani shu yerning o'zida ochish mumkin (ko'pi bilan forma uzayib ketmasin)
+const MAX_CALF_CARDS = 10;
+
 const makeEventForm = () => ({
     animal_group: '',
     event_type: 'davolash',
     animal_count: '',
+    mother: '',
     title: '',
     description: '',
     start_date: today(),
@@ -68,6 +74,10 @@ function FarmWork() {
     const [reloadKey, setReloadKey] = useState(0);
 
     const [eventForm, setEventForm] = useState(makeEventForm);
+    const [animals, setAnimals] = useState([]);
+    const [calves, setCalves] = useState([]);
+    const [withCards, setWithCards] = useState(true);
+    const [eventNotice, setEventNotice] = useState('');
     const [eventError, setEventError] = useState('');
     const [savingEvent, setSavingEvent] = useState(false);
 
@@ -86,13 +96,15 @@ function FarmWork() {
             api.get('animals-group/', { params: { farm: farmId } }),
             api.get('animals-event/', { params: { farm: farmId } }),
             api.get('animals-type/'),
+            api.get('animals-card/', { params: { farm: farmId } }).catch(() => ({ data: [] })),
         ])
-            .then(([farmRes, groupsRes, eventsRes, typesRes]) => {
+            .then(([farmRes, groupsRes, eventsRes, typesRes, animalsRes]) => {
                 if (cancelled) return;
                 setFarm(farmRes.data);
                 setGroups(asList(groupsRes.data));
                 setEvents(asList(eventsRes.data));
                 setTypes(asList(typesRes.data));
+                setAnimals(asList(animalsRes.data));
                 setError('');
             })
             .catch((err) => {
@@ -115,6 +127,16 @@ function FarmWork() {
     const activeGroups = useMemo(() => groups.filter((g) => g.status === 'faol'), [groups]);
     const selectedGroup = eventForm.animal_group || (activeGroups[0] ? String(activeGroups[0].id) : '');
 
+    // Tug'ilish: ona tanlash (hamma uchun) va buzoq kartochkalarini ochish (faqat ferma egasi uchun)
+    const isBirth = eventForm.event_type === 'tugilish';
+    const birthCount = Number(eventForm.animal_count) || 0;
+    const canOpenCards = isOwner && isBirth && birthCount >= 1 && birthCount <= MAX_CALF_CARDS;
+    const openCards = canOpenCards && withCards;
+    const mothers = useMemo(
+        () => animals.filter((a) => a.sex === 'urgochi' && a.status === 'faol' && String(a.group) === selectedGroup),
+        [animals, selectedGroup]
+    );
+
     const ongoing = useMemo(() => events.filter((e) => e.status !== 'yakunlangan'), [events]);
 
     const workers = useMemo(() => {
@@ -136,19 +158,57 @@ function FarmWork() {
         [events, filters]
     );
 
-    const handleEventChange = (e) => setEventForm({ ...eventForm, [e.target.name]: e.target.value });
+    const handleEventChange = (e) => {
+        const { name, value } = e.target;
+        // Guruh almashsa, tanlangan ona ham shu guruhniki bo'lmay qoladi
+        setEventForm({ ...eventForm, [name]: value, ...(name === 'animal_group' ? { mother: '' } : {}) });
+    };
+
+    const handleCalfChange = (index, field, value) =>
+        setCalves((prev) => {
+            const next = Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => prev[i] || EMPTY_CALF);
+            next[index] = { ...next[index], [field]: value };
+            return next;
+        });
 
     const handleAddEvent = async (e) => {
         e.preventDefault();
-        setSavingEvent(true);
         setEventError('');
+        setEventNotice('');
+
+        const { mother, ...fields } = eventForm;
+        const payload = {
+            ...fields,
+            animal_group: Number(selectedGroup),
+            animal_count: eventForm.animal_count ? Number(eventForm.animal_count) : null,
+        };
+        if (isBirth && mother) payload.animal = Number(mother);
+        if (openCards) {
+            payload.calves = Array.from({ length: birthCount }, (_, i) => ({ ...EMPTY_CALF, ...calves[i] })).map((c) => ({
+                tag_number: c.tag_number.trim(),
+                name: c.name.trim(),
+                sex: c.sex,
+            }));
+            if (payload.calves.some((c) => !c.tag_number)) {
+                setEventError("Har bir buzoq uchun quloq raqamini kiriting");
+                return;
+            }
+        }
+        // Tug'ilishda sarlavha bo'sh qolsa, o'zimiz yozamiz
+        if (isBirth && !payload.title.trim()) {
+            const tags = (payload.calves || []).map((c) => `№${c.tag_number}`).join(', ');
+            payload.title = tags ? `Buzoq tug'ildi: ${tags}` : "Buzoq tug'ildi";
+        }
+
+        setSavingEvent(true);
         try {
-            await api.post('animals-event/', {
-                ...eventForm,
-                animal_group: Number(selectedGroup),
-                animal_count: eventForm.animal_count ? Number(eventForm.animal_count) : null,
-            });
+            const { data } = await api.post('animals-event/', payload);
+            const made = data?.calves_created ?? [];
+            if (made.length) {
+                setEventNotice(`Buzoq kartochkasi ochildi: ${made.map((a) => `№${a.tag_number}`).join(', ')}`);
+            }
             setEventForm(makeEventForm());
+            setCalves([]);
             reload();
         } catch (err) {
             setEventError(getErrorMessage(err, "Yozuvni saqlab bo'lmadi"));
@@ -320,6 +380,7 @@ function FarmWork() {
                         {/* Yangi yozuv */}
                         <h3 className="section-title">Yangi ish yozuvi</h3>
                         <div className="work-card">
+                            {eventNotice && <p className="success-text" role="status">{eventNotice}</p>}
                             {activeGroups.length === 0 ? (
                                 <p className="empty-state">
                                     {isOwner
@@ -356,13 +417,77 @@ function FarmWork() {
                                             value={eventForm.animal_count} onChange={handleEventChange}
                                             required={Boolean(COUNT_HINTS[eventForm.event_type])} />
                                         {COUNT_HINTS[eventForm.event_type] && (
-                                            <p className="workers-hint">{COUNT_HINTS[eventForm.event_type]}</p>
+                                            <p className="workers-hint">
+                                                {openCards
+                                                    ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
+                                                    : COUNT_HINTS[eventForm.event_type]}
+                                            </p>
                                         )}
                                     </div>
+                                    {isBirth && (
+                                        <div className="form-field">
+                                            <label>Onasi (ixtiyoriy)</label>
+                                            <select name="mother" value={eventForm.mother} onChange={handleEventChange}>
+                                                <option value="">—</option>
+                                                {mothers.map((m) => (
+                                                    <option key={m.id} value={m.id}>
+                                                        №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {isOwner && isBirth && birthCount > MAX_CALF_CARDS && (
+                                        <p className="workers-hint">
+                                            {MAX_CALF_CARDS} tadan ko'p buzoq bo'lsa, kartochkalarni keyin
+                                            "Hayvon kartochkalari" sahifasida oching.
+                                        </p>
+                                    )}
+                                    {canOpenCards && (
+                                        <div className="form-field">
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                                <input type="checkbox" checked={withCards}
+                                                    style={{ width: 'auto', margin: 0 }}
+                                                    onChange={(e) => setWithCards(e.target.checked)} />
+                                                Buzoq kartochkasini ham ochish
+                                            </label>
+                                        </div>
+                                    )}
+                                    {openCards && Array.from({ length: birthCount }, (_, i) => {
+                                        const calf = calves[i] || EMPTY_CALF;
+                                        return (
+                                            <div className="work-card" key={i} style={{ marginBottom: 12 }}>
+                                                <p className="workers-hint" style={{ marginTop: 0 }}>{i + 1}-buzoq</p>
+                                                <div className="form-row">
+                                                    <div className="form-field">
+                                                        <label>Quloq raqami</label>
+                                                        <input type="text" value={calf.tag_number} maxLength={30} required
+                                                            placeholder="Masalan: 21"
+                                                            onChange={(e) => handleCalfChange(i, 'tag_number', e.target.value)} />
+                                                    </div>
+                                                    <div className="form-field">
+                                                        <label>Jinsi</label>
+                                                        <select value={calf.sex}
+                                                            onChange={(e) => handleCalfChange(i, 'sex', e.target.value)}>
+                                                            {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div className="form-field">
+                                                    <label>Laqabi (ixtiyoriy)</label>
+                                                    <input type="text" value={calf.name} maxLength={100}
+                                                        onChange={(e) => handleCalfChange(i, 'name', e.target.value)} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                     <div className="form-field">
                                         <label>Sarlavha</label>
                                         <input type="text" name="title" value={eventForm.title} onChange={handleEventChange}
-                                            placeholder="Masalan: 10 ta tovuq antibiotik bilan davolanyapti" required />
+                                            placeholder={isBirth
+                                                ? "Bo'sh qoldirsangiz, avtomatik yoziladi"
+                                                : 'Masalan: 10 ta tovuq antibiotik bilan davolanyapti'}
+                                            required={!isBirth} />
                                     </div>
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>

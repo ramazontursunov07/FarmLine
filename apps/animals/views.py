@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -132,6 +132,12 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         if not is_farm_member(user, group.farm):
             raise PermissionDenied("Siz bu fermaga yozuv qo'sha olmaysiz.")
 
+        # Tug'ilish bilan birga buzoq kartochkalarini ochish (kartochkalarni faqat ferma egasi boshqaradi)
+        calves = serializer.validated_data.get('calves') or []
+        if calves and group.farm.owner_id != user.id:
+            raise PermissionDenied("Buzoq kartochkalarini faqat ferma egasi ochadi. "
+                                   "Tug'ilishni kartochkasiz yozing.")
+
         event_type = serializer.validated_data['event_type']
         if event_type not in COUNT_EVENT_TYPES:
             serializer.save(recorded_by=user)
@@ -163,10 +169,12 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     raise ValidationError({'animal_group': "Faol bo'lmagan guruhga tug'ilish yozib bo'lmaydi"})
                 locked.count += count
             locked.save(update_fields=['count', 'status', 'updated_at'])
-            serializer.save(recorded_by=user)
+            event = serializer.save(recorded_by=user)
             if event_type == 'olim' and animal is not None:
                 animal.status = 'olgan'
                 animal.save(update_fields=['status', 'updated_at'])
+            if event_type == 'tugilish' and calves:
+                event._calves_created = self._create_calves(event, locked, calves)
 
             if event_type == 'olim' and user.id != group.farm.owner_id:
                 notify_users([group.farm.owner], (
@@ -175,6 +183,22 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     f"Guruhda qoldi: {locked.count} ta\n"
                     f"Kim: {display_name(user)}"
                 ))
+
+    @staticmethod
+    def _create_calves(event, group, calves):
+        """Tug'ilish yozuvi bilan bir tranzaksiyada buzoq kartochkalarini ochadi (guruh allaqachon qulflangan)."""
+        try:
+            created = [
+                Animal.objects.create(
+                    farm_id=group.farm_id, group=group, tag_number=c['tag_number'], name=c.get('name', ''),
+                    sex=c.get('sex', 'urgochi'), birth_date=event.start_date, mother=event.animal, status='faol')
+                for c in calves
+            ]
+        except IntegrityError:  # bir vaqtda boshqa so'rov shu quloq raqamini band qilgan bo'lsa
+            raise ValidationError({'calves': "Bu quloq raqami fermada allaqachon bor"})
+        if Animal.objects.filter(group=group, status='faol').count() > group.count:
+            raise ValidationError({'calves': "Faol kartochkalar soni guruh sonidan oshib ketadi"})
+        return created
 
     def perform_update(self, serializer):
         event = serializer.instance
@@ -207,6 +231,12 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     raise ValidationError(
                         "Bu tug'ilishni o'chirib bo'lmaydi: undan keyin hayvonlar kamaygan, soni yetmay qoladi.")
                 locked.count -= instance.animal_count
+                cards = Animal.objects.filter(group=locked, status='faol').count()
+                if locked.count < cards:
+                    raise ValidationError(
+                        f"Bu tug'ilishni o'chirib bo'lmaydi: guruhda {cards} ta faol hayvon kartochkasi bor, "
+                        f"o'chirgandan keyin guruh soni ({locked.count} ta) undan kam bo'lib qoladi. "
+                        f"Avval buzoq kartochkasini o'chiring.")
             if locked.count > 0 and locked.status in ('olgan', 'sotilgan'):
                 locked.status = 'faol'
             locked.save(update_fields=['count', 'status', 'updated_at'])
