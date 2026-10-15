@@ -161,8 +161,8 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
                 <FarmRow
                     to={`/farms/${farm.id}/animals`}
                     icon="tag"
-                    title="Hayvon kartochkalari"
-                    status="Vazn, sut, tug'ish"
+                    title="Barcha hayvonlar"
+                    status="Vazn, sut, tug'ish, davolash"
                 />
                 <FarmRow
                     to={`/farms/${farm.id}/tasks`}

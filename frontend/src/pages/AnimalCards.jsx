@@ -10,8 +10,6 @@ const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
-const EMPTY_FORM = { group: '', tag_number: '', name: '', sex: 'urgochi', birth_date: '', mother: '' };
-
 function formatDate(iso) {
     if (!iso) return '';
     const [y, m, d] = iso.slice(0, 10).split('-');
@@ -28,17 +26,10 @@ function AnimalCards() {
     const [animals, setAnimals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [reloadKey, setReloadKey] = useState(0);
-
-    const [form, setForm] = useState(EMPTY_FORM);
-    const [formError, setFormError] = useState('');
-    const [saving, setSaving] = useState(false);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('faol');
     const groupFilter = searchParams.get('group') || '';
-
-    const reload = () => setReloadKey((k) => k + 1);
 
     useEffect(() => {
         let cancelled = false;
@@ -63,25 +54,7 @@ function AnimalCards() {
         return () => {
             cancelled = true;
         };
-    }, [farmId, reloadKey]);
-
-    const isOwner = farm ? farm.owner_username === user.username : false;
-    const activeGroups = useMemo(() => groups.filter((g) => g.status === 'faol'), [groups]);
-
-    // Har bir guruhda nechta faol kartochka borligi (guruh sonidan oshmasligi kerak)
-    const cardsPerGroup = useMemo(() => {
-        const map = {};
-        animals.forEach((a) => {
-            if (a.status === 'faol') map[a.group] = (map[a.group] || 0) + 1;
-        });
-        return map;
-    }, [animals]);
-
-    const selectedGroup = form.group || (activeGroups[0] ? String(activeGroups[0].id) : '');
-    const mothers = useMemo(
-        () => animals.filter((a) => a.sex === 'urgochi' && a.status !== 'olgan'),
-        [animals]
-    );
+    }, [farmId]);
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -92,30 +65,6 @@ function AnimalCards() {
                 (!q || a.tag_number.toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q))
         );
     }, [animals, groupFilter, statusFilter, search]);
-
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        setFormError('');
-        try {
-            await api.post('animals-card/', {
-                group: Number(selectedGroup),
-                tag_number: form.tag_number.trim(),
-                name: form.name.trim(),
-                sex: form.sex,
-                birth_date: form.birth_date || null,
-                mother: form.mother ? Number(form.mother) : null,
-            });
-            setForm({ ...EMPTY_FORM, group: selectedGroup });
-            reload();
-        } catch (err) {
-            setFormError(getErrorMessage(err, "Kartochkani saqlab bo'lmadi"));
-        } finally {
-            setSaving(false);
-        }
-    };
 
     return (
         <div className="app-shell">
@@ -192,71 +141,6 @@ function AnimalCards() {
                                     </li>
                                 ))}
                             </ul>
-                        )}
-
-                        {isOwner && (
-                            <>
-                                <h3 className="section-title">Yangi kartochka</h3>
-                                <div className="work-card">
-                                    {activeGroups.length === 0 ? (
-                                        <p className="empty-state">
-                                            Avval "Ferma ishlari" sahifasidan hayvon guruhini qo'shing.
-                                        </p>
-                                    ) : (
-                                        <form onSubmit={handleAdd}>
-                                            <div className="form-row">
-                                                <div className="form-field">
-                                                    <label>Hayvon guruhi</label>
-                                                    <select name="group" value={selectedGroup} onChange={handleChange}>
-                                                        {activeGroups.map((g) => (
-                                                            <option key={g.id} value={g.id}>
-                                                                {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''} ·
-                                                                {' '}kartochka: {cardsPerGroup[g.id] || 0}/{g.count}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div className="form-field">
-                                                    <label>Quloq raqami</label>
-                                                    <input type="text" name="tag_number" value={form.tag_number}
-                                                        onChange={handleChange} placeholder="Masalan: 14" maxLength={30} required />
-                                                </div>
-                                            </div>
-                                            <div className="form-row">
-                                                <div className="form-field">
-                                                    <label>Laqabi (ixtiyoriy)</label>
-                                                    <input type="text" name="name" value={form.name} onChange={handleChange} />
-                                                </div>
-                                                <div className="form-field">
-                                                    <label>Jinsi</label>
-                                                    <select name="sex" value={form.sex} onChange={handleChange}>
-                                                        {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div className="form-row">
-                                                <div className="form-field">
-                                                    <label>Tug'ilgan sana (ixtiyoriy)</label>
-                                                    <input type="date" name="birth_date" value={form.birth_date} onChange={handleChange} />
-                                                </div>
-                                                <div className="form-field">
-                                                    <label>Onasi (ixtiyoriy)</label>
-                                                    <select name="mother" value={form.mother} onChange={handleChange}>
-                                                        <option value="">—</option>
-                                                        {mothers.map((m) => (
-                                                            <option key={m.id} value={m.id}>№{m.tag_number}{m.name ? ` · ${m.name}` : ''}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {formError && <p className="error-text" role="alert">{formError}</p>}
-                                            <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                                                {saving ? 'Kuting...' : "Kartochka qo'shish"}
-                                            </button>
-                                        </form>
-                                    )}
-                                </div>
-                            </>
                         )}
                     </>
                 )}
