@@ -1334,3 +1334,99 @@ a.farm-tile:hover {
 .btn-install:hover {
     background: var(--color-primary-light);
 }
+
+/* ---- Hayvon kartochkalari ---- */
+.animal-link {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.animal-link:hover {
+    text-decoration: underline;
+}
+
+.animal-open {
+    text-decoration: none;
+}
+
+.animal-item--olgan,
+.animal-item--sotilgan {
+    opacity: 0.7;
+}
+
+.animal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.animal-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.animal-stat-label {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.animal-stat-value {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.animal-stat-sub {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.animal-chart {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    color: var(--color-primary);
+}
+
+.animal-chart-label {
+    font-size: 9px;
+    fill: var(--color-text-muted);
+}
+
+.animal-inline-form {
+    margin-top: 8px;
+}
+
+.animal-mini-list {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    font-size: 14px;
+}
+
+.animal-mini-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px solid var(--color-border);
+}
+
+.animal-mini-list li span {
+    min-width: 90px;
+    color: var(--color-text-muted);
+}
+
+.animal-owner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 32px;
+}

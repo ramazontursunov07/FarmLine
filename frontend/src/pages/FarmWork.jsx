@@ -305,6 +305,10 @@ function FarmWork() {
                             {isOwner ? ' · Ishchilar yozgan ishlar ham shu yerda ko\'rinadi' : ''}
                         </p>
 
+                        <Link to={`/farms/${farmId}/animals`} className="back-link">
+                            Hayvon kartochkalari (vazn, sut, tug'ish) →
+                        </Link>
+
                         {/* Davom etayotgan ishlar */}
                         <h3 className="section-title">Davom etayotgan ishlar</h3>
                         {ongoing.length === 0 ? (
@@ -404,6 +408,11 @@ function FarmWork() {
                                                 {g.count} ta{g.birth_date ? ` · tug'ilgan: ${formatDate(g.birth_date)}` : ''}
                                                 {!isOwner && ` · ${g.status_display}`}
                                             </span>
+                                        </div>
+                                        <div className="work-side">
+                                            <Link to={`/farms/${farmId}/animals?group=${g.id}`} className="farm-item-action">
+                                                Kartochkalar
+                                            </Link>
                                         </div>
                                         {isOwner && (
                                             <div className="work-side">

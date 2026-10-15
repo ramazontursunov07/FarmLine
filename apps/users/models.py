@@ -84,4 +84,6 @@ class TelegramLinkToken(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - Telegram ulash ({'ishlatilgan' if self.is_used else 'faol'})"
-    
+
+
+"""O'rganildi."""

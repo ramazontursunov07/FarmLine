@@ -10,6 +10,9 @@ import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
 import AssistantChat from '../components/AssistantChat';
+import { Icon } from '../components/dashboardKit';
+import { greeting, longDate } from '../utils/dashboardDates';
+import './Dashboard.css';
 
 const FARM_TYPES = {
     chorvachilik: 'Chorvachilik',
@@ -17,47 +20,32 @@ const FARM_TYPES = {
     aralash: 'Aralash',
 };
 
-const ICONS = {
-    work: (
-        <path d="M5 4h11l3 3v13H5V4zm3 6h8M8 14h8M8 18h5" />
-    ),
-    tasks: (
-        <path d="M4 6l2 2 3-3M4 14l2 2 3-3M12 7h8M12 15h8" />
-    ),
-    stock: (
-        <path d="M3 8l9-4 9 4-9 4-9-4zm0 0v8l9 4 9-4V8M12 12v8" />
-    ),
-    money: (
-        <path d="M3 7h18v12H3V7zm0 4h18M16 15h2" />
-    ),
-    lock: (
-        <path d="M6 11h12v9H6v-9zm3 0V8a3 3 0 016 0v3" />
-    ),
-};
-
-function TileIcon({ name }) {
-    return (
-        <svg className="farm-tile-icon" viewBox="0 0 24 24" width="22" height="22" fill="none"
-            stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {ICONS[name]}
-        </svg>
-    );
-}
-
-// Ferma ichidagi bo'limga o'tish kartochkasi. to bo'lmasa, kartochka bosilmaydi (ruxsat yo'q).
-function FarmTile({ to, icon, title, status, alert }) {
+// Ferma ichidagi bo'limga o'tish qatori. to bo'lmasa, qator bosilmaydi (ruxsat yo'q).
+// onClick berilsa, qator havola emas, ochiladigan tugma bo'ladi (expanded: ochiq yoki yo'qligi)
+function FarmRow({ to, icon, title, status, alert, onClick, expanded }) {
     const body = (
         <>
-            <TileIcon name={icon} />
-            <span className="farm-tile-title">{title}</span>
-            <span className={`farm-tile-status${alert ? ' farm-tile-status--alert' : ''}`}>{status}</span>
+            <span className="db-row-icon"><Icon name={icon} size={18} /></span>
+            <span className="db-row-text">
+                <span className="db-row-title">{title}</span>
+                <span className="db-row-status">{status}</span>
+            </span>
+            {(to || onClick) && <Icon name="chevron" size={16} className="db-row-go" />}
         </>
     );
+    if (onClick) {
+        return (
+            <button type="button" className={`db-row db-row--button${expanded ? ' is-open' : ''}`}
+                onClick={onClick} aria-expanded={expanded}>
+                {body}
+            </button>
+        );
+    }
     if (!to) {
-        return <div className="farm-tile farm-tile--locked" aria-disabled="true">{body}</div>;
+        return <div className="db-row db-row--locked" aria-disabled="true">{body}</div>;
     }
     return (
-        <Link className={`farm-tile${alert ? ' farm-tile--alert' : ''}`} to={to}>
+        <Link className={`db-row${alert ? ' db-row--alert' : ''}`} to={to}>
             {body}
         </Link>
     );
@@ -116,7 +104,7 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
 
     if (editing) {
         return (
-            <li className="farm-item farm-item--editing">
+            <li className="db-farm db-farm--editing">
                 <form className="farm-edit-form" onSubmit={handleSave}>
                     <div className="form-field">
                         <label>Nomi</label>
@@ -154,65 +142,105 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
     const stockStatus = lowStock > 0 ? `${lowStock} ta kam qolgan` : 'Zaxira yetarli';
 
     return (
-        <li className="farm-card">
-            <div className="farm-card-head">
+        <li className="db-farm">
+            <div className="db-farm-head">
                 <div>
-                    <span className="farm-card-name">{farm.name}</span>
-                    <span className="farm-card-location">{farm.location}</span>
+                    <h3 className="db-farm-name">{farm.name}</h3>
+                    <p className="db-farm-place">{farm.location}</p>
                 </div>
-                <span className="farm-item-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
+                <span className="db-farm-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
             </div>
 
-            <div className="farm-tiles">
-                <FarmTile
+            <div className="db-rows">
+                <FarmRow
                     to={`/farms/${farm.id}/work`}
                     icon="work"
                     title="Ferma ishlari"
                     status="Hayvonlar va davolash"
                 />
-                <FarmTile
+                <FarmRow
+                    to={`/farms/${farm.id}/animals`}
+                    icon="tag"
+                    title="Hayvon kartochkalari"
+                    status="Vazn, sut, tug'ish"
+                />
+                <FarmRow
                     to={`/farms/${farm.id}/tasks`}
                     icon="tasks"
                     title="Vazifalar"
                     status={taskStatus}
                     alert={tasks.overdue > 0}
                 />
-                <FarmTile
+                <FarmRow
                     to={`/farms/${farm.id}/inventory`}
                     icon="stock"
                     title="Ombor"
                     status={stockStatus}
                     alert={lowStock > 0}
                 />
-                <FarmTile
+                <FarmRow
                     to={showFinance ? `/farms/${farm.id}/finance` : null}
                     icon={showFinance ? 'money' : 'lock'}
                     title="Kirim-chiqim"
                     status={showFinance ? 'Hisob-kitob' : "Ko'rishga ruxsat yo'q"}
                 />
+                {canManage && (
+                    <>
+                        <FarmRow
+                            icon="users"
+                            title="Ishchilar"
+                            status="Qo'shish va ruxsatlar"
+                            onClick={() => setShowWorkers((v) => !v)}
+                            expanded={showWorkers}
+                        />
+                        {showWorkers && <div className="db-workers"><WorkersPanel farmId={farm.id} /></div>}
+                    </>
+                )}
             </div>
 
             {canManage && (
-                <div className="farm-card-actions">
-                    <button type="button" className="farm-item-action" onClick={() => setShowWorkers((v) => !v)}>
-                        {showWorkers ? 'Ishchilarni yopish' : 'Ishchilar'}
-                    </button>
-                    <button type="button" className="farm-item-action" onClick={startEdit}>
+                <div className="db-farm-actions">
+                    <button type="button" className="db-link-btn" onClick={startEdit}>
                         Tahrirlash
                     </button>
-                    <button type="button" className="farm-item-action farm-item-action--danger" onClick={handleDelete}>
+                    <button type="button" className="db-link-btn db-link-btn--danger" onClick={handleDelete}>
                         O'chirish
                     </button>
                 </div>
             )}
-            {canManage && showWorkers && <WorkersPanel farmId={farm.id} />}
         </li>
     );
 }
 
-function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdated, onDeleted }) {
+// Yangi ferma qo'shish: dastlab yig'ilgan, bosilganda forma ochiladi
+function NewFarm({ onCreated, first }) {
+    const [expanded, setExpanded] = useState(false);
+    const open = expanded || first; // birinchi fermada forma darrov ochiq turadi
+    const setOpen = setExpanded;
+
+    if (!open) {
+        return (
+            <li className="db-farm db-farm--new">
+                <button type="button" className="db-newfarm-btn" onClick={() => setOpen(true)}>
+                    <Icon name="plus" size={22} />
+                    <span>Yangi ferma qo'shish</span>
+                </button>
+            </li>
+        );
+    }
     return (
-        <ul className="farm-list">
+        <li className="db-farm db-farm--form">
+            <FarmForm onFarmCreated={(farm) => { onCreated(farm); setOpen(false); }} />
+            {!first && (
+                <button type="button" className="db-link-btn" onClick={() => setOpen(false)}>Bekor qilish</button>
+            )}
+        </li>
+    );
+}
+
+function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdated, onDeleted, extra }) {
+    return (
+        <ul className="db-farms">
             {farms.map((farm) => (
                 <FarmItem
                     key={farm.id}
@@ -225,6 +253,7 @@ function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdate
                     onDeleted={onDeleted}
                 />
             ))}
+            {extra}
         </ul>
     );
 }
@@ -323,16 +352,15 @@ function Dashboard() {
     };
 
     const renderFarms = () => {
-        if (loading) return <p className="empty-state">Yuklanmoqda...</p>;
+        if (loading) return <p className="db-muted">Yuklanmoqda...</p>;
         if (error) {
             return (
-                <div className="empty-state">
+                <div className="db-muted">
                     <p className="error-text">{error}</p>
                     <button className="btn-ghost" onClick={handleRetry}>Qayta urinish</button>
                 </div>
             );
         }
-        if (farms.length === 0) return <p className="empty-state">Hali fermangiz yo'q</p>;
         return (
             <FarmList
                 farms={farms}
@@ -341,12 +369,23 @@ function Dashboard() {
                 lowStockCounts={lowStockCounts}
                 onUpdated={handleFarmUpdated}
                 onDeleted={handleFarmDeleted}
+                extra={user.role === 'fermer' ? <NewFarm onCreated={handleFarmCreated} first={farms.length === 0} /> : null}
             />
         );
     };
 
+    const openTasks = Object.values(taskCounts).reduce((s, c) => s + c.open, 0);
+    const lateTasks = Object.values(taskCounts).reduce((s, c) => s + c.overdue, 0);
+
+    const farmsSection = (
+        <section className="db-section">
+            <h2 className="db-h2">{user.role === 'fermer' ? 'Mening fermalarim' : 'Sizning fermalaringiz'}</h2>
+            {renderFarms()}
+        </section>
+    );
+
     return (
-        <div className="app-shell">
+        <div className="app-shell db-page">
             <header className="app-header">
                 <h1>FarmLine</h1>
                 <div className="user-bar">
@@ -357,35 +396,42 @@ function Dashboard() {
                 </div>
             </header>
 
-            <main className="app-main">
-                <TelegramBanner />
-
-                {user.role === 'admin' && (
+            {user.role === 'admin' && (
+                <main className="app-main">
+                    <TelegramBanner />
                     <div className="panel">
                         <h2 className="panel-title">Admin Panel</h2>
                         <p className="panel-subtitle">Barcha fermerlar va ularning fermalari</p>
                         <AdminPanel />
                     </div>
-                )}
+                </main>
+            )}
 
-                {user.role === 'fermer' && <FarmerOverview refreshKey={`${farms.length}-${dataVersion}`} />}
+            {user.role === 'fermer' && (
+                <FarmerOverview refreshKey={`${farms.length}-${dataVersion}`}>
+                    <TelegramBanner />
+                    {farmsSection}
+                </FarmerOverview>
+            )}
 
-                {user.role === 'fermer' && (
-                    <div className="panel">
-                        <h2 className="panel-title">Mening fermalarim</h2>
-                        <FarmForm onFarmCreated={handleFarmCreated} />
-                        {renderFarms()}
-                    </div>
-                )}
-
-                {user.role === 'ishchi' && (
-                    <div className="panel">
-                        <h2 className="panel-title">Ish paneli</h2>
-                        <p className="panel-subtitle">Sizga tayinlangan fermalar</p>
-                        {renderFarms()}
-                    </div>
-                )}
-            </main>
+            {user.role === 'ishchi' && (
+                <>
+                    <section className="db-hero">
+                        <div className="db-hero-inner">
+                            <div className="db-hero-main">
+                                <p className="db-date">{longDate()}</p>
+                                <h2 className="db-hello">{greeting()}, {user.first_name || user.username}</h2>
+                                <p className="db-hero-note">
+                                    {openTasks === 0
+                                        ? "Sizga tayinlangan ochiq vazifa yo'q."
+                                        : `Sizda ${openTasks} ta ochiq vazifa bor${lateTasks > 0 ? `, ${lateTasks} tasining muddati o'tgan` : ''}.`}
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                    <div className="db-main">{farmsSection}</div>
+                </>
+            )}
             <AssistantChat onActionDone={() => setDataVersion((v) => v + 1)} />
         </div>
     );

@@ -42,9 +42,9 @@ function compact(value) {
 
 function ProfitChart({ months }) {
     const W = 360;
-    const H = 190;
+    const H = 200;
     const top = 22;
-    const bottom = 24;
+    const bottom = 34;
     const plotH = H - top - bottom;
     const maxPos = Math.max(0, ...months.map((m) => m.profit));
     const maxNeg = Math.max(0, ...months.map((m) => -m.profit));

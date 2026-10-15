@@ -54,9 +54,9 @@ def _more(total):
 
 # ---------------------------------------------------------------- 1. Yem bashorati
 def feed_forecast_lines(farm, today):
-    items = list(InventoryItem.objects.filter(farm=farm, item_type='ozuqa'))
-    if not items:
-        return []
+    items = list(InventoryItem.objects.filter(farm=farm, item_type='ozuqa')) #shu fermadagi barcha ozuqalarni olib keladi.
+    if not items:  #agarda bo'lmasa deb tekshiradi.
+        return [] #quruq list
 
     since = today - timedelta(days=FEED_LOOKBACK_DAYS - 1)
     usage = {
@@ -121,21 +121,21 @@ def spending_alert_lines(farm, today):
     if today.day < SPEND_MIN_DAY:
         return []
 
-    this_start = today.replace(day=1)
-    prev_last = this_start - timedelta(days=1)
-    prev_start = prev_last.replace(day=1)
+    this_start = today.replace(day=1) #oyning boshini topadi.
+    prev_last = this_start - timedelta(days=1) #oyning oxirini topadi.
+    prev_start = prev_last.replace(day=1) #o'tgan oyning birinchi kunini topadi.
     # O'tgan oyning xuddi shu davri bilan solishtiramiz (to'liq oy bilan emas): 1..bugungi kun
-    prev_end = prev_start.replace(day=min(today.day, prev_last.day))
+    prev_end = prev_start.replace(day=min(today.day, prev_last.day)) #o'tgan oydagi bugungi kunga teng sanani topadi.
 
     current = _expense_by_category(farm, this_start, today)
     previous = _expense_by_category(farm, prev_start, prev_end)
-    cur_total = sum(current.values(), Decimal('0'))
-    prev_total = sum(previous.values(), Decimal('0'))
+    cur_total = sum(current.values(), Decimal('0')) #shu oy chiqimi
+    prev_total = sum(previous.values(), Decimal('0')) #o'tgan oy chiqimi
     if prev_total <= 0:
         return []  # solishtiradigan narsa yo'q
 
-    diff = cur_total - prev_total
-    percent = diff * 100 / prev_total
+    diff = cur_total - prev_total #shu oy va o'tgan oy chiqimi farqi.
+    percent = diff * 100 / prev_total #chiqimni necha foiz o'sganini hisoblaydi.
     if percent < SPEND_GROWTH_PERCENT or diff < SPEND_MIN_DIFF:
         return []
 
@@ -154,7 +154,7 @@ def spending_alert_lines(farm, today):
 # ---------------------------------------------------------------- 3. Vaksinatsiya eslatmasi
 def _when(start_date, today):
     delta = (start_date - today).days
-    if delta == 0:
+    if delta == 0: #Agarda vaksinatsiya bugun boshlangan bo'lsa.Bugun deydi.
         return "bugun"
     if delta == 1:
         return "ertaga"
@@ -203,3 +203,5 @@ def build_alert_lines(farm, today):
         except Exception:
             logger.exception("Ogohlantirishni hisoblashda xato: %s (ferma id=%s)", builder.__name__, farm.pk)
     return lines
+
+"""O'rganildi"""

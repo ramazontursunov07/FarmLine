@@ -36,4 +36,6 @@ def notify_users(users, text):
             run()
 
     transaction.on_commit(dispatch)
-    
+
+
+"""O'rganildi."""

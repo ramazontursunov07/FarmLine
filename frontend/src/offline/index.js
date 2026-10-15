@@ -16,12 +16,14 @@ import { getOfflineState, setOfflineState } from './state';
 // (ularda yangi akkaunt yaratiladi) internetni talab qiladi.
 const QUEUEABLE = new Set([
     'farms', 'tasks', 'finance', 'animals-event', 'animals-group', 'animals-type',
+    'animals-card', 'animals-weight', 'animals-milk',
     'inventory-item', 'inventory-transaction',
 ]);
 
 const RESOURCE_LABEL = {
     farms: 'Ferma', tasks: 'Vazifa', finance: 'Kirim-chiqim', 'animals-event': 'Hayvon ishi',
     'animals-group': 'Hayvon guruhi', 'animals-type': 'Hayvon turi',
+    'animals-card': 'Hayvon kartochkasi', 'animals-weight': 'Hayvon vazni', 'animals-milk': 'Sut miqdori',
     'inventory-item': 'Ombor mahsuloti', 'inventory-transaction': 'Ombor harakati',
 };
 const ACTION_LABEL = { post: "qo'shish", patch: "o'zgartirish", delete: "o'chirish" };
@@ -216,7 +218,8 @@ function containsTmp(value, tmpIds) {
 export function describeOp(op) {
     const name = RESOURCE_LABEL[op.resource] || op.resource;
     const d = op.data || {};
-    const detail = d.title || d.item_name || d.name || d.description || d.note || (d.amount ? `${d.amount} so'm` : '');
+    const detail = d.title || d.item_name || d.name || (d.tag_number ? `№${d.tag_number}` : '') || d.description || d.note
+        || (d.weight_kg ? `${d.weight_kg} kg` : '') || (d.liters ? `${d.liters} l` : '') || (d.amount ? `${d.amount} so'm` : '');
     return `${name}: ${ACTION_LABEL[op.method] || op.method}${detail ? ` («${String(detail).slice(0, 40)}»)` : ''}`;
 }
 

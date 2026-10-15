@@ -11,3 +11,5 @@ class IsAppAdmin(BasePermission):
 
     def has_permission(self, request, view):
         return is_app_admin(request.user)
+
+"""O'ranildi."""

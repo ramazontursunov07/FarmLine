@@ -93,3 +93,5 @@ def build_worker_digest(user, today):
         lines.append(f"{mark}{t.title}{due}")
     lines += _more(len(tasks)) if len(tasks) > MAX_ITEMS * 2 else []
     return "\n".join(lines)
+
+"""O'rganildi."""

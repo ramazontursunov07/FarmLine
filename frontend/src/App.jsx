@@ -6,6 +6,8 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
 import FarmWork from './pages/FarmWork';
+import AnimalCards from './pages/AnimalCards';
+import AnimalCard from './pages/AnimalCard';
 import Tasks from './pages/Tasks';
 import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
@@ -41,6 +43,24 @@ function App() {
                 element={
                     <PrivateRoute>
                         <FarmWork />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/animals"
+                element={
+                    <PrivateRoute>
+                        <AnimalCards />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/animals/:animalId"
+                element={
+                    <PrivateRoute>
+                        <AnimalCard />
                     </PrivateRoute>
                 }
             />

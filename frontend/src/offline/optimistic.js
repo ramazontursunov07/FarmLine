@@ -14,6 +14,9 @@ const EVENT_STATUS = { boshlangan: 'Boshlangan', davom_etmoqda: 'Davom etmoqda',
 const GROUP_STATUS = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan", yoqolgan: "Yo'qolgan" };
 const ITEM_TYPE = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
 const MOVE_TYPE = { kirim: 'Kirim', sarf: 'Sarf' };
+const SEX = { urgochi: "Urg'ochi", erkak: 'Erkak' };
+const ANIMAL_STATUS = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
+const SESSION = { kun: 'Butun kun', ertalab: 'Ertalab', kechqurun: 'Kechqurun' };
 
 const COUNT_EVENTS = ['olim', 'tugilish'];
 
@@ -67,7 +70,7 @@ function matchesParams(rec, params = {}) {
     for (const [k, v] of Object.entries(params)) {
         if (v === '' || v == null) continue;
         if (k === 'farm' || k === 'status' || k === 'transaction_type' || k === 'category' || k === 'item_type'
-            || k === 'event_type' || k === 'inventory_item') {
+            || k === 'event_type' || k === 'inventory_item' || k === 'animal' || k === 'group' || k === 'sex') {
             if (rec[k] !== undefined && String(rec[k]) !== String(v)) return false;
         } else if (k === 'open' && (v === 1 || v === '1' || v === true)) {
             if (rec.status === 'bajarildi') return false;
@@ -119,6 +122,22 @@ function derive(resource, rec, entries) {
         const end = out.end_date ? new Date(out.end_date) : new Date();
         out.days_since_start = out.start_date ? Math.max(0, Math.floor((end - new Date(out.start_date)) / 86400000)) : 0;
         out.recorded_by_username ??= user?.username ?? null;
+        out.recorded_by_name ??= user?.username ?? null;
+    } else if (resource === 'animals-card') {
+        const group = recordsOf(entries, 'animals-group').find((g) => sameId(g.id, out.group));
+        if (group) {
+            out.farm = group.farm;
+            out.group_label = group.breed ? `${group.animal_type_name} (${group.breed})` : group.animal_type_name;
+        }
+        out.sex_display = SEX[out.sex] ?? out.sex;
+        out.status_display = ANIMAL_STATUS[out.status] ?? out.status;
+    } else if (resource === 'animals-weight' || resource === 'animals-milk') {
+        const animal = recordsOf(entries, 'animals-card').find((a) => sameId(a.id, out.animal));
+        if (animal) {
+            out.farm = animal.farm;
+            out.animal_tag = animal.tag_number;
+        }
+        if (resource === 'animals-milk') out.session_display = SESSION[out.session] ?? out.session;
         out.recorded_by_name ??= user?.username ?? null;
     } else if (resource === 'inventory-item') {
         out.item_type_display = ITEM_TYPE[out.item_type] ?? out.item_type;
@@ -239,6 +258,15 @@ export async function applyCreate(userId, resource, payload, tmpId) {
     if (resource === 'animals-group') {
         rec.status ??= 'faol';
         rec.updated_at = rec.created_at;
+    }
+    if (resource === 'animals-card') {
+        rec.status ??= 'faol';
+        rec.sex ??= 'urgochi';
+        rec.updated_at = rec.created_at;
+    }
+    if (resource === 'animals-weight' || resource === 'animals-milk') {
+        rec.recorded_by = user?.id ?? null;
+        if (resource === 'animals-milk') rec.session ??= 'kun';
     }
     if (resource === 'tasks') {
         rec.status ??= 'yangi';

@@ -74,6 +74,14 @@ class AnimalEvent(models.Model):  #ishlar
         on_delete=models.CASCADE,
         related_name='events'
     )
+    # Ixtiyoriy: voqea guruhning bitta aniq hayvoniga tegishli bo'lsa (individual kartochka)
+    animal = models.ForeignKey(
+        'animals.Animal',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='events'
+    )
     event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -102,3 +110,87 @@ class AnimalEvent(models.Model):  #ishlar
         """Voqea boshlangandan beri necha kun o'tgani (masalan davolanish davomiyligi)"""
         end = self.end_date or timezone.now().date()
         return (end - self.start_date).days
+
+
+class Animal(models.Model):
+    """Guruh ichidagi alohida hayvon kartochkasi (masalan, quloq raqami №14 sigir). Ixtiyoriy."""
+    SEX_CHOICES = (
+        ('urgochi', "Urg'ochi"),
+        ('erkak', 'Erkak'),
+    )
+    STATUS_CHOICES = (
+        ('faol', 'Faol'),
+        ('sotilgan', 'Sotilgan'),
+        ('olgan', "O'lgan"),
+    )
+
+    # farm guruhdan olinadi, lekin quloq raqami fermada noyob bo'lishi uchun alohida saqlanadi
+    farm = models.ForeignKey('farms.Farm', on_delete=models.CASCADE, related_name='animals')
+    group = models.ForeignKey(AnimalGroup, on_delete=models.CASCADE, related_name='animals')
+    tag_number = models.CharField(max_length=30)  # quloq raqami / birka
+    name = models.CharField(max_length=100, blank=True)  # laqabi
+    sex = models.CharField(max_length=10, choices=SEX_CHOICES, default='urgochi')
+    birth_date = models.DateField(null=True, blank=True)
+    mother = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='calves')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['tag_number']
+        verbose_name = "Hayvon kartochkasi"
+        verbose_name_plural = "Hayvon kartochkalari"
+        constraints = [
+            models.UniqueConstraint(fields=['farm', 'tag_number'], name='unique_animal_tag_per_farm'),
+        ]
+
+    def __str__(self):
+        return f"№{self.tag_number} {self.name}".strip()
+
+
+class WeightRecord(models.Model):
+    """Hayvon vazni tarixi (kg)."""
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='weights')
+    date = models.DateField()
+    weight_kg = models.DecimalField(max_digits=7, decimal_places=1)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_weights'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['animal', 'date'], name='unique_weight_per_animal_day'),
+        ]
+
+    def __str__(self):
+        return f"{self.animal} - {self.weight_kg} kg ({self.date})"
+
+
+class MilkRecord(models.Model):
+    """Sut miqdori (litr). Kuniga bir yoki bir necha marta (ertalab/kechqurun) yozilishi mumkin."""
+    SESSION_CHOICES = (
+        ('kun', 'Butun kun'),
+        ('ertalab', 'Ertalab'),
+        ('kechqurun', 'Kechqurun'),
+    )
+
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='milk_records')
+    date = models.DateField()
+    session = models.CharField(max_length=10, choices=SESSION_CHOICES, default='kun')
+    liters = models.DecimalField(max_digits=6, decimal_places=1)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_milk'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['animal', 'date', 'session'], name='unique_milk_per_animal_session'),
+        ]
+
+    def __str__(self):
+        return f"{self.animal} - {self.liters} l ({self.date}, {self.session})"

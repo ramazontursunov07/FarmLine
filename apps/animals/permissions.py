@@ -12,12 +12,14 @@ class IsFarmOwnerOrWorker(BasePermission):
         return request.user and request.user.is_authenticated  #user bo'lsa va u authenticateddan o'tgan bo'lsa.
 
     def has_object_permission(self, request, view, obj):
-        # AnimalGroup uchun farm to'g'ridan-to'g'ri bor,
-        # AnimalEvent uchun esa animal_group orqali olinadi
+        # AnimalGroup va Animal uchun farm to'g'ridan-to'g'ri bor,
+        # AnimalEvent uchun animal_group, vazn/sut yozuvlari uchun animal orqali olinadi
         if hasattr(obj, 'farm'):
             farm = obj.farm
         elif hasattr(obj, 'animal_group'):
             farm = obj.animal_group.farm
+        elif hasattr(obj, 'animal'):  # vazn va sut yozuvlari
+            farm = obj.animal.farm
         else:
             return False
 

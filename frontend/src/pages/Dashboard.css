@@ -1,0 +1,680 @@
+/* Dashboard: "bugun nimaga e'tibor berish kerak" tepada, fermalar o'rtada, tahlil pastda */
+
+:root {
+    --db-band: #28402F;
+    --db-band-deep: #1E3226;
+    --db-on-band: #EEF1E6;
+    --db-on-band-muted: rgba(238, 241, 230, 0.68);
+    --db-on-band-line: rgba(238, 241, 230, 0.16);
+    --db-leaf: #A5CFA4;
+    --db-amber: #EBBE6F;
+    --db-rose: #F2A491;
+    --db-teal: #86BFCB;
+}
+
+/* ---------- Tepa qism ---------- */
+.db-hero {
+    background: var(--db-band);
+    color: var(--db-on-band);
+}
+
+.db-hero-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 32px 48px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 56px;
+    align-items: start;
+}
+
+.db-date {
+    margin: 0 0 4px;
+    font-size: 15px;
+    color: var(--db-on-band-muted);
+}
+
+.db-hello {
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    color: var(--db-on-band);
+    margin: 0 0 24px;
+}
+
+.db-hero-note {
+    margin: 0;
+    font-size: 16px;
+    color: var(--db-on-band-muted);
+    max-width: 52ch;
+}
+
+/* Ferma tanlash */
+.db-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 28px;
+}
+
+.db-pill {
+    padding: 7px 14px;
+    border: 1px solid var(--db-on-band-line);
+    background: transparent;
+    color: var(--db-on-band);
+    font-size: 14px;
+    border-radius: 999px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.db-pill:hover {
+    border-color: var(--db-on-band-muted);
+}
+
+.db-pill[aria-pressed='true'] {
+    background: var(--db-on-band);
+    border-color: var(--db-on-band);
+    color: var(--db-band);
+    font-weight: 600;
+}
+
+.db-hero button:focus-visible,
+.db-hero a:focus-visible {
+    outline: 2px solid var(--db-amber);
+    outline-offset: 2px;
+}
+
+/* E'tibor talab qiladigan ishlar */
+.db-attn-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--db-on-band);
+    margin: 0 0 14px;
+}
+
+.db-attn-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--db-on-band-line);
+}
+
+.db-attn-list li {
+    border-bottom: 1px solid var(--db-on-band-line);
+}
+
+.db-attn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 8px;
+    margin: 0 -8px;
+    color: var(--db-on-band);
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.db-attn:hover {
+    background: rgba(238, 241, 230, 0.07);
+}
+
+.db-attn-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(238, 241, 230, 0.1);
+}
+
+.db-attn--late .db-attn-icon { color: var(--db-rose); }
+.db-attn--stock .db-attn-icon { color: var(--db-amber); }
+.db-attn--care .db-attn-icon { color: var(--db-teal); }
+
+.db-attn-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.db-attn-name {
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.db-attn-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    font-size: 13.5px;
+    color: var(--db-on-band-muted);
+}
+
+.db-attn-kind {
+    font-weight: 600;
+}
+
+.db-attn--late .db-attn-kind { color: var(--db-rose); }
+.db-attn--stock .db-attn-kind { color: var(--db-amber); }
+.db-attn--care .db-attn-kind { color: var(--db-teal); }
+
+.db-attn-go {
+    flex: none;
+    color: var(--db-on-band-muted);
+    transition: transform 0.15s ease;
+}
+
+.db-attn:hover .db-attn-go {
+    transform: translateX(3px);
+}
+
+.db-more {
+    margin: 12px 0 0;
+    padding: 6px 0;
+    background: none;
+    border: none;
+    color: var(--db-on-band);
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.db-attn-rest {
+    margin: 10px 0 0;
+    font-size: 13.5px;
+    color: var(--db-on-band-muted);
+}
+
+.db-allgood {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 18px 0;
+    border-top: 1px solid var(--db-on-band-line);
+    color: var(--db-leaf);
+}
+
+.db-allgood-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--db-on-band);
+}
+
+.db-allgood-text {
+    margin: 2px 0 0;
+    font-size: 15px;
+    color: var(--db-on-band-muted);
+}
+
+/* ---------- Shu oy hisobi ---------- */
+.db-money {
+    background: var(--db-band-deep);
+    border-radius: 6px;
+    padding: 24px 24px 20px;
+}
+
+.db-money-month {
+    margin: 0 0 14px;
+    font-size: 15px;
+    color: var(--db-on-band-muted);
+}
+
+.db-money-month::first-letter {
+    text-transform: uppercase;
+}
+
+.db-money-result {
+    margin: 0 0 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.db-money-num {
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--db-leaf);
+    overflow-wrap: anywhere;
+}
+
+.db-money-num.is-loss {
+    color: var(--db-rose);
+}
+
+.db-money-word {
+    font-size: 15px;
+    color: var(--db-on-band-muted);
+}
+
+.db-money-empty {
+    margin: 0 0 18px;
+    font-size: 16px;
+    color: var(--db-on-band);
+}
+
+.db-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.db-bar-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    grid-template-areas: 'label track' '. value';
+    column-gap: 10px;
+    row-gap: 4px;
+    align-items: center;
+    font-size: 14px;
+}
+
+.db-bar-label { grid-area: label; color: var(--db-on-band-muted); }
+.db-bar-track { grid-area: track; height: 10px; border-radius: 5px; background: rgba(238, 241, 230, 0.1); overflow: hidden; }
+.db-bar-value { grid-area: value; font-weight: 600; }
+
+.db-bar {
+    display: block;
+    height: 100%;
+    width: var(--w);
+    border-radius: 5px;
+    animation: db-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.db-bar--in { background: var(--db-leaf); }
+.db-bar--out { background: var(--db-amber); }
+
+@keyframes db-grow {
+    from { width: 0; }
+}
+
+.db-money-prev {
+    margin: 20px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--db-on-band-line);
+    font-size: 14px;
+    color: var(--db-on-band-muted);
+}
+
+.db-money-prev strong {
+    color: var(--db-on-band);
+}
+
+/* ---------- Asosiy qism ---------- */
+.db-main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 8px 32px 72px;
+}
+
+.db-main .tg-banner {
+    margin: 32px 0 0;
+}
+
+.db-section {
+    margin-top: 48px;
+}
+
+.db-h2 {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+}
+
+.db-muted {
+    color: var(--color-text-muted);
+    font-size: 15px;
+    margin: 0;
+}
+
+/* Fermalar */
+.db-farms {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+.db-farm {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 22px 22px 16px;
+}
+
+.db-farm-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.db-farm-name {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+}
+
+.db-farm-place {
+    margin: 2px 0 0;
+    font-size: 14.5px;
+    color: var(--color-text-muted);
+}
+
+.db-farm-type {
+    flex: none;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #E8EDE2;
+    color: var(--color-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.db-rows {
+    border-top: 1px solid var(--color-border);
+}
+
+.db-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 8px;
+    margin: 0 -8px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+a.db-row:hover {
+    background: #F3F6EF;
+}
+
+.db-row-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #E8EDE2;
+    color: var(--color-primary);
+}
+
+.db-row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.db-row-title {
+    font-weight: 600;
+    font-size: 15.5px;
+}
+
+.db-row-status {
+    font-size: 13.5px;
+    color: var(--color-text-muted);
+}
+
+.db-row-go {
+    flex: none;
+    color: var(--color-text-muted);
+    transition: transform 0.15s ease;
+}
+
+a.db-row:hover .db-row-go {
+    transform: translateX(3px);
+}
+
+.db-row--alert .db-row-icon {
+    background: #F8E4DE;
+    color: var(--color-error);
+}
+
+.db-row--alert .db-row-status {
+    color: var(--color-error);
+    font-weight: 600;
+}
+
+.db-row--locked {
+    opacity: 0.6;
+}
+
+.db-farm-actions {
+    display: flex;
+    gap: 20px;
+    padding-top: 12px;
+}
+
+.db-link-btn {
+    padding: 4px 0;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.db-link-btn:hover {
+    color: var(--color-primary);
+}
+
+.db-link-btn--danger:hover {
+    color: var(--color-error);
+}
+
+/* Ishchilar qatori: havola emas, ochiladigan tugma */
+button.db-row {
+    width: calc(100% + 16px);
+    font: inherit;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+}
+
+button.db-row:hover {
+    background: #F3F6EF;
+}
+
+button.db-row .db-row-go {
+    transition: transform 0.2s ease;
+}
+
+button.db-row.is-open .db-row-go {
+    transform: rotate(90deg);
+}
+
+/* Ochilgan ishchilar paneli */
+.db-workers {
+    margin: 0 -8px;
+    padding: 4px 8px 16px;
+    background: #F7F9F4;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.db-workers .workers-panel {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.db-workers .workers-head {
+    justify-content: flex-end;
+    margin: 12px 0 4px;
+}
+
+.db-workers .workers-head h4 {
+    display: none; /* sarlavha qatorning o'zida bor */
+}
+
+.db-workers .worker-form {
+    background: var(--color-surface);
+    border-radius: 6px;
+}
+
+.db-workers .worker-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.db-workers .worker-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+}
+
+.db-workers .worker-actions {
+    width: 100%;
+    justify-content: space-between;
+}
+
+.db-workers .worker-name {
+    font-size: 15.5px;
+}
+
+.db-farm--editing .farm-edit-form .form-field {
+    margin-bottom: 14px;
+}
+
+/* Yangi ferma */
+.db-farm--new {
+    padding: 0;
+    background: transparent;
+    border: 2px dashed var(--color-border);
+}
+
+.db-newfarm-btn {
+    width: 100%;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 4px;
+}
+
+.db-farm--new:hover {
+    border-color: var(--color-primary);
+}
+
+.db-farm--form .farm-form {
+    margin: 0 0 12px;
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+/* ---------- Tahlil ---------- */
+.db-activity {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+}
+
+.db-activity li {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    gap: 16px;
+    padding: 14px 20px;
+    font-size: 15px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.db-activity li:last-child {
+    border-bottom: none;
+}
+
+.db-activity-time {
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.db-section .charts-grid {
+    margin: 0;
+}
+
+.db-section .chart-svg {
+    display: block;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+/* ---------- Telefon ---------- */
+@media (max-width: 900px) {
+    .db-hero-inner {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 32px;
+        padding: 28px 20px 32px;
+    }
+
+    .db-money {
+        order: -1; /* hisob tepada: eng muhim raqam birinchi ko'rinadi */
+    }
+
+    .db-hello {
+        font-size: 28px;
+        margin-bottom: 18px;
+    }
+
+    .db-main {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .db-activity li {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+}
+
+@media (max-width: 600px) {
+    .db-page .app-header {
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
+    .db-page .user-bar {
+        gap: 10px;
+    }
+
+    .db-page .user-bar > span {
+        display: none; /* salomlashish tepa qismda bor */
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .db-bar {
+        animation: none;
+    }
+
+    .db-attn-go,
+    .db-row-go {
+        transition: none;
+    }
+}

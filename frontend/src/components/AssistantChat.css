@@ -12,6 +12,7 @@
     border: none;
     border-radius: 999px;
     background: var(--color-primary);
+    box-shadow: 0 0 0 3px #fff, 0 6px 18px rgba(26, 36, 32, 0.3); /* yashil fonda ham ko'rinib tursin */
     color: #fff;
     font-size: 15px;
     font-weight: 600;

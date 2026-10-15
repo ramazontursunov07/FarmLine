@@ -94,3 +94,5 @@ class AdminUserListSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone_number',
                   'role', 'date_joined', 'farms_count']
+
+"""O'rganildi."""
