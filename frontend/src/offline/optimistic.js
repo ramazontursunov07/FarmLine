@@ -325,6 +325,9 @@ export async function applyDelete(userId, resource, id) {
         adjustGroup(entries, rec.animal_group, (rec.event_type === 'olim' ? 1 : -1) * num(rec.animal_count));
     } else if (rec && resource === 'finance' && rec.animal_count && rec.animal_group) {
         adjustGroup(entries, rec.animal_group, num(rec.animal_count));
+    } else if (rec && resource === 'animals-card' && rec.status === 'faol') {
+        // Faol kartochka o'chirilsa, guruh soni 1 taga kamayadi (server bilan bir xil)
+        patchRecord(entries, 'animals-group', rec.group, (g) => ({ ...g, count: Math.max(0, num(g.count) - 1) }));
     }
 
     for (const e of entries) {

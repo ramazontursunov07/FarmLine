@@ -110,7 +110,9 @@ function AnimalCards() {
     const handleDelete = async (a) => {
         const ok = window.confirm(
             `№${a.tag_number}${a.name ? ` (${a.name})` : ''} kartochkasini o'chirasizmi?\n\n` +
-            "Uning vazn va sut tarixi ham o'chadi. Guruh soni o'zgarmaydi. Buni qaytarib bo'lmaydi."
+            "Uning vazn va sut tarixi ham o'chadi. " +
+            (a.status === 'faol' ? "Guruhdagi hayvonlar soni 1 taga kamayadi. " : "Guruh soni o'zgarmaydi. ") +
+            "Buni qaytarib bo'lmaydi."
         );
         if (!ok) return;
         try {

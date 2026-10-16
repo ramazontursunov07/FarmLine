@@ -55,6 +55,35 @@ class AnimalCardCrudTests(AnimalCardBase):
         self.assertEqual(r.json()['group_label'], 'Qoramol (Golshteyn)')
         self.assertEqual(Animal.objects.get().farm_id, self.farm.pk)
 
+    def test_deleting_active_card_reduces_group_count(self):
+        cow = self.make_animal('14')
+        self.assertEqual(self.client.delete(f'{CARDS}{cow.pk}/').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 2)
+        self.assertFalse(Animal.objects.filter(pk=cow.pk).exists())
+
+    def test_deleting_sold_card_keeps_group_count(self):
+        sold = self.make_animal('15', status='sotilgan')
+        self.assertEqual(self.client.delete(f'{CARDS}{sold.pk}/').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+
+    def test_deleting_card_does_not_go_below_zero(self):
+        self.group.count = 0
+        self.group.status = 'faol'
+        self.group.save()
+        cow = self.make_animal('16', status='faol')
+        self.assertEqual(self.client.delete(f'{CARDS}{cow.pk}/').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 0)
+
+    def test_worker_cannot_delete_card_or_change_count(self):
+        cow = self.make_animal('17')
+        self.client.force_authenticate(self.worker)
+        self.assertEqual(self.client.delete(f'{CARDS}{cow.pk}/').status_code, 403)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+
     def test_worker_cannot_create_card(self):
         self.client.force_authenticate(self.worker)
         self.assertEqual(self.new_card().status_code, 403)

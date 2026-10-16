@@ -9,6 +9,8 @@ import InstallButton from '../components/InstallButton';
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const SESSIONS = { kun: 'Butun kun', ertalab: 'Ertalab', kechqurun: 'Kechqurun' };
 
+const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
+
 function formatDate(iso) {
     if (!iso) return '';
     const [y, m, d] = iso.slice(0, 10).split('-');
@@ -117,15 +119,31 @@ function AnimalCard() {
     const [calvingError, setCalvingError] = useState('');
     const [busy, setBusy] = useState(false);
 
+    const [milkRecords, setMilkRecords] = useState([]);
+    const [editingCard, setEditingCard] = useState(false);
+    const [cardForm, setCardForm] = useState(null);
+    const [cardError, setCardError] = useState('');
+    const [motherOptions, setMotherOptions] = useState([]);
+    const [editingWeight, setEditingWeight] = useState(null);
+    const [editingMilk, setEditingMilk] = useState(null);
+    const [recordError, setRecordError] = useState('');
+
     const reload = () => setReloadKey((k) => k + 1);
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([api.get(`farms/${farmId}/`), api.get(`animals-card/${animalId}/card/`)])
-            .then(([farmRes, cardRes]) => {
+        Promise.all([
+            api.get(`farms/${farmId}/`),
+            api.get(`animals-card/${animalId}/card/`),
+            // Sut yozuvlari ro'yxati (tahrirlash/o'chirish uchun): oxirgi 30 kun. Yuklanmasa ham sahifa ishlayveradi
+            api.get('animals-milk/', { params: { animal: animalId, date_from: lastDays(30)[0] } })
+                .catch(() => ({ data: [] })),
+        ])
+            .then(([farmRes, cardRes, milkRes]) => {
                 if (cancelled) return;
                 setFarm(farmRes.data);
                 setData(cardRes.data);
+                setMilkRecords(asList(milkRes.data));
                 setError('');
             })
             .catch((err) => {
@@ -246,9 +264,108 @@ function AnimalCard() {
         }
     };
 
+    // --- Kartochkani tahrirlash (faqat ferma egasi)
+    const startEditCard = async () => {
+        setCardError('');
+        setCardForm({
+            tag_number: animal.tag_number,
+            name: animal.name || '',
+            sex: animal.sex,
+            birth_date: animal.birth_date || '',
+            mother: animal.mother ? String(animal.mother) : '',
+            notes: animal.notes || '',
+        });
+        setEditingCard(true);
+        try {
+            const { data: list } = await api.get('animals-card/', { params: { farm: farmId, sex: 'urgochi' } });
+            setMotherOptions(asList(list).filter((a) => String(a.id) !== String(animalId)));
+        } catch {
+            // ona ro'yxati yuklanmasa ham qolgan maydonlarni tahrirlash mumkin
+        }
+    };
+
+    const handleCardChange = (e) => setCardForm({ ...cardForm, [e.target.name]: e.target.value });
+
+    const handleSaveCard = (e) => {
+        e.preventDefault();
+        submit(
+            async () => {
+                const res = await api.patch(`animals-card/${animalId}/`, {
+                    tag_number: cardForm.tag_number.trim(),
+                    name: cardForm.name.trim(),
+                    sex: cardForm.sex,
+                    birth_date: cardForm.birth_date || null,
+                    mother: cardForm.mother ? Number(cardForm.mother) : null,
+                    notes: cardForm.notes.trim(),
+                });
+                setEditingCard(false);
+                return res;
+            },
+            setCardError,
+            "Kartochkani saqlab bo'lmadi"
+        );
+    };
+
+    // --- Vazn yozuvini tahrirlash
+    const startEditWeight = (w) => {
+        setRecordError('');
+        setEditingMilk(null);
+        setEditingWeight({ id: w.id, date: w.date, weight_kg: w.weight_kg });
+    };
+
+    const handleSaveWeight = (e) => {
+        e.preventDefault();
+        submit(
+            async () => {
+                const res = await api.patch(`animals-weight/${editingWeight.id}/`, {
+                    date: editingWeight.date, weight_kg: editingWeight.weight_kg,
+                });
+                setEditingWeight(null);
+                return res;
+            },
+            setRecordError,
+            "Vaznni o'zgartirib bo'lmadi"
+        );
+    };
+
+    // --- Sut yozuvini tahrirlash / o'chirish (ferma egasi yoki yozuvni yozgan ishchi)
+    const canModifyMilk = (r) => isOwner || (user.id != null && r.recorded_by === user.id);
+
+    const startEditMilk = (r) => {
+        setRecordError('');
+        setEditingWeight(null);
+        setEditingMilk({ id: r.id, date: r.date, session: r.session, liters: r.liters });
+    };
+
+    const handleSaveMilk = (e) => {
+        e.preventDefault();
+        submit(
+            async () => {
+                const res = await api.patch(`animals-milk/${editingMilk.id}/`, {
+                    date: editingMilk.date, session: editingMilk.session, liters: editingMilk.liters,
+                });
+                setEditingMilk(null);
+                return res;
+            },
+            setRecordError,
+            "Sutni o'zgartirib bo'lmadi"
+        );
+    };
+
+    const handleDeleteMilk = async (r) => {
+        if (!window.confirm(`${formatDate(r.date)} (${SESSIONS[r.session] || r.session}) dagi ${r.liters} l yozuvini o'chirasizmi?`)) return;
+        try {
+            await api.delete(`animals-milk/${r.id}/`);
+            reload();
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+        }
+    };
+
     const handleDeleteCard = async () => {
         const ok = window.confirm(
-            `№${animal.tag_number} kartochkasini o'chirasizmi?\n\nVazn va sut tarixi ham o'chadi. Guruh soni o'zgarmaydi. Buni qaytarib bo'lmaydi.`
+            `№${animal.tag_number} kartochkasini o'chirasizmi?\n\nVazn va sut tarixi ham o'chadi. ` +
+            `${isActive ? "Guruhdagi hayvonlar soni 1 taga kamayadi." : "Guruh soni o'zgarmaydi."} Buni qaytarib bo'lmaydi.`
         );
         if (!ok) return;
         try {
@@ -294,6 +411,59 @@ function AnimalCard() {
                             {animal.mother_tag ? ` · onasi: №${animal.mother_tag}` : ''}
                         </p>
                         {animal.notes && <p className="work-desc">{animal.notes}</p>}
+                        {isOwner && !editingCard && (
+                            <button type="button" className="btn-ghost btn-auto" onClick={startEditCard}>
+                                Kartochkani tahrirlash
+                            </button>
+                        )}
+                        {editingCard && cardForm && (
+                            <form className="work-card animal-inline-form" onSubmit={handleSaveCard}>
+                                <div className="form-row">
+                                    <div className="form-field">
+                                        <label>Quloq raqami</label>
+                                        <input type="text" name="tag_number" value={cardForm.tag_number}
+                                            onChange={handleCardChange} maxLength={30} required />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Laqabi</label>
+                                        <input type="text" name="name" value={cardForm.name}
+                                            onChange={handleCardChange} maxLength={100} />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-field">
+                                        <label>Jinsi</label>
+                                        <select name="sex" value={cardForm.sex} onChange={handleCardChange}>
+                                            {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Tug'ilgan sana</label>
+                                        <input type="date" name="birth_date" value={cardForm.birth_date}
+                                            max={today()} onChange={handleCardChange} />
+                                    </div>
+                                </div>
+                                <div className="form-field">
+                                    <label>Onasi</label>
+                                    <select name="mother" value={cardForm.mother} onChange={handleCardChange}>
+                                        <option value="">Noma'lum</option>
+                                        {motherOptions.map((m) => (
+                                            <option key={m.id} value={m.id}>№{m.tag_number}{m.name ? ` · ${m.name}` : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-field">
+                                    <label>Izoh</label>
+                                    <textarea name="notes" rows="3" value={cardForm.notes} onChange={handleCardChange} />
+                                </div>
+                                {cardError && <p className="error-text" role="alert">{cardError}</p>}
+                                <div className="farm-edit-actions">
+                                    <button type="submit" className="btn-primary btn-auto" disabled={busy}>Saqlash</button>
+                                    <button type="button" className="btn-ghost btn-auto" disabled={busy}
+                                        onClick={() => setEditingCard(false)}>Bekor qilish</button>
+                                </div>
+                            </form>
+                        )}
                         {notice && <p className="workers-hint" role="status">{notice}</p>}
 
                         <div className="animal-stats">
@@ -351,14 +521,43 @@ function AnimalCard() {
                             {weightsDesc.length > 0 && (
                                 <ul className="animal-mini-list">
                                     {weightsDesc.slice(0, 10).map((w) => (
-                                        <li key={w.id}>
-                                            <span>{formatDate(w.date)}</span>
-                                            <strong>{w.weight_kg} kg</strong>
-                                            {isOwner && (
-                                                <button type="button" className="farm-item-action farm-item-action--danger"
-                                                    onClick={() => handleDeleteWeight(w)}>O'chirish</button>
-                                            )}
-                                        </li>
+                                        editingWeight?.id === w.id ? (
+                                            <li key={w.id} className="animal-mini-edit">
+                                                <form onSubmit={handleSaveWeight} className="animal-inline-form">
+                                                    <div className="form-row">
+                                                        <div className="form-field">
+                                                            <label>Sana</label>
+                                                            <input type="date" value={editingWeight.date} max={today()}
+                                                                onChange={(e) => setEditingWeight({ ...editingWeight, date: e.target.value })} required />
+                                                        </div>
+                                                        <div className="form-field">
+                                                            <label>Vazn (kg)</label>
+                                                            <input type="number" step="0.1" min="0.1" value={editingWeight.weight_kg}
+                                                                onChange={(e) => setEditingWeight({ ...editingWeight, weight_kg: e.target.value })} required />
+                                                        </div>
+                                                    </div>
+                                                    {recordError && <p className="error-text" role="alert">{recordError}</p>}
+                                                    <div className="farm-edit-actions">
+                                                        <button type="submit" className="btn-primary btn-auto" disabled={busy}>Saqlash</button>
+                                                        <button type="button" className="btn-ghost btn-auto" disabled={busy}
+                                                            onClick={() => setEditingWeight(null)}>Bekor qilish</button>
+                                                    </div>
+                                                </form>
+                                            </li>
+                                        ) : (
+                                            <li key={w.id}>
+                                                <span>{formatDate(w.date)}</span>
+                                                <strong>{w.weight_kg} kg</strong>
+                                                {isOwner && (
+                                                    <>
+                                                        <button type="button" className="farm-item-action"
+                                                            onClick={() => startEditWeight(w)}>Tahrirlash</button>
+                                                        <button type="button" className="farm-item-action farm-item-action--danger"
+                                                            onClick={() => handleDeleteWeight(w)}>O'chirish</button>
+                                                    </>
+                                                )}
+                                            </li>
+                                        )
                                     ))}
                                 </ul>
                             )}
@@ -397,6 +596,56 @@ function AnimalCard() {
                                             {milkError && <p className="error-text" role="alert">{milkError}</p>}
                                             <button type="submit" className="btn-primary btn-auto" disabled={busy}>Sutni yozish</button>
                                         </form>
+                                    )}
+                                    {milkRecords.length > 0 && (
+                                        <ul className="animal-mini-list">
+                                            {milkRecords.slice(0, 10).map((r) => (
+                                                editingMilk?.id === r.id ? (
+                                                    <li key={r.id} className="animal-mini-edit">
+                                                        <form onSubmit={handleSaveMilk} className="animal-inline-form">
+                                                            <div className="form-row">
+                                                                <div className="form-field">
+                                                                    <label>Sana</label>
+                                                                    <input type="date" value={editingMilk.date} max={today()}
+                                                                        onChange={(e) => setEditingMilk({ ...editingMilk, date: e.target.value })} required />
+                                                                </div>
+                                                                <div className="form-field">
+                                                                    <label>Vaqti</label>
+                                                                    <select value={editingMilk.session}
+                                                                        onChange={(e) => setEditingMilk({ ...editingMilk, session: e.target.value })}>
+                                                                        {Object.entries(SESSIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            <div className="form-field">
+                                                                <label>Sut (litr)</label>
+                                                                <input type="number" step="0.1" min="0.1" value={editingMilk.liters}
+                                                                    onChange={(e) => setEditingMilk({ ...editingMilk, liters: e.target.value })} required />
+                                                            </div>
+                                                            {recordError && <p className="error-text" role="alert">{recordError}</p>}
+                                                            <div className="farm-edit-actions">
+                                                                <button type="submit" className="btn-primary btn-auto" disabled={busy}>Saqlash</button>
+                                                                <button type="button" className="btn-ghost btn-auto" disabled={busy}
+                                                                    onClick={() => setEditingMilk(null)}>Bekor qilish</button>
+                                                            </div>
+                                                        </form>
+                                                    </li>
+                                                ) : (
+                                                    <li key={r.id}>
+                                                        <span>{formatDate(r.date)} · {r.session_display || SESSIONS[r.session]}</span>
+                                                        <strong>{r.liters} l</strong>
+                                                        {canModifyMilk(r) && (
+                                                            <>
+                                                                <button type="button" className="farm-item-action"
+                                                                    onClick={() => startEditMilk(r)}>Tahrirlash</button>
+                                                                <button type="button" className="farm-item-action farm-item-action--danger"
+                                                                    onClick={() => handleDeleteMilk(r)}>O'chirish</button>
+                                                            </>
+                                                        )}
+                                                    </li>
+                                                )
+                                            ))}
+                                        </ul>
                                     )}
                                 </div>
                             </>

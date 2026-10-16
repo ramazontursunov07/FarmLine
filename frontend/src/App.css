@@ -1427,6 +1427,15 @@ a.farm-tile:hover {
     color: var(--color-text-muted);
 }
 
+/* Ro'yxat qatori tahrirlash formasiga aylanganda */
+.animal-mini-list li.animal-mini-edit {
+    display: block;
+}
+
+.animal-mini-list li strong {
+    margin-right: auto;
+}
+
 .animal-owner-actions {
     display: flex;
     flex-wrap: wrap;

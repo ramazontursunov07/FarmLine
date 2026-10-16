@@ -333,7 +333,15 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_owner(instance.farm)
-        instance.delete()
+        with transaction.atomic():
+            # Faol hayvon o'chirilsa, guruhdagi hayvonlar soni ham 1 taga kamayadi.
+            # Sotilgan/o'lgan hayvon soni avval (sotuv yoki o'lim yozuvida) kamaytirilgan, shuning uchun tegilmaydi.
+            if instance.status == 'faol':
+                group = AnimalGroup.objects.select_for_update().get(pk=instance.group_id)
+                if group.count > 0:
+                    group.count -= 1
+                    group.save(update_fields=['count', 'updated_at'])
+            instance.delete()
 
     @action(detail=True, methods=['get'])
     def card(self, request, pk=None):
