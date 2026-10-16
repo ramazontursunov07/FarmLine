@@ -21,6 +21,11 @@ from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEve
                           AnimalSerializer, WeightRecordSerializer, MilkRecordSerializer)
 
 
+def one_decimal(value):
+    """SQLite 15, PostgreSQL 15.0 qaytaradi: javobda har doim 1 ta kasr raqami bilan ('15.0')."""
+    return str(Decimal(value).quantize(Decimal('0.1')))
+
+
 def is_farm_member(user, farm):
     """Ferma egasi yoki shu fermaga biriktirilgan ishchimi?"""
     return farm.owner_id == user.id or Worker.objects.filter(farm=farm,
@@ -362,11 +367,11 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         milk = {
             'period_days': 30,
             'days_recorded': len(daily),
-            'total_liters': str(total),
+            'total_liters': one_decimal(total),
             'daily_average': str((total / len(daily)).quantize(Decimal('0.1'))) if daily else None,
             'last_date': daily[-1]['date'] if daily else None,
-            'last_day_liters': str(daily[-1]['total']) if daily else None,
-            'daily': [{'date': row['date'], 'liters': str(row['total'])} for row in daily],
+            'last_day_liters': one_decimal(daily[-1]['total']) if daily else None,
+            'daily': [{'date': row['date'], 'liters': one_decimal(row['total'])} for row in daily],
         }
 
         # --- voqealar va buzoqlar

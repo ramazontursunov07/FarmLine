@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -177,7 +179,8 @@ class AnimalSerializer(serializers.ModelSerializer):
 
     def get_last_weight(self, obj):
         value = getattr(obj, 'last_weight', None)
-        return None if value is None else str(value)
+        # SQLite subquery 450 qaytaradi, PostgreSQL 450.0: har doim bir xil (1 ta kasr raqami) ko'rinsin
+        return None if value is None else str(Decimal(value).quantize(Decimal('0.1')))
 
     def get_last_weight_date(self, obj):
         return getattr(obj, 'last_weight_date', None)
@@ -297,4 +300,21 @@ class MilkRecordSerializer(_AnimalRecordSerializer):
                 clash = clash.exclude(pk=self.instance.pk)
             if clash.exists():
                 raise serializers.ValidationError({'session': "Bu sana va vaqt uchun sut allaqachon yozilgan"})
+
+            # "Butun kun" bilan ertalab/kechqurun bir kunda aralashmaydi: kun jami yozuvlar yig'indisi,
+            # aralashsa o'sha sut ikki marta hisoblanib qoladi.
+            others = MilkRecord.objects.filter(animal=animal, date=date)
+            if self.instance is not None:
+                others = others.exclude(pk=self.instance.pk)
+            existing = set(others.values_list('session', flat=True))
+            if session == 'kun' and existing & {'ertalab', 'kechqurun'}:
+                raise serializers.ValidationError({
+                    'session': "Bu kun uchun ertalab/kechqurungi sut yozilgan. "
+                               "Butun kun uchun alohida yozish kerak emas: kun jami avtomatik hisoblanadi."
+                })
+            if session in ('ertalab', 'kechqurun') and 'kun' in existing:
+                raise serializers.ValidationError({
+                    'session': "Bu kun uchun butun kunlik sut yozilgan. "
+                               "Ertalab/kechqurunni alohida yozish uchun avval butun kunlik yozuvni o'chiring."
+                })
         return attrs

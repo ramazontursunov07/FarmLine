@@ -277,17 +277,6 @@ function FarmWork() {
         }
     };
 
-    const handleChangeCount = (group) => {
-        const value = window.prompt(`${group.animal_type_name}: yangi sonini kiriting`, group.count);
-        if (value === null) return;
-        const n = Number(value);
-        if (!Number.isInteger(n) || n < 0) {
-            window.alert("Iltimos, 0 yoki undan katta butun son kiriting");
-            return;
-        }
-        patchGroup(group, { count: n });
-    };
-
     const handleDeleteGroup = async (group) => {
         const ok = window.confirm(
             `${group.animal_type_name} guruhini o'chirasizmi?\n\nUning barcha ish yozuvlari ham o'chib ketadi. Buni qaytarib bo'lmaydi.`
@@ -546,9 +535,6 @@ function FarmWork() {
                                                         <option key={v} value={v}>{l}</option>
                                                     ))}
                                                 </select>
-                                                <button type="button" className="farm-item-action" onClick={() => handleChangeCount(g)}>
-                                                    Sonini o'zgartirish
-                                                </button>
                                                 <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteGroup(g)}>
                                                     O'chirish
                                                 </button>

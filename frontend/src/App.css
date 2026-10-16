@@ -1349,6 +1349,10 @@ a.farm-tile:hover {
     text-decoration: none;
 }
 
+.animal-edit-form {
+    width: 100%;
+}
+
 .animal-item--olgan,
 .animal-item--sotilgan {
     opacity: 0.7;

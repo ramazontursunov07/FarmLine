@@ -176,6 +176,27 @@ class WeightMilkTests(AnimalCardBase):
         self.assertEqual(self.milk(session='ertalab').status_code, 400)  # takror
         self.assertEqual(self.milk(session='kechqurun').status_code, 201)
 
+    def test_whole_day_milk_not_allowed_after_morning_and_evening(self):
+        self.assertEqual(self.milk(session='ertalab').status_code, 201)
+        self.assertEqual(self.milk(session='kechqurun').status_code, 201)
+        r = self.milk(session='kun')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('session', r.json())
+        self.assertEqual(MilkRecord.objects.count(), 2)
+
+    def test_whole_day_milk_not_allowed_after_only_morning(self):
+        self.assertEqual(self.milk(session='ertalab').status_code, 201)
+        self.assertEqual(self.milk(session='kun').status_code, 400)
+
+    def test_morning_not_allowed_after_whole_day(self):
+        self.assertEqual(self.milk(session='kun').status_code, 201)
+        self.assertEqual(self.milk(session='ertalab').status_code, 400)
+        self.assertEqual(self.milk(session='kechqurun').status_code, 400)
+
+    def test_whole_day_milk_other_day_and_other_cow_ok(self):
+        self.assertEqual(self.milk(session='ertalab').status_code, 201)
+        self.assertEqual(self.milk(date=self.today - timedelta(days=1), session='kun').status_code, 201)
+
     def test_milk_only_for_female(self):
         bull = self.make_animal('77', sex='erkak')
         self.assertEqual(self.milk(animal=bull).status_code, 400)
@@ -430,8 +451,9 @@ class CalvingWithCardsTests(AnimalCardBase):
         self.assertEqual(r.status_code, 400)
         self.group.refresh_from_db()
         # Faqat testning o'zi yaratgan buqa qolgan: na yozuv, na buzoq kartochkasi, na guruh soni o'zgargan
-        self.assertEqual((self.group.count, AnimalEvent.objects.count(), list(Animal.objects.values_list('tag_number', flat=True))),
-                         (3, 0, ['7']))
+        self.assertEqual(
+            (self.group.count, AnimalEvent.objects.count(), list(Animal.objects.values_list('tag_number', flat=True))),
+            (3, 0, ['7']))
 
     def test_worker_cannot_open_cards(self):
         self.client.force_authenticate(self.worker)
