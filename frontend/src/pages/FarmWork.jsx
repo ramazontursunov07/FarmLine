@@ -21,6 +21,11 @@ const COUNT_HINTS = {
     tugilish: "Guruhdagi hayvonlar soni shuncha ko'payadi.",
 };
 
+// Bu ish turlari aniq bir hayvonga tegishli: formada quloq raqami so'raladi
+const ANIMAL_EVENT_TYPES = ['kasallik', 'davolash', 'olim'];
+// Sarlavha bo'sh qolsa, shu so'z qo'shilib yoziladi: "№14 kasallandi"
+const AUTO_TITLES = { kasallik: 'kasallandi', davolash: 'davolanyapti', olim: "o'ldi" };
+
 const EVENT_STATUSES = {
     boshlangan: 'Boshlangan',
     davom_etmoqda: 'Davom etmoqda',
@@ -45,6 +50,7 @@ const makeEventForm = () => ({
     animal_group: '',
     event_type: 'davolash',
     animal_count: '',
+    animal_tag: '',
     mother: '',
     title: '',
     description: '',
@@ -137,6 +143,22 @@ function FarmWork() {
         [animals, selectedGroup]
     );
 
+    // Kasallik, davolash va o'lim: qaysi hayvon ekanini quloq raqami bilan aniqlaymiz
+    const needsAnimal = ANIMAL_EVENT_TYPES.includes(eventForm.event_type);
+    const groupCards = useMemo(
+        () => animals.filter((a) => a.status === 'faol' && String(a.group) === selectedGroup),
+        [animals, selectedGroup]
+    );
+    const tagTyped = eventForm.animal_tag.trim();
+    const pickedAnimal = needsAnimal && tagTyped
+        ? groupCards.find((a) => a.tag_number.toLowerCase() === tagTyped.toLowerCase()) ?? null
+        : null;
+    // Guruhda kartochka bor bo'lsa, qaysi hayvon ekanini yozish majburiy
+    const animalRequired = needsAnimal && groupCards.length > 0;
+    const tagStartsMatch = tagTyped
+        ? groupCards.some((a) => a.tag_number.toLowerCase().startsWith(tagTyped.toLowerCase()))
+        : false;
+
     const ongoing = useMemo(() => events.filter((e) => e.status !== 'yakunlangan'), [events]);
 
     const workers = useMemo(() => {
@@ -160,8 +182,12 @@ function FarmWork() {
 
     const handleEventChange = (e) => {
         const { name, value } = e.target;
-        // Guruh almashsa, tanlangan ona ham shu guruhniki bo'lmay qoladi
-        setEventForm({ ...eventForm, [name]: value, ...(name === 'animal_group' ? { mother: '' } : {}) });
+        // Guruh almashsa, tanlangan ona va quloq raqami ham shu guruhniki bo'lmay qoladi
+        setEventForm({
+            ...eventForm,
+            [name]: value,
+            ...(name === 'animal_group' ? { mother: '', animal_tag: '' } : {}),
+        });
     };
 
     const handleCalfChange = (index, field, value) =>
@@ -176,12 +202,33 @@ function FarmWork() {
         setEventError('');
         setEventNotice('');
 
-        const { mother, ...fields } = eventForm;
+        const { mother, animal_tag: _tag, ...fields } = eventForm;
         const payload = {
             ...fields,
             animal_group: Number(selectedGroup),
             animal_count: eventForm.animal_count ? Number(eventForm.animal_count) : null,
         };
+        if (needsAnimal) {
+            if (tagTyped && !pickedAnimal) {
+                setEventError(
+                    `Bu guruhda №${tagTyped} raqamli faol hayvon topilmadi. ` +
+                    'Avval "Hayvon kartochkalari" sahifasida shu raqamli kartochka oching.'
+                );
+                return;
+            }
+            if (!tagTyped && animalRequired) {
+                setEventError("Qaysi hayvon ekanini yozing (quloq raqami)");
+                return;
+            }
+            if (pickedAnimal) {
+                payload.animal = pickedAnimal.id;
+                // Aniq bitta hayvon: o'limda soni 1, qolgan ish turlarida son kerak emas
+                payload.animal_count = eventForm.event_type === 'olim' ? 1 : null;
+                if (!payload.title.trim()) {
+                    payload.title = `№${pickedAnimal.tag_number} ${AUTO_TITLES[eventForm.event_type]}`;
+                }
+            }
+        }
         if (isBirth && mother) payload.animal = Number(mother);
         if (openCards) {
             payload.calves = Array.from({ length: birthCount }, (_, i) => ({ ...EMPTY_CALF, ...calves[i] })).map((c) => ({
@@ -300,7 +347,7 @@ function FarmWork() {
                     </span>
                 </span>
                 <span className="work-meta">
-                    {ev.animal_group_label} · {ev.animal_group_count} ta · {formatDate(ev.start_date)}
+                    {ev.animal_group_label}{ev.animal_tag ? ` · №${ev.animal_tag}` : ''} · {ev.animal_group_count} ta · {formatDate(ev.start_date)}
                     {ev.status !== 'yakunlangan' && ` · ${ev.days_since_start} kun`}
                     {ev.end_date && ` – ${formatDate(ev.end_date)}`}
                 </span>
@@ -398,21 +445,55 @@ function FarmWork() {
                                             </select>
                                         </div>
                                     </div>
-                                    <div className="form-field">
-                                        <label>
-                                            {COUNT_HINTS[eventForm.event_type] ? 'Nechta hayvon' : 'Nechta hayvon (ixtiyoriy)'}
-                                        </label>
-                                        <input type="number" name="animal_count" min="1" step="1"
-                                            value={eventForm.animal_count} onChange={handleEventChange}
-                                            required={Boolean(COUNT_HINTS[eventForm.event_type])} />
-                                        {COUNT_HINTS[eventForm.event_type] && (
-                                            <p className="workers-hint">
-                                                {openCards
-                                                    ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
-                                                    : COUNT_HINTS[eventForm.event_type]}
-                                            </p>
-                                        )}
-                                    </div>
+                                    {needsAnimal && (
+                                        <div className="form-field">
+                                            <label>{animalRequired ? 'Qaysi hayvon? Quloq raqami' : 'Quloq raqami (ixtiyoriy)'}</label>
+                                            <input type="text" name="animal_tag" list="group-animal-tags" autoComplete="off"
+                                                value={eventForm.animal_tag} onChange={handleEventChange}
+                                                placeholder="Masalan: 14" maxLength={30} required={animalRequired} />
+                                            <datalist id="group-animal-tags">
+                                                {groupCards.map((a) => (
+                                                    <option key={a.id} value={a.tag_number} label={a.name || undefined} />
+                                                ))}
+                                            </datalist>
+                                            {pickedAnimal ? (
+                                                <p className="workers-hint">
+                                                    №{pickedAnimal.tag_number}{pickedAnimal.name ? ` · ${pickedAnimal.name}` : ''}
+                                                    {eventForm.event_type === 'olim'
+                                                        ? ` · kartochka "O'lgan" bo'ladi va guruh soni 1 taga kamayadi.`
+                                                        : ' · yozuv shu hayvonning kartochkasida ham ko\'rinadi.'}
+                                                </p>
+                                            ) : tagTyped && tagStartsMatch ? (
+                                                <p className="workers-hint">Ro'yxatdan hayvonni tanlang yoki raqamni oxirigacha yozing.</p>
+                                            ) : tagTyped ? (
+                                                <p className="error-text" role="alert">
+                                                    Bu guruhda №{tagTyped} raqamli faol hayvon topilmadi.
+                                                </p>
+                                            ) : groupCards.length === 0 ? (
+                                                <p className="workers-hint">
+                                                    Bu guruhda hayvon kartochkasi yo'q, shuning uchun yozuv butun guruhga yoziladi.
+                                                    Aniq hayvon uchun avval "Hayvon kartochkalari" sahifasida kartochka oching.
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    )}
+                                    {!pickedAnimal && (
+                                        <div className="form-field">
+                                            <label>
+                                                {COUNT_HINTS[eventForm.event_type] ? 'Nechta hayvon' : 'Nechta hayvon (ixtiyoriy)'}
+                                            </label>
+                                            <input type="number" name="animal_count" min="1" step="1"
+                                                value={eventForm.animal_count} onChange={handleEventChange}
+                                                required={Boolean(COUNT_HINTS[eventForm.event_type])} />
+                                            {COUNT_HINTS[eventForm.event_type] && (
+                                                <p className="workers-hint">
+                                                    {openCards
+                                                        ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
+                                                        : COUNT_HINTS[eventForm.event_type]}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                     {isBirth && (
                                         <div className="form-field">
                                             <label>Onasi (ixtiyoriy)</label>
@@ -473,10 +554,10 @@ function FarmWork() {
                                     <div className="form-field">
                                         <label>Sarlavha</label>
                                         <input type="text" name="title" value={eventForm.title} onChange={handleEventChange}
-                                            placeholder={isBirth
+                                            placeholder={isBirth || pickedAnimal
                                                 ? "Bo'sh qoldirsangiz, avtomatik yoziladi"
                                                 : 'Masalan: 10 ta tovuq antibiotik bilan davolanyapti'}
-                                            required={!isBirth} />
+                                            required={!isBirth && !pickedAnimal} />
                                     </div>
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>
