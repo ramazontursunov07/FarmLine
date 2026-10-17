@@ -16,6 +16,13 @@ class FarmSerializer(serializers.ModelSerializer):
                   'can_view_finance', 'created_at', 'updated_at']
         read_only_fields = ['owner']
 
+    def update(self, instance, validated_data):
+        # Manzil o'zgarsa, ob-havo koordinatasi qayta aniqlanadi
+        if 'location' in validated_data and validated_data['location'] != instance.location:
+            instance.latitude = None
+            instance.longitude = None
+        return super().update(instance, validated_data)
+
     def get_can_view_finance(self, obj):
         """Fermer o'z fermasida har doim True; ishchida esa unga berilgan huquq."""
         request = self.context.get('request')

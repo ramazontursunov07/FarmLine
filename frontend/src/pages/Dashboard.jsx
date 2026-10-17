@@ -6,6 +6,7 @@ import FarmForm from '../components/FarmForm';
 import AdminPanel from '../components/AdminPanel';
 import WorkersPanel from '../components/WorkersPanel';
 import FarmerOverview from '../components/FarmerOverview';
+import WeatherPanel from '../components/WeatherPanel';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
@@ -378,10 +379,13 @@ function Dashboard() {
     const lateTasks = Object.values(taskCounts).reduce((s, c) => s + c.overdue, 0);
 
     const farmsSection = (
-        <section className="db-section">
-            <h2 className="db-h2">{user.role === 'fermer' ? 'Mening fermalarim' : 'Sizning fermalaringiz'}</h2>
-            {renderFarms()}
-        </section>
+        <>
+            {!loading && !error && farms.length > 0 && <WeatherPanel farms={farms} />}
+            <section className="db-section">
+                <h2 className="db-h2">{user.role === 'fermer' ? 'Mening fermalarim' : 'Sizning fermalaringiz'}</h2>
+                {renderFarms()}
+            </section>
+        </>
     );
 
     return (

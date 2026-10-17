@@ -16,6 +16,8 @@ class Farm(models.Model):
     )
     name = models.CharField(max_length=255) #ferma nomi
     location = models.CharField(max_length=255) #ferma lokatsiyasi
+    latitude = models.FloatField(null=True, blank=True, editable=False) #ob-havo uchun (manzildan avtomatik topiladi)
+    longitude = models.FloatField(null=True, blank=True, editable=False)
     farm_type = models.CharField(max_length=20, choices=FARM_TYPE_CHOICES) #qanaqa yo'nalishdagi ferma.
     created_at = models.DateTimeField(auto_now_add=True) #yaratilgan sanasi
     updated_at = models.DateTimeField(auto_now=True) #yangilangan sanasi
