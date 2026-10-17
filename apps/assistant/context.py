@@ -15,6 +15,7 @@ from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem
 from apps.tasks.models import Task
 from apps.users.digest import build_worker_digest, money, qty
+from apps.weather.services import farm_weather_context
 
 MAX_FARMS = 5
 MAX_ROWS = 10
@@ -117,7 +118,13 @@ def build_context(user, today=None):
     today = today or timezone.localdate()
     if user.role == 'fermer':
         farms = Farm.objects.filter(owner=user).order_by('name')[:MAX_FARMS]
-        return "\n\n".join(_farm_context(f, today) for f in farms)
+        parts = [_farm_context(f, today) for f in farms]
+        # Ob-havo faqat birinchi fermaga (tez ishlashi uchun; natija 30 daqiqa saqlanadi)
+        weather = farm_weather_context(farms[0]) if farms else None
+        return "\n\n".join(parts + ([weather] if weather else []))
     if user.role == 'ishchi':
-        return build_worker_digest(user, today) or ''
+        text = build_worker_digest(user, today) or ''
+        profile = user.worker_profiles.select_related('farm').first()
+        weather = farm_weather_context(profile.farm) if profile else None
+        return "\n\n".join(p for p in (text, weather) if p)
     return ''

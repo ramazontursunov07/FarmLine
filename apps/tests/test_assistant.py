@@ -15,6 +15,21 @@ def make_user(username, role):
     return User.objects.create_user(username=username, password='Kuchli-Parol-2026', role=role)
 
 
+# Haqiqiy internetga chiqmaslik uchun ob-havo so'rovlari soxta javob bilan almashtiriladi
+_weather_patch = None
+
+
+def setUpModule():
+    global _weather_patch
+    from apps.tests.test_weather import fake_get
+    _weather_patch = patch('apps.weather.services.requests.get', side_effect=fake_get)
+    _weather_patch.start()
+
+
+def tearDownModule():
+    _weather_patch.stop()
+
+
 class AssistantTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -63,6 +78,11 @@ class ContextPrivacyTests(TestCase):
         self.farm = Farm.objects.create(owner=self.owner, name='Ozoda', location='Toshkent', farm_type='chorvachilik')
         self.other_farm = Farm.objects.create(owner=self.other, name='Yashirin', location='Buxoro', farm_type='aralash')
 
+    def test_context_has_weather(self):
+        ctx = build_context(self.owner)
+        self.assertIn('Ob-havo (Ozoda', ctx)
+        self.assertIn('Sovuq', ctx)
+
     def test_owner_sees_only_own_farms(self):
         ctx = build_context(self.owner)
         self.assertIn('Ozoda', ctx)
@@ -82,7 +102,7 @@ class ContextPrivacyTests(TestCase):
         )
         ctx = build_context(worker)
         self.assertNotIn('123 456', ctx)
-        self.assertNotIn('Ozoda', ctx.split('\n')[0] if ctx else '')
+        self.assertNotIn('=== Ferma', ctx)
 
     def test_month_totals_and_loss(self):
         today = date(2026, 10, 13)

@@ -122,6 +122,30 @@ def parse_forecast(data):
     }
 
 
+def farm_weather_context(farm):
+    """AI yordamchi uchun ob-havo matni (xato bo'lsa None: yordamchi ob-havosiz ham ishlayveradi)."""
+    try:
+        if farm.latitude is None or farm.longitude is None:
+            point = geocode(farm.location)
+            if point is None:
+                return None
+            farm.latitude, farm.longitude = point
+            farm.save(update_fields=['latitude', 'longitude'])
+        fc = fetch_forecast(farm.latitude, farm.longitude)
+    except WeatherError:
+        return None
+    cur = fc['current']
+    lines = [f"Ob-havo ({farm.name}, {farm.location}): hozir {cur['temp']}°, {cur['text']}, "
+             f"shamol {cur['wind_kmh']} km/soat, namlik {cur['humidity']}%"]
+    for d in fc['days']:
+        rain = f", yog'in {d['rain_mm']} mm ({d['rain_chance']}%)" if d['rain_mm'] else ''
+        lines.append(f"  • {d['date']}: {d['temp_min']}…{d['temp_max']}°, {d['text']}, "
+                     f"shamol {d['wind_kmh']} km/soat{rain}")
+    for a in build_alerts(fc['days']):
+        lines.append(f"  ! {a['date']}: {a['text']}")
+    return "\n".join(lines)
+
+
 def build_alerts(days):
     """Dehqon uchun qisqa ogohlantirishlar (eng yaqin kunlar bo'yicha)."""
     alerts = []

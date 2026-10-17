@@ -8,7 +8,9 @@ from django.conf import settings
 
 SYSTEM = (
     "Sen FarmLine fermer yordamchisisan. "
-    "O'zbek tilida, qisqa va tushunarli javob ber."
+    "O'zbek tilida, qisqa va tushunarli javob ber. "
+    "Ob-havo haqida so'ralsa, quyida berilgan ob-havo ma'lumotidan foydalanib javob ber va "
+    "chorva uchun qisqa maslahat qo'sh."
 )
 
 EMPTY_ANSWER = "Javob olinmadi. Savolni boshqacha yozib ko'ring."
