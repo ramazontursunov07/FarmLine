@@ -17,6 +17,23 @@ function formatDate(iso) {
     return `${d}.${m}.${y}`;
 }
 
+// Tug'ishgacha: "12 kun qoldi", "bugun", "3 kun kechikdi"
+function calvingLeft(days) {
+    if (days == null) return '';
+    if (days === 0) return 'bugun';
+    return days > 0 ? `${days} kun qoldi` : `${-days} kun kechikdi`;
+}
+
+// Yoshi oylarda (sana noma'lum bo'lsa null)
+function monthsOld(iso) {
+    if (!iso) return null;
+    const born = new Date(iso);
+    const now = new Date();
+    let months = (now.getFullYear() - born.getFullYear()) * 12 + now.getMonth() - born.getMonth();
+    if (now.getDate() < born.getDate()) months -= 1;
+    return months;
+}
+
 // "5 oy" yoki "2 yil 3 oy"
 function ageText(iso) {
     if (!iso) return '';
@@ -117,6 +134,9 @@ function AnimalCard() {
     const [milkError, setMilkError] = useState('');
     const [calvingForm, setCalvingForm] = useState({ start_date: today(), animal_count: '1' });
     const [calvingError, setCalvingError] = useState('');
+    const [pregForm, setPregForm] = useState({ pregnant_since: today(), due_date: '' });
+    const [dueEdit, setDueEdit] = useState(null);
+    const [pregError, setPregError] = useState('');
     const [busy, setBusy] = useState(false);
 
     const [milkRecords, setMilkRecords] = useState([]);
@@ -226,6 +246,43 @@ function AnimalCard() {
             setCalvingError,
             "Tug'ishni saqlab bo'lmadi"
         );
+    };
+
+    const handleMarkPregnant = (e) => {
+        e.preventDefault();
+        const payload = { pregnant_since: pregForm.pregnant_since };
+        if (pregForm.due_date) payload.due_date = pregForm.due_date;
+        submit(
+            async () => {
+                const res = await api.patch(`animals-card/${animalId}/`, payload);
+                setPregForm({ pregnant_since: today(), due_date: '' });
+                return res;
+            },
+            setPregError,
+            "Bug'ozlikni saqlab bo'lmadi"
+        );
+    };
+
+    const handleSaveDue = (e) => {
+        e.preventDefault();
+        submit(
+            async () => {
+                const res = await api.patch(`animals-card/${animalId}/`, { due_date: dueEdit || null });
+                setDueEdit(null);
+                return res;
+            },
+            setPregError,
+            "Tug'ish sanasini saqlab bo'lmadi"
+        );
+    };
+
+    const handleClearPregnancy = async () => {
+        if (!window.confirm(`№${animal.tag_number} endi bug'oz emasmi?\n\nBug'ozlik belgisi olib tashlanadi.`)) return;
+        try {
+            afterSave(await api.patch(`animals-card/${animalId}/`, { pregnant_since: null }));
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+        }
     };
 
     const handleDeath = async () => {
@@ -379,6 +436,11 @@ function AnimalCard() {
     const ws = data?.weight_summary;
     const milk = data?.milk;
     const change = ws?.change_kg != null ? Number(ws.change_kg) : null;
+    // 1 yoshgacha bo'lgan bolada (buzoq, qo'zi...) sut, bug'ozlik va tug'ish bo'limlari kerak emas
+    const age = monthsOld(animal?.birth_date);
+    const isYoung = age != null && age < 12;
+    const showMilk = isFemale && (!isYoung || (milk?.days_recorded ?? 0) > 0);
+    const canBreed = isFemale && isActive && (!isYoung || Boolean(animal?.is_pregnant));
 
     return (
         <div className="app-shell">
@@ -476,7 +538,7 @@ function AnimalCard() {
                                     {ws.daily_gain_g != null && ` · ${ws.daily_gain_g} g/kun`}
                                 </span>
                             </div>
-                            {isFemale && (
+                            {showMilk && (
                                 <div className="animal-stat">
                                     <span className="animal-stat-label">Sut (30 kun, o'rtacha)</span>
                                     <span className="animal-stat-value">{milk.daily_average ? `${milk.daily_average} l` : '—'}</span>
@@ -487,7 +549,20 @@ function AnimalCard() {
                                     </span>
                                 </div>
                             )}
-                            {isFemale && (
+                            {canBreed && (
+                                <div className="animal-stat">
+                                    <span className="animal-stat-label">Bug'ozlik</span>
+                                    <span className="animal-stat-value">{animal.is_pregnant ? "Bug'oz" : "Yo'q"}</span>
+                                    <span className="animal-stat-sub">
+                                        {animal.is_pregnant
+                                            ? (animal.due_date
+                                                ? `tug'ishi: ${formatDate(animal.due_date)} · ${calvingLeft(animal.days_to_calving)}`
+                                                : "tug'ish sanasi kiritilmagan")
+                                            : 'belgilanmagan'}
+                                    </span>
+                                </div>
+                            )}
+                            {isFemale && !isYoung && (
                                 <div className="animal-stat">
                                     <span className="animal-stat-label">Oxirgi tug'ish</span>
                                     <span className="animal-stat-value">{data.last_calving_date ? formatDate(data.last_calving_date) : '—'}</span>
@@ -564,7 +639,7 @@ function AnimalCard() {
                         </div>
 
                         {/* Sut */}
-                        {isFemale && (
+                        {showMilk && (
                             <>
                                 <h3 className="section-title">Sut miqdori</h3>
                                 <div className="work-card">
@@ -651,8 +726,74 @@ function AnimalCard() {
                             </>
                         )}
 
+                        {/* Bug'ozlik */}
+                        {canBreed && (
+                            <>
+                                <h3 className="section-title">Bug'ozlik</h3>
+                                <div className="work-card">
+                                    {animal.is_pregnant ? (
+                                        <>
+                                            <p className="work-meta">
+                                                Bug'oz ({formatDate(animal.pregnant_since)} dan).
+                                                {animal.due_date
+                                                    ? ` Taxminiy tug'ish: ${formatDate(animal.due_date)} (${calvingLeft(animal.days_to_calving)}).`
+                                                    : " Taxminiy tug'ish sanasi kiritilmagan."}
+                                            </p>
+                                            {isOwner && (
+                                                dueEdit !== null ? (
+                                                    <form onSubmit={handleSaveDue} className="animal-inline-form">
+                                                        <div className="form-field">
+                                                            <label>Taxminiy tug'ish sanasi</label>
+                                                            <input type="date" value={dueEdit} min={animal.pregnant_since}
+                                                                onChange={(e) => setDueEdit(e.target.value)} />
+                                                        </div>
+                                                        {pregError && <p className="error-text" role="alert">{pregError}</p>}
+                                                        <div className="farm-edit-actions">
+                                                            <button type="submit" className="btn-primary btn-auto" disabled={busy}>Saqlash</button>
+                                                            <button type="button" className="btn-ghost" onClick={() => setDueEdit(null)}>Bekor qilish</button>
+                                                        </div>
+                                                    </form>
+                                                ) : (
+                                                    <div className="farm-edit-actions">
+                                                        <button type="button" className="btn-ghost"
+                                                            onClick={() => { setPregError(''); setDueEdit(animal.due_date || ''); }}>
+                                                            Tug'ish sanasini o'zgartirish
+                                                        </button>
+                                                        <button type="button" className="btn-ghost" onClick={handleClearPregnancy}>
+                                                            Bug'oz emas
+                                                        </button>
+                                                    </div>
+                                                )
+                                            )}
+                                            <p className="workers-hint">Tug'ishni yozsangiz, bug'ozlik belgisi o'zi olib tashlanadi.</p>
+                                        </>
+                                    ) : isOwner ? (
+                                        <form onSubmit={handleMarkPregnant} className="animal-inline-form">
+                                            <div className="form-row">
+                                                <div className="form-field">
+                                                    <label>Bug'ozlik boshlangan sana (urug'lantirilgan)</label>
+                                                    <input type="date" value={pregForm.pregnant_since} max={today()}
+                                                        onChange={(e) => setPregForm({ ...pregForm, pregnant_since: e.target.value })} required />
+                                                </div>
+                                                <div className="form-field">
+                                                    <label>Taxminiy tug'ish sanasi (ixtiyoriy)</label>
+                                                    <input type="date" value={pregForm.due_date} min={pregForm.pregnant_since}
+                                                        onChange={(e) => setPregForm({ ...pregForm, due_date: e.target.value })} />
+                                                </div>
+                                            </div>
+                                            <p className="workers-hint">Tug'ish sanasini bo'sh qoldirsangiz, hayvon turiga qarab o'zi hisoblanadi (sigir uchun 283 kun).</p>
+                                            {pregError && <p className="error-text" role="alert">{pregError}</p>}
+                                            <button type="submit" className="btn-primary btn-auto" disabled={busy}>Bug'oz deb belgilash</button>
+                                        </form>
+                                    ) : (
+                                        <p className="work-meta">Bug'ozlik belgilanmagan.</p>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
                         {/* Tug'ish */}
-                        {isFemale && isActive && (
+                        {canBreed && (
                             <>
                                 <h3 className="section-title">Tug'ish</h3>
                                 <div className="work-card">

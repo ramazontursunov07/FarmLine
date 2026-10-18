@@ -8,7 +8,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.animals.models import AnimalEvent, AnimalGroup
+from apps.animals.models import Animal, AnimalEvent, AnimalGroup
 from apps.animals.serializers import AnimalEventSerializer
 from apps.core.mixins import IdempotentCreateMixin
 from apps.finance.models import Transaction
@@ -140,6 +140,21 @@ class FarmViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             'items': AnimalEventSerializer(treating[:5], many=True).data,
         }
 
+        # --- Tug'ishi yaqin (14 kun ichida yoki muddati o'tgan) bug'oz hayvonlar ---
+        soon = (
+            Animal.objects.filter(farm_id__in=ids, status='faol', pregnant_since__isnull=False,
+                                  due_date__isnull=False, due_date__lte=today + timedelta(days=14))
+            .select_related('farm').order_by('due_date', 'id')
+        )
+        pregnancies = {
+            'count': soon.count(),
+            'items': [
+                {'id': a.id, 'farm': a.farm_id, 'farm_name': a.farm.name, 'tag_number': a.tag_number,
+                 'name': a.name, 'due_date': a.due_date, 'days_left': (a.due_date - today).days}
+                for a in soon[:5]
+            ],
+        }
+
         # --- Vazifalar ---
         open_tasks = Task.objects.filter(farm_id__in=ids).exclude(status='bajarildi')
         overdue_qs = (
@@ -228,6 +243,7 @@ class FarmViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             'farms_count': len(ids),
             'animals': animals,
             'treatments': treatments,
+            'pregnancies': pregnancies,
             'tasks': tasks,
             'inventory': inventory,
             'finance': finance,

@@ -180,6 +180,10 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 animal.save(update_fields=['status', 'updated_at'])
             if event_type == 'tugilish' and calves:
                 event._calves_created = self._create_calves(event, locked, calves)
+            if event_type == 'tugilish' and serializer.validated_data.get('animal') is not None:
+                # Ona tug'di: bug'ozlik tugaydi
+                Animal.objects.filter(pk=serializer.validated_data['animal'].pk).update(
+                    pregnant_since=None, due_date=None)
 
             if event_type == 'olim' and user.id != group.farm.owner_id:
                 notify_users([group.farm.owner], (
@@ -296,17 +300,18 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
     @staticmethod
     def _check_capacity(group_id, exclude_pk=None):
-        """Faol kartochkalar soni guruh sonidan oshmasin (guruh qulflanadi)."""
+        """Guruh qulflanadi; faol kartochkalar soni guruh sonidan oshsa, guruh soni oshiriladi."""
         group = AnimalGroup.objects.select_for_update().get(pk=group_id)
         if group.status != 'faol':
             raise ValidationError({'group': "Faol bo'lmagan guruhga kartochka qo'shib bo'lmaydi"})
         cards = Animal.objects.filter(group=group, status='faol')
         if exclude_pk:
             cards = cards.exclude(pk=exclude_pk)
-        if cards.count() + 1 > group.count:
-            raise ValidationError({'group': (
-                f"Guruhda {group.count} ta hayvon bor va ularning kartochkasi allaqachon ochilgan. "
-                f"Avval guruh sonini oshiring.")})
+        needed = cards.count() + 1
+        if needed > group.count:
+            # Yangi hayvon kartochkasi guruh sonini o'zi oshiradi (guruhni sonsiz ochish mumkin)
+            group.count = needed
+            group.save(update_fields=['count', 'updated_at'])
 
     def perform_create(self, serializer):
         group = serializer.validated_data['group']
@@ -459,3 +464,4 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
     model = MilkRecord
     queryset = MilkRecord.objects.all()
     serializer_class = MilkRecordSerializer
+

@@ -34,6 +34,11 @@ function AnimalCards() {
     const [editError, setEditError] = useState('');
     const [saving, setSaving] = useState(false);
 
+    const [adding, setAdding] = useState(false);
+    const [addForm, setAddForm] = useState({ group: '', tag_number: '', name: '', sex: 'urgochi', birth_date: '' });
+    const [addError, setAddError] = useState('');
+    const [addSaving, setAddSaving] = useState(false);
+
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('faol');
     const groupFilter = searchParams.get('group') || '';
@@ -78,6 +83,40 @@ function AnimalCards() {
             mother: a.mother ? String(a.mother) : '',
             status: a.status,
         });
+    };
+
+    const activeGroups = groups.filter((g) => g.status === 'faol');
+
+    const openAdd = () => {
+        setAddError('');
+        setAddForm({
+            group: groupFilter || (activeGroups[0] ? String(activeGroups[0].id) : ''),
+            tag_number: '', name: '', sex: 'urgochi', birth_date: '',
+        });
+        setAdding(true);
+    };
+
+    const handleAddChange = (e) => setAddForm({ ...addForm, [e.target.name]: e.target.value });
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        setAddSaving(true);
+        setAddError('');
+        try {
+            await api.post('animals-card/', {
+                group: Number(addForm.group),
+                tag_number: addForm.tag_number.trim(),
+                name: addForm.name.trim(),
+                sex: addForm.sex,
+                birth_date: addForm.birth_date || null,
+            });
+            setAdding(false);
+            reload();
+        } catch (err) {
+            setAddError(getErrorMessage(err, "Hayvonni qo'shib bo'lmadi"));
+        } finally {
+            setAddSaving(false);
+        }
     };
 
     const handleEditChange = (e) => setEditForm({ ...editForm, [e.target.name]: e.target.value });
@@ -160,6 +199,72 @@ function AnimalCards() {
                             Har bir hayvon uchun alohida hisob: vazn, sut, tug'ish va davolash tarixi.
                             Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
                         </p>
+
+                        {isOwner && !adding && (
+                            <button type="button" className="btn-primary btn-auto" onClick={openAdd}>
+                                + Hayvon qo'shish
+                            </button>
+                        )}
+                        {isOwner && adding && (
+                            <div className="work-card">
+                                {activeGroups.length === 0 ? (
+                                    <>
+                                        <p className="work-meta">
+                                            Avval hayvon guruhini oching: «Ferma ishlari» sahifasida «Hayvon guruhlari» bo'limida.
+                                        </p>
+                                        <button type="button" className="btn-ghost" onClick={() => setAdding(false)}>Yopish</button>
+                                    </>
+                                ) : (
+                                    <form className="animal-inline-form" onSubmit={handleAdd}>
+                                        <div className="form-row">
+                                            <div className="form-field">
+                                                <label>Guruhi</label>
+                                                <select name="group" value={addForm.group} onChange={handleAddChange}>
+                                                    {activeGroups.map((g) => (
+                                                        <option key={g.id} value={g.id}>
+                                                            {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Quloq raqami</label>
+                                                <input type="text" name="tag_number" value={addForm.tag_number}
+                                                    onChange={handleAddChange} maxLength={30} required />
+                                            </div>
+                                        </div>
+                                        <div className="form-row">
+                                            <div className="form-field">
+                                                <label>Laqabi (ixtiyoriy)</label>
+                                                <input type="text" name="name" value={addForm.name}
+                                                    onChange={handleAddChange} maxLength={100} />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Jinsi</label>
+                                                <select name="sex" value={addForm.sex} onChange={handleAddChange}>
+                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Tug'ilgan sana (ixtiyoriy)</label>
+                                            <input type="date" name="birth_date" value={addForm.birth_date}
+                                                max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} />
+                                        </div>
+                                        <p className="workers-hint">Guruhdagi hayvonlar soni 1 taga ko'payadi.</p>
+                                        {addError && <p className="error-text" role="alert">{addError}</p>}
+                                        <div className="farm-edit-actions">
+                                            <button type="submit" className="btn-primary btn-auto" disabled={addSaving}>
+                                                {addSaving ? 'Kuting...' : "Qo'shish"}
+                                            </button>
+                                            <button type="button" className="btn-ghost" disabled={addSaving} onClick={() => setAdding(false)}>
+                                                Bekor qilish
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        )}
 
                         <div className="filter-bar">
                             <input type="search" placeholder="Quloq raqami yoki laqab" value={search}
@@ -270,6 +375,7 @@ function AnimalCards() {
                                                     №{a.tag_number}{a.name ? ` · ${a.name}` : ''}
                                                 </Link>
                                                 {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
+                                                {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
                                             </span>
                                             <span className="work-meta">
                                                 {a.group_label} · {SEXES[a.sex] || a.sex}
@@ -278,6 +384,7 @@ function AnimalCards() {
                                             <span className="work-meta">
                                                 {a.last_weight ? `Vazni: ${a.last_weight} kg (${formatDate(a.last_weight_date)})` : "Vazn yozilmagan"}
                                                 {a.last_calving_date ? ` · oxirgi tug'ish: ${formatDate(a.last_calving_date)}` : ''}
+                                                {a.is_pregnant && a.due_date ? ` · tug'ishi: ${formatDate(a.due_date)}` : ''}
                                             </span>
                                         </div>
                                         <div className="work-side animal-actions">

@@ -679,6 +679,8 @@ button.db-row.is-open .db-row-go {
     }
 }
 
+.db-attn--birth .db-attn-icon { color: var(--db-leaf); }
+
 /* ---------- Ob-havo ---------- */
 .db-wx-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .db-wx-where { color: var(--color-text-muted, #6b7468); font-size: 0.9rem; }

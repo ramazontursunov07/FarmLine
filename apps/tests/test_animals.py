@@ -109,14 +109,20 @@ class AnimalCardCrudTests(AnimalCardBase):
         self.assertEqual(r.status_code, 400)
         self.assertIn('tag_number', r.json())
 
-    def test_cards_cannot_exceed_group_count(self):
+    def test_new_card_raises_group_count(self):
         self.group.count = 2
         self.group.save()
+        for tag in ('1', '2', '3'):
+            self.assertEqual(self.new_card(tag).status_code, 201)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+
+    def test_empty_group_fills_up_with_cards(self):
+        self.group.count = 0
+        self.group.save()
         self.assertEqual(self.new_card('1').status_code, 201)
-        self.assertEqual(self.new_card('2').status_code, 201)
-        r = self.new_card('3')
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('group', r.json())
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 1)
 
     def test_mother_must_be_female_and_same_farm(self):
         bull = self.make_animal('7', sex='erkak')
@@ -531,3 +537,77 @@ class CalvingWithCardsTests(AnimalCardBase):
         self.assertEqual(second.headers.get('Idempotent-Replayed'), 'true')
         self.group.refresh_from_db()
         self.assertEqual((self.group.count, Animal.objects.count(), AnimalEvent.objects.count()), (4, 1, 1))
+
+
+class PregnancyTests(AnimalCardBase):
+    def patch(self, animal, **data):
+        return self.client.patch(f'{CARDS}{animal.pk}/', data, format='json')
+
+    def test_mark_pregnant_calculates_due_date(self):
+        cow = self.make_animal('1')
+        since = self.today - timedelta(days=30)
+        r = self.patch(cow, pregnant_since=str(since))
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json()
+        self.assertTrue(body['is_pregnant'])
+        self.assertEqual(body['due_date'], str(since + timedelta(days=283)))
+        self.assertEqual(body['days_to_calving'], 253)
+
+    def test_custom_due_date_and_clearing(self):
+        cow = self.make_animal('2')
+        due = self.today + timedelta(days=20)
+        r = self.patch(cow, pregnant_since=str(self.today - timedelta(days=10)), due_date=str(due))
+        self.assertEqual(r.json()['due_date'], str(due))
+        r = self.patch(cow, pregnant_since=None)
+        self.assertFalse(r.json()['is_pregnant'])
+        self.assertIsNone(r.json()['due_date'])
+
+    def test_validation(self):
+        bull = self.make_animal('3', sex='erkak')
+        self.assertEqual(self.patch(bull, pregnant_since=str(self.today)).status_code, 400)
+        cow = self.make_animal('4')
+        self.assertEqual(self.patch(cow, pregnant_since=str(self.today + timedelta(days=1))).status_code, 400)
+        r = self.patch(cow, pregnant_since=str(self.today), due_date=str(self.today - timedelta(days=1)))
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.patch(cow, due_date=str(self.today)).status_code, 400)
+
+    def test_birth_by_mother_ends_pregnancy(self):
+        cow = self.make_animal('5', pregnant_since=self.today - timedelta(days=280), due_date=self.today)
+        r = self.client.post(EVENTS, {'animal_group': self.group.pk, 'animal': cow.pk, 'event_type': 'tugilish',
+                                      'title': "Tug'di", 'animal_count': 1, 'start_date': str(self.today)},
+                             format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        cow.refresh_from_db()
+        self.assertIsNone(cow.pregnant_since)
+        self.assertIsNone(cow.due_date)
+
+    def test_selling_ends_pregnancy(self):
+        cow = self.make_animal('6', pregnant_since=self.today - timedelta(days=100),
+                               due_date=self.today + timedelta(days=183))
+        self.assertEqual(self.patch(cow, status='sotilgan').status_code, 200)
+        cow.refresh_from_db()
+        self.assertIsNone(cow.pregnant_since)
+
+    def test_worker_cannot_mark(self):
+        cow = self.make_animal('7')
+        self.client.force_authenticate(self.worker)
+        self.assertEqual(self.patch(cow, pregnant_since=str(self.today)).status_code, 403)
+
+    def test_dashboard_summary_lists_soon_due(self):
+        self.make_animal('8', pregnant_since=self.today - timedelta(days=275), due_date=self.today + timedelta(days=8))
+        self.make_animal('9', pregnant_since=self.today - timedelta(days=100),
+                         due_date=self.today + timedelta(days=183))
+        r = self.client.get('/api/farms/summary/')
+        self.assertEqual(r.status_code, 200)
+        preg = r.json()['pregnancies']
+        self.assertEqual(preg['count'], 1)
+        self.assertEqual(preg['items'][0]['tag_number'], '8')
+        self.assertEqual(preg['items'][0]['days_left'], 8)
+
+    def test_gestation_days_by_type_name(self):
+        from apps.animals.serializers import gestation_days
+        self.assertEqual(gestation_days('Sigir'), 283)
+        self.assertEqual(gestation_days("Qo\u02bby"), 150)
+        self.assertEqual(gestation_days("Qo'y"), 150)
+        self.assertIsNone(gestation_days('Tovuq'))
+

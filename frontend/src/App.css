@@ -858,6 +858,10 @@
     border-left-color: var(--color-error);
 }
 
+.work-badge--preg {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
 .work-badge--muhim {
     border-color: var(--color-accent);
 }

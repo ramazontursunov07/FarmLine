@@ -15,6 +15,7 @@ const KIND = {
     late: { icon: 'clock', label: "Muddati o'tgan" },
     stock: { icon: 'stock', label: 'Zaxira kam' },
     care: { icon: 'care', label: 'Davolanmoqda' },
+    birth: { icon: 'care', label: "Tug'ishi yaqin" },
 };
 
 function formatDateTime(iso) {
@@ -150,6 +151,7 @@ function FarmerOverview({ refreshKey, children }) {
     let total = 0;
     if (hasFarms) {
         const { tasks, inventory, treatments } = data;
+        const pregnancies = data.pregnancies || { count: 0, items: [] };
         const farmName = (id) => data.farms.find((f) => f.id === id)?.name ?? '';
         rows = [
             ...tasks.overdue_items.map((t) => ({
@@ -165,8 +167,13 @@ function FarmerOverview({ refreshKey, children }) {
                 key: `e${e.id}`, kind: 'care', to: `/farms/${e.farm}/work`, title: e.title,
                 meta: [farmName(e.farm), e.animal_group_label, `${e.days_since_start} kundan beri`].filter(Boolean),
             })),
+            ...pregnancies.items.map((a) => ({
+                key: `p${a.id}`, kind: 'birth', to: `/farms/${a.farm}/animals/${a.id}`,
+                title: `№${a.tag_number}${a.name ? ` · ${a.name}` : ''}`,
+                meta: [a.farm_name, a.days_left < 0 ? `${-a.days_left} kun kechikdi` : a.days_left === 0 ? "bugun tug'ishi kutilmoqda" : `${a.days_left} kundan keyin tug'adi`],
+            })),
         ];
-        total = tasks.overdue + inventory.low_count + treatments.count;
+        total = tasks.overdue + inventory.low_count + treatments.count + pregnancies.count;
     }
 
     return (

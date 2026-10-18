@@ -33,12 +33,12 @@ class AnimalGroup(models.Model):
         on_delete=models.PROTECT,
         related_name='groups'
     )
-    breed = models.CharField(max_length=100, blank=True)  #nasl
-    count = models.PositiveIntegerField(default=0) #soni
-    birth_date = models.DateField(null=True, blank=True) #tug'ilgan sanasi
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol') #status
-    created_at = models.DateTimeField(auto_now_add=True) #yaratilganligi.
-    updated_at = models.DateTimeField(auto_now=True) #yangilangan sanasi.
+    breed = models.CharField(max_length=100, blank=True)  # nasl
+    count = models.PositiveIntegerField(default=0)  # soni
+    birth_date = models.DateField(null=True, blank=True)  # tug'ilgan sanasi
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol')  # status
+    created_at = models.DateTimeField(auto_now_add=True)  # yaratilganligi.
+    updated_at = models.DateTimeField(auto_now=True)  # yangilangan sanasi.
 
     class Meta:
         ordering = ['-created_at']
@@ -53,7 +53,7 @@ class AnimalGroup(models.Model):
 COUNT_EVENT_TYPES = ('olim', 'tugilish')
 
 
-class AnimalEvent(models.Model):  #ishlar
+class AnimalEvent(models.Model):  # ishlar
     EVENT_TYPE_CHOICES = (
         ('kasallik', 'Kasallik'),
         ('davolash', 'Davolash'),
@@ -132,6 +132,8 @@ class Animal(models.Model):
     sex = models.CharField(max_length=10, choices=SEX_CHOICES, default='urgochi')
     birth_date = models.DateField(null=True, blank=True)
     mother = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='calves')
+    pregnant_since = models.DateField(null=True, blank=True)  # bug'ozlik boshlangan (urug'lantirilgan) sana
+    due_date = models.DateField(null=True, blank=True)  # taxminiy tug'ish sanasi
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -194,3 +196,4 @@ class MilkRecord(models.Model):
 
     def __str__(self):
         return f"{self.animal} - {self.liters} l ({self.date}, {self.session})"
+

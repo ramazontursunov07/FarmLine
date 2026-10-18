@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.utils import timezone
@@ -155,6 +156,24 @@ class AnimalEventSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# Bug'ozlik muddati (kun). Hayvon turi nomida shu so'z bo'lsa, tug'ish sanasi o'zi hisoblanadi.
+GESTATION_DAYS = (
+    ('sigir', 283), ('qoramol', 283), ('buzoq', 283), ('mol', 283),
+    ("qo'y", 150), ('echki', 150), ('ot', 340), ('biya', 340),
+    ('tuya', 390), ("cho'chqa", 114),
+)
+
+
+def gestation_days(type_name):
+    name = (type_name or '').lower()
+    for ch in ('\u02bb', '\u2018', '\u2019', '`', '\u02bc'):
+        name = name.replace(ch, "'")
+    for word, days in GESTATION_DAYS:
+        if word in name:
+            return days
+    return None
+
+
 class AnimalSerializer(serializers.ModelSerializer):
     farm = serializers.IntegerField(source='group.farm_id', read_only=True)
     group_label = serializers.SerializerMethodField()
@@ -165,17 +184,28 @@ class AnimalSerializer(serializers.ModelSerializer):
     last_weight = serializers.SerializerMethodField()
     last_weight_date = serializers.SerializerMethodField()
     last_calving_date = serializers.SerializerMethodField()
+    is_pregnant = serializers.SerializerMethodField()
+    days_to_calving = serializers.SerializerMethodField()
 
     class Meta:
         model = Animal
         fields = ['id', 'farm', 'group', 'group_label', 'tag_number', 'name', 'sex', 'sex_display',
                   'birth_date', 'mother', 'mother_tag', 'status', 'status_display', 'notes',
+                  'pregnant_since', 'due_date', 'is_pregnant', 'days_to_calving',
                   'last_weight', 'last_weight_date', 'last_calving_date', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
     def get_group_label(self, obj):
         group = obj.group
         return f"{group.animal_type.name} ({group.breed})" if group.breed else group.animal_type.name
+
+    def get_is_pregnant(self, obj):
+        return obj.pregnant_since is not None
+
+    def get_days_to_calving(self, obj):
+        if obj.pregnant_since is None or obj.due_date is None:
+            return None
+        return (obj.due_date - timezone.localdate()).days
 
     def get_last_weight(self, obj):
         value = getattr(obj, 'last_weight', None)
@@ -202,6 +232,7 @@ class AnimalSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
         group = attrs.get('group', getattr(instance, 'group', None))
+        self._validate_pregnancy(attrs, instance, group)
         if instance is not None and 'group' in attrs and attrs['group'].farm_id != instance.farm_id:
             raise serializers.ValidationError({'group': "Hayvonni boshqa fermaga ko'chirib bo'lmaydi"})
 
@@ -222,6 +253,37 @@ class AnimalSerializer(serializers.ModelSerializer):
             if instance is not None and mother.pk == instance.pk:
                 raise serializers.ValidationError({'mother': "Hayvon o'zining onasi bo'la olmaydi"})
         return attrs
+
+    def _validate_pregnancy(self, attrs, instance, group):
+        sex = attrs.get('sex', getattr(instance, 'sex', 'urgochi'))
+        status = attrs.get('status', getattr(instance, 'status', 'faol'))
+        since = attrs.get('pregnant_since', getattr(instance, 'pregnant_since', None))
+
+        # Bug'ozlik tugadi: sana o'chsa, tug'ish sanasi ham o'chadi
+        if 'pregnant_since' in attrs and attrs['pregnant_since'] is None:
+            attrs['due_date'] = None
+            return
+        # Hayvon sotilsa/o'lsa yoki erkak qilib o'zgartirilsa, bug'ozlik o'zi tugaydi
+        if since is not None and (status != 'faol' or sex != 'urgochi'):
+            if attrs.get('pregnant_since') is not None:
+                raise serializers.ValidationError({'pregnant_since': "Faqat faol urg'ochi hayvon bug'oz bo'la oladi"})
+            attrs['pregnant_since'] = None
+            attrs['due_date'] = None
+            return
+        if since is None:
+            if attrs.get('due_date') is not None:
+                raise serializers.ValidationError({'due_date': "Avval bug'ozlik boshlangan sanani kiriting"})
+            return
+
+        if 'pregnant_since' in attrs and since > timezone.localdate():
+            raise serializers.ValidationError({'pregnant_since': "Sana kelajakda bo'lishi mumkin emas"})
+        if 'pregnant_since' in attrs and 'due_date' not in attrs:
+            days = gestation_days(group.animal_type.name) if group is not None else None
+            attrs['due_date'] = since + timedelta(days=days) if days else None
+        due = attrs.get('due_date', getattr(instance, 'due_date', None))
+        if due is not None and due < since:
+            raise serializers.ValidationError(
+                {'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
 
 
 class _AnimalRecordSerializer(serializers.ModelSerializer):

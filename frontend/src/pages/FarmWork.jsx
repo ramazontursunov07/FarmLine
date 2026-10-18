@@ -58,7 +58,7 @@ const makeEventForm = () => ({
     status: 'davom_etmoqda',
 });
 
-const EMPTY_GROUP_FORM = { animal_type_name: '', breed: '', count: '', birth_date: '' };
+const EMPTY_GROUP_FORM = { animal_type_name: '', breed: '' };
 const EMPTY_FILTERS = { event_type: '', status: '', recorded_by: '' };
 
 function formatDate(iso) {
@@ -303,8 +303,7 @@ function FarmWork() {
                 farm: Number(farmId),
                 animal_type: type.id,
                 breed: groupForm.breed.trim(),
-                count: Number(groupForm.count),
-                birth_date: groupForm.birth_date || null,
+                count: 0, // soni kartochkalar qo'shilgan sari o'zi oshadi
             });
             setGroupForm(EMPTY_GROUP_FORM);
             reload();
@@ -313,6 +312,18 @@ function FarmWork() {
         } finally {
             setSavingGroup(false);
         }
+    };
+
+    // Guruhga hayvon qo'shish (sotib olingan, boshqa joydan keltirilgan va h.k.)
+    const handleAddAnimals = (group) => {
+        const answer = window.prompt(`${group.animal_type_name}: nechta hayvon qo'shasiz?`, '1');
+        if (answer === null) return;
+        const n = Number(answer);
+        if (!Number.isInteger(n) || n < 1) {
+            window.alert("Iltimos, 1 dan katta butun son kiriting.");
+            return;
+        }
+        patchGroup(group, { count: group.count + n });
     };
 
     const patchGroup = async (group, data) => {
@@ -611,6 +622,11 @@ function FarmWork() {
                                         </div>
                                         {isOwner && (
                                             <div className="work-side">
+                                                {g.status === 'faol' && (
+                                                    <button type="button" className="farm-item-action" onClick={() => handleAddAnimals(g)}>
+                                                        + Hayvon qo'shish
+                                                    </button>
+                                                )}
                                                 <select value={g.status} onChange={(e) => patchGroup(g, { status: e.target.value })}>
                                                     {Object.entries(GROUP_STATUSES).map(([v, l]) => (
                                                         <option key={v} value={v}>{l}</option>
@@ -642,17 +658,6 @@ function FarmWork() {
                                         <div className="form-field">
                                             <label>Zoti (ixtiyoriy)</label>
                                             <input type="text" name="breed" value={groupForm.breed} onChange={handleGroupChange} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>Soni</label>
-                                            <input type="number" name="count" min="0" step="1" value={groupForm.count}
-                                                onChange={handleGroupChange} required />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>Tug'ilgan sana (ixtiyoriy)</label>
-                                            <input type="date" name="birth_date" value={groupForm.birth_date} onChange={handleGroupChange} />
                                         </div>
                                     </div>
                                     {groupError && <p className="error-text" role="alert">{groupError}</p>}
