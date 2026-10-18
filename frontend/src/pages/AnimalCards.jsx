@@ -108,7 +108,7 @@ function AnimalCards() {
                 tag_number: addForm.tag_number.trim(),
                 name: addForm.name.trim(),
                 sex: addForm.sex,
-                birth_date: addForm.birth_date || null,
+                birth_date: addForm.birth_date,
             });
             setAdding(false);
             reload();
@@ -247,9 +247,9 @@ function AnimalCards() {
                                             </div>
                                         </div>
                                         <div className="form-field">
-                                            <label>Tug'ilgan sana (ixtiyoriy)</label>
+                                            <label>Tug'ilgan sana</label>
                                             <input type="date" name="birth_date" value={addForm.birth_date}
-                                                max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} />
+                                                max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} required />
                                         </div>
                                         <p className="workers-hint">Guruhdagi hayvonlar soni 1 taga ko'payadi.</p>
                                         {addError && <p className="error-text" role="alert">{addError}</p>}
@@ -314,9 +314,9 @@ function AnimalCards() {
                                                         </select>
                                                     </div>
                                                     <div className="form-field">
-                                                        <label>Tug'ilgan sana (ixtiyoriy)</label>
+                                                        <label>Tug'ilgan sana</label>
                                                         <input type="date" name="birth_date" value={editForm.birth_date}
-                                                            onChange={handleEditChange} />
+                                                            max={new Date().toLocaleDateString('en-CA')} onChange={handleEditChange} required />
                                                     </div>
                                                 </div>
                                                 <div className="form-row">

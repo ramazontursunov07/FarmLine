@@ -502,7 +502,7 @@ function AnimalCard() {
                                     <div className="form-field">
                                         <label>Tug'ilgan sana</label>
                                         <input type="date" name="birth_date" value={cardForm.birth_date}
-                                            max={today()} onChange={handleCardChange} />
+                                            max={today()} onChange={handleCardChange} required />
                                     </div>
                                 </div>
                                 <div className="form-field">

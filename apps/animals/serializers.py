@@ -232,6 +232,9 @@ class AnimalSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
         group = attrs.get('group', getattr(instance, 'group', None))
+        # Tug'ilgan sana majburiy (yoshi bo'yicha sut/bug'ozlik bo'limlari ko'rsatiladi)
+        if (instance is None and not attrs.get('birth_date')) or ('birth_date' in attrs and attrs['birth_date'] is None):
+            raise serializers.ValidationError({'birth_date': "Tug'ilgan sanani kiriting"})
         self._validate_pregnancy(attrs, instance, group)
         if instance is not None and 'group' in attrs and attrs['group'].farm_id != instance.farm_id:
             raise serializers.ValidationError({'group': "Hayvonni boshqa fermaga ko'chirib bo'lmaydi"})
@@ -253,6 +256,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             if instance is not None and mother.pk == instance.pk:
                 raise serializers.ValidationError({'mother': "Hayvon o'zining onasi bo'la olmaydi"})
         return attrs
+
 
     def _validate_pregnancy(self, attrs, instance, group):
         sex = attrs.get('sex', getattr(instance, 'sex', 'urgochi'))
@@ -282,8 +286,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             attrs['due_date'] = since + timedelta(days=days) if days else None
         due = attrs.get('due_date', getattr(instance, 'due_date', None))
         if due is not None and due < since:
-            raise serializers.ValidationError(
-                {'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
+            raise serializers.ValidationError({'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
 
 
 class _AnimalRecordSerializer(serializers.ModelSerializer):

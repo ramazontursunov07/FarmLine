@@ -37,7 +37,8 @@ class AnimalCardBase(APITestCase):
         self.client.force_authenticate(self.owner)
 
     def new_card(self, tag='14', **extra):
-        data = {'group': self.group.pk, 'tag_number': tag, 'name': 'Mushuk', 'sex': 'urgochi'}
+        data = {'group': self.group.pk, 'tag_number': tag, 'name': 'Mushuk', 'sex': 'urgochi',
+                'birth_date': str(self.today - timedelta(days=1000))}
         data.update(extra)
         return self.client.post(CARDS, data, format='json')
 
@@ -103,6 +104,14 @@ class AnimalCardCrudTests(AnimalCardBase):
         self.assertEqual(self.client.get(f'{CARDS}{animal.pk}/').status_code, 404)
         self.assertEqual(self.client.get(f'{CARDS}{animal.pk}/card/').status_code, 404)
 
+    def test_birth_date_is_required(self):
+        r = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '40', 'sex': 'urgochi'}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('birth_date', r.json())
+        cow = self.make_animal('41', birth_date=self.today - timedelta(days=900))
+        r = self.client.patch(f'{CARDS}{cow.pk}/', {'birth_date': None}, format='json')
+        self.assertEqual(r.status_code, 400)
+
     def test_duplicate_tag_in_farm_rejected(self):
         self.assertEqual(self.new_card('14').status_code, 201)
         r = self.new_card('14')
@@ -160,7 +169,7 @@ class AnimalCardCrudTests(AnimalCardBase):
 
     def test_idempotency_key_prevents_duplicate_card(self):
         headers = {'HTTP_IDEMPOTENCY_KEY': 'karta-test-12345'}
-        r1 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5'}, format='json', **headers)
+        r1 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5', 'birth_date': '2023-01-01'}, format='json', **headers)
         r2 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5'}, format='json', **headers)
         self.assertEqual((r1.status_code, r2.status_code), (201, 201))
         self.assertEqual(Animal.objects.count(), 1)
@@ -538,7 +547,6 @@ class CalvingWithCardsTests(AnimalCardBase):
         self.group.refresh_from_db()
         self.assertEqual((self.group.count, Animal.objects.count(), AnimalEvent.objects.count()), (4, 1, 1))
 
-
 class PregnancyTests(AnimalCardBase):
     def patch(self, animal, **data):
         return self.client.patch(f'{CARDS}{animal.pk}/', data, format='json')
@@ -582,8 +590,7 @@ class PregnancyTests(AnimalCardBase):
         self.assertIsNone(cow.due_date)
 
     def test_selling_ends_pregnancy(self):
-        cow = self.make_animal('6', pregnant_since=self.today - timedelta(days=100),
-                               due_date=self.today + timedelta(days=183))
+        cow = self.make_animal('6', pregnant_since=self.today - timedelta(days=100), due_date=self.today + timedelta(days=183))
         self.assertEqual(self.patch(cow, status='sotilgan').status_code, 200)
         cow.refresh_from_db()
         self.assertIsNone(cow.pregnant_since)
@@ -595,8 +602,7 @@ class PregnancyTests(AnimalCardBase):
 
     def test_dashboard_summary_lists_soon_due(self):
         self.make_animal('8', pregnant_since=self.today - timedelta(days=275), due_date=self.today + timedelta(days=8))
-        self.make_animal('9', pregnant_since=self.today - timedelta(days=100),
-                         due_date=self.today + timedelta(days=183))
+        self.make_animal('9', pregnant_since=self.today - timedelta(days=100), due_date=self.today + timedelta(days=183))
         r = self.client.get('/api/farms/summary/')
         self.assertEqual(r.status_code, 200)
         preg = r.json()['pregnancies']
@@ -610,4 +616,3 @@ class PregnancyTests(AnimalCardBase):
         self.assertEqual(gestation_days("Qo\u02bby"), 150)
         self.assertEqual(gestation_days("Qo'y"), 150)
         self.assertIsNone(gestation_days('Tovuq'))
-
