@@ -86,4 +86,21 @@ class TelegramLinkToken(models.Model):
         return f"{self.user.username} - Telegram ulash ({'ishlatilgan' if self.is_used else 'faol'})"
 
 
+class DigestRun(models.Model):
+    """
+    Kunlik hisobot qaysi kunga yuborilgani. Tashqi rejalashtiruvchi bir kunda ikki marta chaqirsa ham,
+    hisobot bir marta yuboriladi.
+    """
+    date = models.DateField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+        verbose_name = "Kunlik hisobot yuborilishi"
+        verbose_name_plural = "Kunlik hisobotlar yuborilishi"
+
+    def __str__(self):
+        return f"Kunlik hisobot: {self.date}"
+
+
 """O'rganildi."""

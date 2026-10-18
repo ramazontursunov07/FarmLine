@@ -4,6 +4,7 @@ Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 1. Yem bashorati  -- "yem 5 kunga yetadi" (so'nggi kunlardagi sarf asosida)
 2. Chiqim ogohlantirishi -- "bu oy chiqim o'tgan oyning shu davridan 40% ko'p"
 3. Vaksinatsiya eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan vaksinatsiyalar
+4. Tug'ish eslatmasi -- tug'ishi yaqin yoki muddati o'tib ketgan bug'oz hayvonlar
 
 Har bir funksiya matn qatorlari ro'yxatini qaytaradi (ogohlantirish bo'lmasa -- bo'sh ro'yxat).
 Chegaralarni shu fayl tepasidagi sozlamalardan o'zgartirish mumkin.
@@ -16,7 +17,7 @@ from decimal import Decimal
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from apps.animals.models import AnimalEvent
+from apps.animals.models import Animal, AnimalEvent
 from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem, InventoryTransaction
 
@@ -38,6 +39,11 @@ SPEND_MIN_DIFF = Decimal('100000')   # farq shu summadan (so'm) kam bo'lsa, foiz
 # --- Vaksinatsiya ---
 VACCINE_DAYS_AHEAD = 3     # necha kun oldindan eslatiladi
 VACCINE_OVERDUE_DAYS = 7   # muddati o'tganlarni necha kungacha eslatamiz
+
+# Tug'ish eslatmasi
+CALVING_DAYS_AHEAD = 14     # tug'ishga necha kun qolganda eslatma boshlanadi
+CALVING_URGENT_DAYS = 3     # shu kundan kam qolsa, xabar "shoshilinch" belgisi (🚨) bilan chiqadi
+CALVING_OVERDUE_DAYS = 21   # muddati o'tib ketganlarni necha kungacha eslatamiz
 
 
 def _money(value):
@@ -190,6 +196,32 @@ def vaccination_lines(farm, today):
     return lines + _more(len(events))
 
 
+# ---------------------------------------------------------------- 4. Tug'ish eslatmasi
+def calving_lines(farm, today):
+    """
+    Tug'ishi yaqin (yoki muddati o'tib ketgan) bug'oz hayvonlar.
+    Hayvon kartochkasida "Tug'ilish" yozilganda bug'ozlik tugaydi va eslatma o'zi to'xtaydi.
+    """
+    animals = list(
+        Animal.objects.filter(
+            farm=farm, status='faol', pregnant_since__isnull=False, due_date__isnull=False,
+            due_date__gte=today - timedelta(days=CALVING_OVERDUE_DAYS),
+            due_date__lte=today + timedelta(days=CALVING_DAYS_AHEAD),
+        ).order_by('due_date', 'id')
+    )
+    if not animals:
+        return []
+
+    urgent = any(a.due_date <= today + timedelta(days=CALVING_URGENT_DAYS) for a in animals)
+    lines = [f"{'🚨' if urgent else '🐄'} Tug'ishi yaqin: {len(animals)} ta"]
+    for a in animals[:MAX_ITEMS]:
+        lines.append(f"  • {a} — {_when(a.due_date, today)}")
+    lines += _more(len(animals))
+    if any(a.due_date <= today for a in animals):
+        lines.append("  ℹ️ Tug'ib bo'lgan bo'lsa, hayvon kartochkasida «Tug'ilish» ni yozing: eslatma to'xtaydi.")
+    return lines
+
+
 # ---------------------------------------------------------------- Hammasi birga
 def build_alert_lines(farm, today):
     """
@@ -197,7 +229,7 @@ def build_alert_lines(farm, today):
     to'xtab qolmasligi uchun xato log'ga yoziladi va qolganlari davom etadi.
     """
     lines = []
-    for builder in (vaccination_lines, feed_forecast_lines, spending_alert_lines):
+    for builder in (calving_lines, vaccination_lines, feed_forecast_lines, spending_alert_lines):
         try:
             lines += builder(farm, today)
         except Exception:

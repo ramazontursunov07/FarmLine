@@ -1,3 +1,4 @@
+import hmac
 import html
 import ipaddress
 from urllib.parse import urlparse
@@ -5,6 +6,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -13,7 +15,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import PasswordResetToken, TelegramLinkToken, User
+from .digest_runner import run_digest_in_background
+from .models import DigestRun, PasswordResetToken, TelegramLinkToken, User
 from .permissions import IsAppAdmin
 from .serializers import (
     AdminUserListSerializer,
@@ -225,3 +228,30 @@ class AdminUserListView(generics.ListAPIView):
         if role:
             qs = qs.filter(role=role)
         return qs
+
+
+class DailyDigestCronView(APIView):
+    """
+    Tashqi rejalashtiruvchi (masalan, GitHub Actions) kuniga bir marta chaqiradi va kunlik hisobot Telegramga yuboriladi.
+    X-Cron-Secret sarlavhasi CRON_SECRET bilan bir xil bo'lishi shart. Kalit sozlanmagan yoki noto'g'ri bo'lsa, 404
+    qaytariladi: begonalar bunday manzil borligini ham bilmasin.
+    Bir kunda faqat bir marta ishlaydi; qayta yuborish uchun ?force=1.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'cron'
+
+    def post(self, request):
+        secret = settings.CRON_SECRET
+        given = request.headers.get('X-Cron-Secret', '')
+        if not secret or not hmac.compare_digest(given.encode('utf-8'), secret.encode('utf-8')):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        today = timezone.localdate()
+        run, created = DigestRun.objects.get_or_create(date=today)
+        if not created and request.query_params.get('force') != '1':
+            return Response({'detail': 'Bugungi hisobot allaqachon yuborilgan'}, status=status.HTTP_200_OK)
+
+        run_digest_in_background(today, run.pk)
+        return Response({'detail': 'Hisobot yuborilmoqda'}, status=status.HTTP_202_ACCEPTED)

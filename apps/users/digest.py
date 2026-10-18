@@ -9,7 +9,7 @@ from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem
 from apps.tasks.models import Task
 
-from .alerts import build_alert_lines
+from .alerts import build_alert_lines, calving_lines
 
 MAX_ITEMS = 5  # har bir ro'yxatdan ko'pi bilan nechta qator ko'rsatiladi
 
@@ -73,8 +73,18 @@ def build_owner_digest(owner, today):
     return f"📊 FarmLine — kunlik hisobot ({today:%d.%m.%Y})\n\n" + "\n\n".join(sections)
 
 
+def _worker_calving_lines(user, today):
+    """Ishchi ishlaydigan fermalardagi tug'ishi yaqin hayvonlar."""
+    lines = []
+    for farm in Farm.objects.filter(workers__user=user).distinct().order_by('name'):
+        farm_lines = calving_lines(farm, today)
+        if farm_lines:
+            lines += [f"🏡 {farm.name}"] + farm_lines
+    return lines
+
+
 def build_worker_digest(user, today):
-    """Ishchining ochiq vazifalari. Ochiq vazifa bo'lmasa None (xabar yuborilmaydi)."""
+    """Ishchining ochiq vazifalari va tug'ishi yaqin hayvonlar. Ikkalasi ham bo'lmasa None (xabar yuborilmaydi)."""
     tasks = list(
         Task.objects.select_related('farm')
         .filter(farm__workers__user=user)
@@ -83,15 +93,25 @@ def build_worker_digest(user, today):
         .distinct()
         .order_by('due_date', '-id')
     )
-    if not tasks:
+    calving = _worker_calving_lines(user, today)
+    if not tasks and not calving:
         return None
 
-    lines = [f"📋 FarmLine — bugungi vazifalaringiz ({today:%d.%m.%Y}): {len(tasks)} ta"]
-    for t in tasks[:MAX_ITEMS * 2]:
-        mark = "⏰ " if t.due_date and t.due_date < today else "• "
-        due = f" (muddat: {t.due_date:%d.%m})" if t.due_date else ""
-        lines.append(f"{mark}{t.title}{due}")
-    lines += _more(len(tasks)) if len(tasks) > MAX_ITEMS * 2 else []
+    lines = []
+    if tasks:
+        lines.append(f"📋 FarmLine — bugungi vazifalaringiz ({today:%d.%m.%Y}): {len(tasks)} ta")
+        for t in tasks[:MAX_ITEMS * 2]:
+            mark = "⏰ " if t.due_date and t.due_date < today else "• "
+            due = f" (muddat: {t.due_date:%d.%m})" if t.due_date else ""
+            lines.append(f"{mark}{t.title}{due}")
+        lines += _more(len(tasks)) if len(tasks) > MAX_ITEMS * 2 else []
+    if calving:
+        if tasks:
+            lines.append("")
+        else:
+            lines.append(f"📋 FarmLine — bugungi eslatmalar ({today:%d.%m.%Y})")
+        lines += calving
     return "\n".join(lines)
+
 
 """O'rganildi."""

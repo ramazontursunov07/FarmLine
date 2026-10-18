@@ -1,0 +1,29 @@
+# Kunlik hisobotni (va tug'ish eslatmalarini) Telegramga yuborish uchun serverni har kuni chaqiradi.
+# Sozlash: GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#   APP_URL     serveringiz manzili, oxirida "/" siz (masalan https://farmline-jby2.onrender.com)
+#   CRON_SECRET serverdagi CRON_SECRET bilan aynan bir xil qiymat
+name: Kunlik hisobot
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # har kuni 02:00 UTC = 07:00 Toshkent vaqti
+  workflow_dispatch:       # qo'lda ishga tushirish (Actions -> Kunlik hisobot -> Run workflow)
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Serverni uyg'otish va hisobotni yuborish
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL va CRON_SECRET sirlarini sozlang"
+            exit 1
+          fi
+          # Bepul rejadagi server uxlab qolgan bo'lsa, birinchi so'rov uni uyg'otadi (30-60 soniya), shuning uchun qayta urinish bor
+          curl --fail-with-body --silent --show-error \
+            --retry 5 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -X POST -H "X-Cron-Secret: $CRON_SECRET" \
+            "$APP_URL/api/users/cron/daily-digest/"

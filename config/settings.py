@@ -39,6 +39,10 @@ FRONTEND_URL = (os.getenv('FRONTEND_URL') or os.getenv('RENDER_EXTERNAL_URL') or
 # Telegram ogohlantirishlari alohida oqimda yuboriladi (testlarda False qilinadi)
 TELEGRAM_ASYNC = os.getenv('TELEGRAM_ASYNC', 'True') == 'True'
 
+# Kunlik hisobotni tashqi rejalashtiruvchi (GitHub Actions) chaqirishi uchun maxfiy kalit.
+# Berilmasa, /api/users/cron/daily-digest/ manzili butunlay o'chiq turadi (404).
+CRON_SECRET = os.getenv('CRON_SECRET')
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -171,6 +175,7 @@ REST_FRAMEWORK = {
         'telegram_link': '10/hour',
         'export': '60/hour',
         'assistant': '60/hour',
+        'cron': '30/hour',
     },
 }
 

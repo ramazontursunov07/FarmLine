@@ -4,14 +4,15 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from apps.animals.models import AnimalEvent, AnimalGroup, AnimalType
-from apps.farms.models import Farm
+from apps.animals.models import Animal, AnimalEvent, AnimalGroup, AnimalType
+from apps.farms.models import Farm, Worker
 from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem, InventoryTransaction
+from apps.tasks.models import Task
 from apps.users.alerts import (
-    build_alert_lines, feed_forecast_lines, spending_alert_lines, vaccination_lines,
+    build_alert_lines, calving_lines, feed_forecast_lines, spending_alert_lines, vaccination_lines,
 )
-from apps.users.digest import build_farm_section
+from apps.users.digest import build_farm_section, build_worker_digest
 from apps.users.models import User
 
 TODAY = date(2026, 10, 13)
@@ -70,7 +71,7 @@ class SpendingAlertTests(AlertsBase):
 
     def test_warns_when_spending_up_50_percent(self):
         self.add(date(2026, 9, 5), 1000000)
-        self.add(date(2026, 9, 25), 5000000)   # o'tgan oyning keyingi qismi -- hisobga olinmaydi
+        self.add(date(2026, 9, 25), 5000000)  # o'tgan oyning keyingi qismi -- hisobga olinmaydi
         self.add(date(2026, 10, 3), 1500000)
         text = "\n".join(spending_alert_lines(self.farm, TODAY))
         self.assertIn("50%", text)
@@ -158,3 +159,136 @@ class DigestIntegrationTests(AlertsBase):
 
     def test_quiet_farm_has_no_alert_blocks(self):
         self.assertEqual(build_alert_lines(self.farm, TODAY), [])
+
+
+class CalvingBase(AlertsBase):
+    def setUp(self):
+        super().setUp()
+        self.group = AnimalGroup.objects.create(
+            farm=self.farm, animal_type=AnimalType.objects.create(name='Sigir'), count=5)
+
+    def cow(self, days_left, tag='14', name='Oqbosh', **extra):
+        """Tug'ishiga days_left kun qolgan bug'oz sigir (manfiy bo'lsa, muddati o'tgan)."""
+        return Animal.objects.create(
+            farm=self.farm, group=self.group, tag_number=tag, name=name,
+            pregnant_since=TODAY - timedelta(days=280 - days_left),
+            due_date=TODAY + timedelta(days=days_left), **extra,
+        )
+
+
+class CalvingTests(CalvingBase):
+    def test_warns_when_calving_is_near(self):
+        self.cow(5)
+        lines = calving_lines(self.farm, TODAY)
+        text = "\n".join(lines)
+        self.assertTrue(lines[0].startswith("🐄"))
+        self.assertIn("Tug'ishi yaqin: 1 ta", text)
+        self.assertIn("№14 Oqbosh", text)
+        self.assertIn("5 kundan keyin", text)
+        self.assertNotIn("🚨", text)
+
+    def test_urgent_marker_when_few_days_left(self):
+        self.cow(2)
+        lines = calving_lines(self.farm, TODAY)
+        self.assertTrue(lines[0].startswith("🚨"))
+        self.assertIn("2 kundan keyin", "\n".join(lines))
+
+    def test_today_and_tomorrow_wording(self):
+        self.cow(0, tag='1', name='Bugun')
+        self.cow(1, tag='2', name='Ertaga')
+        text = "\n".join(calving_lines(self.farm, TODAY))
+        self.assertIn("№1 Bugun — bugun", text)
+        self.assertIn("№2 Ertaga — ertaga", text)
+
+    def test_overdue_cow_shows_hint(self):
+        self.cow(-3)
+        text = "\n".join(calving_lines(self.farm, TODAY))
+        self.assertIn("3 kun kechikdi", text)
+        self.assertIn("«Tug'ilish»", text)
+
+    def test_hint_not_shown_before_due_date(self):
+        self.cow(5)
+        self.assertNotIn("«Tug'ilish»", "\n".join(calving_lines(self.farm, TODAY)))
+
+    def test_outside_window_is_not_listed(self):
+        self.cow(20, tag='1')  # hali erta
+        self.cow(-22, tag='2')  # juda eski, ehtimol eskirgan ma'lumot
+        self.assertEqual(calving_lines(self.farm, TODAY), [])
+
+    def test_window_edges_are_included(self):
+        self.cow(14, tag='1')
+        self.cow(-21, tag='2')
+        self.assertIn("Tug'ishi yaqin: 2 ta", "\n".join(calving_lines(self.farm, TODAY)))
+
+    def test_not_pregnant_or_inactive_animals_are_skipped(self):
+        Animal.objects.create(farm=self.farm, group=self.group, tag_number='5', name='Bo\'sh')  # bug'oz emas
+        self.cow(2, tag='6', status='sotilgan')
+        self.cow(2, tag='7', status='olgan')
+        self.assertEqual(calving_lines(self.farm, TODAY), [])
+
+    def test_other_farms_are_not_included(self):
+        other_owner = User.objects.create_user(username='boshqa', password='Kuchli-Parol-2026', role='fermer')
+        other_farm = Farm.objects.create(owner=other_owner, name='Boshqa', location='Qarshi', farm_type='aralash')
+        other_group = AnimalGroup.objects.create(farm=other_farm, animal_type=self.group.animal_type, count=1)
+        Animal.objects.create(farm=other_farm, group=other_group, tag_number='9',
+                              pregnant_since=TODAY - timedelta(days=270),
+                              due_date=TODAY + timedelta(days=3))
+        self.assertEqual(calving_lines(self.farm, TODAY), [])
+
+    def test_sorted_by_due_date_and_long_list_is_trimmed(self):
+        self.cow(9, tag='A', name='Kech')
+        self.cow(1, tag='B', name='Erta')
+        for i in range(5):
+            self.cow(7, tag=f'X{i}', name='Oddiy')
+        text = "\n".join(calving_lines(self.farm, TODAY))
+        self.assertLess(text.index("Erta"), text.index("Kech"))
+        self.assertIn("va yana 2 ta", text)
+
+    def test_recording_the_birth_stops_the_reminder(self):
+        cow = self.cow(0)
+        Animal.objects.filter(pk=cow.pk).update(pregnant_since=None,
+                                                due_date=None)  # "Tug'ilish" yozilganda shunday bo'ladi
+        self.assertEqual(calving_lines(self.farm, TODAY), [])
+
+    def test_included_in_farm_section_and_alert_lines(self):
+        self.cow(2)
+        self.assertIn("Tug'ishi yaqin", build_farm_section(self.farm, TODAY))
+        self.assertIn("Tug'ishi yaqin", "\n".join(build_alert_lines(self.farm, TODAY)))
+
+
+class WorkerCalvingDigestTests(CalvingBase):
+    def setUp(self):
+        super().setUp()
+        self.worker = User.objects.create_user(username='ishchi', password='Kuchli-Parol-2026', role='ishchi')
+        Worker.objects.create(user=self.worker, farm=self.farm, can_view_finance=False)
+
+    def test_worker_gets_calving_reminder_without_tasks(self):
+        self.cow(2)
+        text = build_worker_digest(self.worker, TODAY)
+        self.assertIn("bugungi eslatmalar", text)
+        self.assertIn("🏡 Baraka", text)
+        self.assertIn("№14 Oqbosh", text)
+
+    def test_worker_with_nothing_gets_no_message(self):
+        self.assertIsNone(build_worker_digest(self.worker, TODAY))
+
+    def test_tasks_and_calving_in_one_message(self):
+        self.cow(1)
+        Task.objects.create(farm=self.farm, title="Suv tashish", created_by=self.owner)
+        text = build_worker_digest(self.worker, TODAY)
+        self.assertIn("bugungi vazifalaringiz", text)
+        self.assertIn("Suv tashish", text)
+        self.assertIn("Tug'ishi yaqin", text)
+        self.assertNotIn("bugungi eslatmalar", text)
+
+    def test_task_only_message_has_no_calving_block(self):
+        Task.objects.create(farm=self.farm, title="Suv tashish", created_by=self.owner)
+        text = build_worker_digest(self.worker, TODAY)
+        self.assertIn("bugungi vazifalaringiz", text)
+        self.assertNotIn("Tug'ishi", text)
+
+    def test_user_who_is_not_a_worker_gets_nothing(self):
+        self.cow(1)
+        stranger = User.objects.create_user(username='begona', password='Kuchli-Parol-2026', role='ishchi')
+        self.assertIsNone(build_worker_digest(stranger, TODAY))
+

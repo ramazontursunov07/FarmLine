@@ -5,6 +5,7 @@ from .views import (
     AdminUserListView,
     ChangePasswordView,
     CustomTokenObtainPairView,
+    DailyDigestCronView,
     ForgotPasswordView,
     RegisterView,
     ResetPasswordView,
@@ -22,4 +23,5 @@ urlpatterns = [
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset_password'),
     path('list/', AdminUserListView.as_view(), name='admin_user_list'),
+    path('cron/daily-digest/', DailyDigestCronView.as_view(), name='cron_daily_digest'),
 ]
