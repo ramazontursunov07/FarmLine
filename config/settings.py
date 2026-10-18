@@ -43,6 +43,10 @@ TELEGRAM_ASYNC = os.getenv('TELEGRAM_ASYNC', 'True') == 'True'
 # Berilmasa, /api/users/cron/daily-digest/ manzili butunlay o'chiq turadi (404).
 CRON_SECRET = os.getenv('CRON_SECRET')
 
+# Kunlik hisobot (tug'ish eslatmasi shu hisobot ichida) Telegramga har kuni shu soatdan keyin yuboriladi
+# (Toshkent vaqti bilan). Ichki rejalashtiruvchi: `python manage.py run_scheduler`.
+DIGEST_HOUR = int(os.getenv('DIGEST_HOUR', '8'))
+
 # Application definition
 
 INSTALLED_APPS = [

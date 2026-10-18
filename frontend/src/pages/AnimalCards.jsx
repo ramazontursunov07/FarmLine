@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import MilkReport from '../components/MilkReport';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
@@ -199,6 +200,8 @@ function AnimalCards() {
                             Har bir hayvon uchun alohida hisob: vazn, sut, tug'ish va davolash tarixi.
                             Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
                         </p>
+
+                        <MilkReport farmId={farmId} refreshKey={reloadKey} />
 
                         {isOwner && !adding && (
                             <button type="button" className="btn-primary btn-auto" onClick={openAdd}>

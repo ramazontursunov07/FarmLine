@@ -1,8 +1,8 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
-from django.db.models import OuterRef, Q, Subquery, Sum
+from django.db.models import Count, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import viewsets
@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.mixins import IdempotentCreateMixin
-from apps.farms.models import Worker
+from apps.farms.models import Farm, Worker
 from apps.users.notify import display_name, notify_users
 from apps.users.permissions import IsAppAdmin, is_app_admin
 from .models import COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, WeightRecord
@@ -465,3 +465,75 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
     queryset = MilkRecord.objects.all()
     serializer_class = MilkRecordSerializer
 
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """
+        Sut hisoboti: tanlangan oyda har bir sigir va hamma sigirlar jami necha litr sut bergani,
+        o'tgan oy bilan solishtirib. ?month=YYYY-MM (bo'lmasa, shu oy), ?farm= (bo'lmasa, barcha fermalar).
+        """
+        today = timezone.localdate()
+        month = request.query_params.get('month') or f"{today:%Y-%m}"
+        try:
+            year, mon = (int(x) for x in month.split('-'))
+            start = date(year, mon, 1)
+        except (ValueError, TypeError):
+            raise ValidationError({'month': "Oy YYYY-MM ko'rinishida bo'lishi kerak (masalan, 2026-10)"})
+        next_start = date(year + (mon == 12), mon % 12 + 1, 1)
+        prev_start = date(year - (mon == 1), (mon - 2) % 12 + 1, 1)
+
+        # Ferma bo'yicha cheklash ichki so'rov (subquery) bilan: ishchilar jadvali bilan JOIN qilinsa,
+        # bir nechta ishchi bor fermada har bir yozuv bir necha marta sanalib qolardi.
+        user = request.user
+        farms = Farm.objects.filter(Q(owner=user) | Q(workers__user=user)).values('pk')
+        records = MilkRecord.objects.filter(animal__farm_id__in=farms)
+        farm_id = request.query_params.get('farm', '')
+        if farm_id:
+            if not farm_id.isdigit():
+                raise ValidationError({'farm': "Ferma raqami noto'g'ri"})
+            records = records.filter(animal__farm_id=int(farm_id))
+
+        in_month = Q(date__gte=start, date__lt=next_start)
+        in_prev = Q(date__gte=prev_start, date__lt=start)
+        rows = list(
+            records.filter(date__gte=prev_start, date__lt=next_start).order_by()
+            .values('animal_id', 'animal__tag_number', 'animal__name')
+            .annotate(
+                liters=Sum('liters', filter=in_month),
+                previous=Sum('liters', filter=in_prev),
+                days=Count('date', filter=in_month, distinct=True),
+            )
+        )
+
+        zero = Decimal('0')
+        animals = []
+        for row in rows:
+            liters = row['liters'] or zero
+            previous = row['previous'] or zero
+            days = row['days']
+            animals.append({
+                'animal': row['animal_id'],
+                'tag_number': row['animal__tag_number'],
+                'name': row['animal__name'],
+                'liters': one_decimal(liters),
+                'previous_liters': one_decimal(previous),
+                'change': one_decimal(liters - previous),
+                'days': days,
+                'daily_average': one_decimal(liters / days) if days else None,
+                '_sort': liters,
+            })
+        animals.sort(key=lambda a: (-a['_sort'], a['tag_number']))
+        for a in animals:
+            del a['_sort']
+
+        total = sum((Decimal(a['liters']) for a in animals), zero)
+        previous_total = sum((Decimal(a['previous_liters']) for a in animals), zero)
+        return Response({
+            'month': f"{start:%Y-%m}",
+            'previous_month': f"{prev_start:%Y-%m}",
+            'farm': int(farm_id) if farm_id else None,
+            'total': one_decimal(total),
+            'previous_total': one_decimal(previous_total),
+            'change': one_decimal(total - previous_total),
+            'animals_count': sum(1 for a in animals if Decimal(a['liters']) > 0),
+            'animals': animals,
+        })

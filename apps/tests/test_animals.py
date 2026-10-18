@@ -169,7 +169,8 @@ class AnimalCardCrudTests(AnimalCardBase):
 
     def test_idempotency_key_prevents_duplicate_card(self):
         headers = {'HTTP_IDEMPOTENCY_KEY': 'karta-test-12345'}
-        r1 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5', 'birth_date': '2023-01-01'}, format='json', **headers)
+        r1 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5', 'birth_date': '2023-01-01'},
+                              format='json', **headers)
         r2 = self.client.post(CARDS, {'group': self.group.pk, 'tag_number': '5'}, format='json', **headers)
         self.assertEqual((r1.status_code, r2.status_code), (201, 201))
         self.assertEqual(Animal.objects.count(), 1)
@@ -240,6 +241,61 @@ class WeightMilkTests(AnimalCardBase):
     def test_whole_day_milk_other_day_and_other_cow_ok(self):
         self.assertEqual(self.milk(session='ertalab').status_code, 201)
         self.assertEqual(self.milk(date=self.today - timedelta(days=1), session='kun').status_code, 201)
+
+    # --- Sut hisoboti: har bir sigir va jami, o'tgan oy bilan
+    def _milk_rows(self):
+        first = self.today.replace(day=1)
+        prev = first - timedelta(days=1)
+        cow2 = self.make_animal('15', name='Qora')
+        MilkRecord.objects.create(animal=self.cow, date=first, session='ertalab', liters=Decimal('10.0'))
+        MilkRecord.objects.create(animal=self.cow, date=first, session='kechqurun', liters=Decimal('8.0'))
+        MilkRecord.objects.create(animal=cow2, date=first, session='kun', liters=Decimal('5.5'))
+        MilkRecord.objects.create(animal=self.cow, date=prev, session='kun', liters=Decimal('20.0'))
+        MilkRecord.objects.create(animal=cow2, date=prev, session='kun', liters=Decimal('7.0'))
+        return cow2
+
+    def test_milk_summary_per_cow_and_total(self):
+        cow2 = self._milk_rows()
+        r = self.client.get(MILK + 'summary/', {'farm': self.farm.pk})
+        self.assertEqual(r.status_code, 200, r.content)
+        data = r.json()
+        self.assertEqual(data['month'], f"{self.today:%Y-%m}")
+        self.assertEqual(Decimal(data['total']), Decimal('23.5'))
+        self.assertEqual(Decimal(data['previous_total']), Decimal('27.0'))
+        self.assertEqual(Decimal(data['change']), Decimal('-3.5'))
+        self.assertEqual(data['animals_count'], 2)
+        # eng ko'p sut bergan birinchi
+        self.assertEqual([a['animal'] for a in data['animals']], [self.cow.pk, cow2.pk])
+        first = data['animals'][0]
+        self.assertEqual(Decimal(first['liters']), Decimal('18.0'))
+        self.assertEqual(Decimal(first['previous_liters']), Decimal('20.0'))
+        self.assertEqual(first['days'], 1)
+        self.assertEqual(Decimal(first['daily_average']), Decimal('18.0'))
+
+    def test_milk_summary_explicit_month(self):
+        self._milk_rows()
+        prev = self.today.replace(day=1) - timedelta(days=1)
+        r = self.client.get(MILK + 'summary/', {'farm': self.farm.pk, 'month': f"{prev:%Y-%m}"})
+        self.assertEqual(Decimal(r.json()['total']), Decimal('27.0'))
+
+    def test_milk_summary_not_doubled_with_many_workers(self):
+        self._milk_rows()
+        other = make_user('ishchi2', 'ishchi')
+        Worker.objects.create(user=other, farm=self.farm)  # ikkinchi ishchi: yozuvlar ikki marta sanalmasin
+        r = self.client.get(MILK + 'summary/', {'farm': self.farm.pk})
+        self.assertEqual(Decimal(r.json()['total']), Decimal('23.5'))
+
+    def test_milk_summary_worker_can_view_but_stranger_sees_nothing(self):
+        self._milk_rows()
+        self.client.force_authenticate(self.worker)
+        self.assertEqual(Decimal(self.client.get(MILK + 'summary/').json()['total']), Decimal('23.5'))
+        self.client.force_authenticate(make_user('begona'))
+        r = self.client.get(MILK + 'summary/', {'farm': self.farm.pk})
+        self.assertEqual((Decimal(r.json()['total']), r.json()['animals']), (Decimal('0.0'), []))
+
+    def test_milk_summary_bad_month(self):
+        for bad in ('2026-13', 'abc', '2026'):
+            self.assertEqual(self.client.get(MILK + 'summary/', {'month': bad}).status_code, 400, bad)
 
     def test_milk_only_for_female(self):
         bull = self.make_animal('77', sex='erkak')
@@ -547,6 +603,7 @@ class CalvingWithCardsTests(AnimalCardBase):
         self.group.refresh_from_db()
         self.assertEqual((self.group.count, Animal.objects.count(), AnimalEvent.objects.count()), (4, 1, 1))
 
+
 class PregnancyTests(AnimalCardBase):
     def patch(self, animal, **data):
         return self.client.patch(f'{CARDS}{animal.pk}/', data, format='json')
@@ -590,7 +647,8 @@ class PregnancyTests(AnimalCardBase):
         self.assertIsNone(cow.due_date)
 
     def test_selling_ends_pregnancy(self):
-        cow = self.make_animal('6', pregnant_since=self.today - timedelta(days=100), due_date=self.today + timedelta(days=183))
+        cow = self.make_animal('6', pregnant_since=self.today - timedelta(days=100),
+                               due_date=self.today + timedelta(days=183))
         self.assertEqual(self.patch(cow, status='sotilgan').status_code, 200)
         cow.refresh_from_db()
         self.assertIsNone(cow.pregnant_since)
@@ -602,7 +660,8 @@ class PregnancyTests(AnimalCardBase):
 
     def test_dashboard_summary_lists_soon_due(self):
         self.make_animal('8', pregnant_since=self.today - timedelta(days=275), due_date=self.today + timedelta(days=8))
-        self.make_animal('9', pregnant_since=self.today - timedelta(days=100), due_date=self.today + timedelta(days=183))
+        self.make_animal('9', pregnant_since=self.today - timedelta(days=100),
+                         due_date=self.today + timedelta(days=183))
         r = self.client.get('/api/farms/summary/')
         self.assertEqual(r.status_code, 200)
         preg = r.json()['pregnancies']

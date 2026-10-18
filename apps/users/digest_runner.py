@@ -2,7 +2,9 @@
 import logging
 import threading
 
+from django.conf import settings
 from django.db import connections
+from django.utils import timezone
 
 from .digest import build_owner_digest, build_worker_digest
 from .models import DigestRun, User
@@ -40,13 +42,33 @@ def send_digests(today, dry=False, out=None):
 
 
 def _run(today, run_pk):
+    """Hisobotni yuboradi. Muvaffaqiyatli bo'lsa True, xato bo'lsa False."""
     try:
         sent, skipped = send_digests(today)
         logger.info("Kunlik hisobot: %s ta yuborildi, %s ta yuborilmadi", sent, skipped)
+        return True
     except Exception:
         logger.exception("Kunlik hisobotni yuborib bo'lmadi")
         # Keyingi chaqiruv qayta urinib ko'rishi uchun "bugun yuborilgan" belgisi olib tashlanadi
         DigestRun.objects.filter(pk=run_pk).delete()
+        return False
+
+
+def send_due_digest(now=None):
+    """
+    Ichki rejalashtiruvchi uchun: bugungi hisobot vaqti (DIGEST_HOUR) kelgan va hali yuborilmagan bo'lsa,
+    shu zahoti yuboradi (tug'ish eslatmasi ham shu hisobotda).
+    Qaytaradi: None -- hozir ish yo'q (vaqt kelmagan yoki bugun yuborilgan), True -- yuborildi, False -- xato bo'ldi.
+    Bir kunda bir marta: DigestRun (sana bo'yicha noyob) ikki jarayon bir vaqtda ishlasa ham takrorlanishga yo'l qo'ymaydi.
+    """
+    now = timezone.localtime(now) if now else timezone.localtime()
+    if now.hour < settings.DIGEST_HOUR:
+        return None
+    today = now.date()
+    run, created = DigestRun.objects.get_or_create(date=today)
+    if not created:
+        return None
+    return _run(today, run.pk)
 
 
 def _thread_main(today, run_pk):
