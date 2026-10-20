@@ -675,3 +675,49 @@ class PregnancyTests(AnimalCardBase):
         self.assertEqual(gestation_days("Qo\u02bby"), 150)
         self.assertEqual(gestation_days("Qo'y"), 150)
         self.assertIsNone(gestation_days('Tovuq'))
+
+class DeleteBirthWithCalvesTests(AnimalCardBase):
+    def calving(self, calves=None, count=2, **extra):
+        data = {'animal_group': self.group.pk, 'event_type': 'tugilish', 'title': "Buzoqlar tug'ildi",
+                'animal_count': count, 'start_date': str(self.today)}
+        if calves is not None:
+            data['calves'] = calves
+        data.update(extra)
+        return self.client.post(EVENTS, data, format='json')
+
+    def test_delete_birth_with_calves_removes_cards_and_count(self):
+        r = self.calving([{'tag_number': '31'}, {'tag_number': '32'}], count=2)
+        event_id = r.json()['id']
+        self.assertEqual(r.json()['newborn_cards'], 2)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 5)
+        self.assertEqual(self.client.delete(f'{EVENTS}{event_id}/?delete_calves=1').status_code, 204)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+        self.assertEqual(Animal.objects.count(), 0)
+
+    def test_delete_calves_flag(self):
+        for tag in ('1', '2', '3'):
+            self.make_animal(tag)
+        event_id = self.calving([{'tag_number': '41'}], count=1).json()['id']
+        # bayroqsiz: kartochkalar soni guruh sonidan oshib ketadi, shuning uchun taqiqlanadi
+        self.assertEqual(self.client.delete(f'{EVENTS}{event_id}/').status_code, 400)
+        r = self.client.delete(f'{EVENTS}{event_id}/?delete_calves=1')
+        self.assertEqual(r.status_code, 204, r.content)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.count, 3)
+        self.assertFalse(Animal.objects.filter(tag_number='41').exists())
+        self.assertEqual(Animal.objects.count(), 3)
+
+    def test_manual_cards_are_not_touched(self):
+        manual = self.make_animal('50', birth_date=self.today)
+        event_id = self.calving([{'tag_number': '51'}], count=1).json()['id']
+        self.assertEqual(self.client.delete(f'{EVENTS}{event_id}/?delete_calves=1').status_code, 204)
+        self.assertTrue(Animal.objects.filter(pk=manual.pk).exists())
+        self.assertFalse(Animal.objects.filter(tag_number='51').exists())
+
+    def test_edit_event_text_and_date(self):
+        event_id = self.calving(None, count=1).json()['id']
+        r = self.client.patch(f'{EVENTS}{event_id}/', {'title': 'Yangi', 'description': 'Izoh'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['title'], 'Yangi')

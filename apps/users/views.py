@@ -77,19 +77,19 @@ class ChangePasswordView(generics.UpdateAPIView):
         return self.request.user
 
     def update(self, request, *args, **kwargs):
-        user = self.get_object()
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        user = self.get_object() #obyektni olamiz
+        serializer = self.get_serializer(data=request.data) #serializatsiya qilamiz.
+        serializer.is_valid(raise_exception=True) #agarda xato bo'lsa xatoni chiqaramiz.
 
-        old_password = serializer.validated_data['old_password']
-        new_password = serializer.validated_data['new_password']
+        old_password = serializer.validated_data['old_password'] #eski password
+        new_password = serializer.validated_data['new_password'] #yangi password
 
-        if not user.check_password(old_password):
+        if not user.check_password(old_password): #eski parolni tekshiramiz.
             return Response({'old_password': "Eski parol noto'g'ri"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user.set_password(new_password)
-        user.save()
-        return Response({'detail': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK)
+        user.set_password(new_password) #agarda eski parol to'g'ri bo'lsa unda yangi parolni kodlaymiz.
+        user.save() #undan keyin saqlaymiz.
+        return Response({'detail': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK) #response
 
 
 class UserUpdateView(generics.RetrieveUpdateAPIView):
@@ -107,8 +107,8 @@ class TelegramLinkView(APIView):
     DELETE - Telegram ulanishini olib tashlaydi.
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'telegram_link'
+    throttle_classes = [ScopedRateThrottle] #necha marta so'rov yuborish mumkinligi
+    throttle_scope = 'telegram_link' #bir daqiqada nechta so'rov yuborish mumkinligi.
 
     def post(self, request):
         # Eski ishlatilmagan kodlar bekor qilinadi

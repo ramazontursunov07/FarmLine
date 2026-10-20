@@ -7,6 +7,8 @@ import { today } from '../utils/format';
 import InstallButton from '../components/InstallButton';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
+const EVENT_STATUSES = { boshlangan: 'Boshlangan', davom_etmoqda: 'Davom etmoqda', yakunlangan: 'Yakunlangan' };
+const COUNT_EVENTS = ['tugilish', 'olim'];
 const SESSIONS = { kun: 'Butun kun', ertalab: 'Ertalab', kechqurun: 'Kechqurun' };
 const EMPTY_CALF = { tag_number: '', name: '', sex: 'urgochi' };
 const MAX_CALF_CARDS = 10;
@@ -151,6 +153,8 @@ function AnimalCard() {
     const [editingWeight, setEditingWeight] = useState(null);
     const [editingMilk, setEditingMilk] = useState(null);
     const [recordError, setRecordError] = useState('');
+    const [editingEvent, setEditingEvent] = useState(null);
+    const [eventError, setEventError] = useState('');
 
     const reload = () => setReloadKey((k) => k + 1);
 
@@ -449,6 +453,53 @@ function AnimalCard() {
         if (!window.confirm(`${formatDate(r.date)} (${SESSIONS[r.session] || r.session}) dagi ${r.liters} l yozuvini o'chirasizmi?`)) return;
         try {
             await api.delete(`animals-milk/${r.id}/`);
+            reload();
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+        }
+    };
+
+    // --- Voqea (ish) yozuvini tahrirlash va o'chirish: ferma egasi yoki yozuvni yozgan ishchi
+    const canEditEvent = (ev) => isOwner || ev.recorded_by === user.id;
+
+    const startEditEvent = (ev) => {
+        setEventError('');
+        setEditingEvent({
+            id: ev.id, title: ev.title, description: ev.description || '', start_date: ev.start_date,
+            status: ev.status, isCount: COUNT_EVENTS.includes(ev.event_type),
+        });
+    };
+
+    const handleSaveEvent = (e) => {
+        e.preventDefault();
+        const payload = {
+            title: editingEvent.title.trim(), description: editingEvent.description.trim(),
+            start_date: editingEvent.start_date,
+        };
+        if (!editingEvent.isCount) payload.status = editingEvent.status;
+        submit(
+            async () => {
+                const res = await api.patch(`animals-event/${editingEvent.id}/`, payload);
+                setEditingEvent(null);
+                return res;
+            },
+            setEventError,
+            "Yozuvni saqlab bo'lmadi"
+        );
+    };
+
+    const handleDeleteEvent = async (ev) => {
+        let text = `"${ev.title}" yozuvini o'chirasizmi?`;
+        const newborns = ev.newborn_cards || 0;
+        if (ev.event_type === 'tugilish' && ev.animal_count) {
+            text += `\n\nGuruhdagi hayvonlar soni ${ev.animal_count} taga kamayadi.`;
+            if (newborns > 0) text += ` ${newborns} ta buzoq kartochkasi ham o'chadi.`;
+        } else if (ev.event_type === 'olim' && ev.animal_count) {
+            text += `\n\nGuruhdagi hayvonlar soni ${ev.animal_count} taga ko'payadi, hayvon qaytadan faol bo'ladi.`;
+        }
+        if (!window.confirm(text)) return;
+        try {
+            await api.delete(`animals-event/${ev.id}/`, newborns > 0 ? { params: { delete_calves: 1 } } : undefined);
             reload();
         } catch (err) {
             window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
@@ -932,6 +983,48 @@ function AnimalCard() {
                         ) : (
                             <ul className="work-list">
                                 {data.events.map((ev) => (
+                                    editingEvent && editingEvent.id === ev.id ? (
+                                        <li key={ev.id} className="work-item animal-edit">
+                                            <form className="animal-edit-form" onSubmit={handleSaveEvent}>
+                                                <div className="form-field">
+                                                    <label>Sarlavha</label>
+                                                    <input type="text" value={editingEvent.title} maxLength={255} required
+                                                        onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })} />
+                                                </div>
+                                                <div className="form-row">
+                                                    <div className="form-field">
+                                                        <label>Sana</label>
+                                                        <input type="date" value={editingEvent.start_date} required
+                                                            onChange={(e) => setEditingEvent({ ...editingEvent, start_date: e.target.value })} />
+                                                    </div>
+                                                    {!editingEvent.isCount && (
+                                                        <div className="form-field">
+                                                            <label>Holati</label>
+                                                            <select value={editingEvent.status}
+                                                                onChange={(e) => setEditingEvent({ ...editingEvent, status: e.target.value })}>
+                                                                {Object.entries(EVENT_STATUSES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="form-field">
+                                                    <label>Izoh (ixtiyoriy)</label>
+                                                    <input type="text" value={editingEvent.description}
+                                                        onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })} />
+                                                </div>
+                                                {editingEvent.isCount && (
+                                                    <p className="workers-hint">Tug'ilish va o'limning sonini o'zgartirib bo'lmaydi: uni o'chirib, qaytadan yozing.</p>
+                                                )}
+                                                {eventError && <p className="error-text" role="alert">{eventError}</p>}
+                                                <div className="farm-edit-actions">
+                                                    <button type="submit" className="btn-primary btn-auto" disabled={busy}>Saqlash</button>
+                                                    <button type="button" className="btn-ghost" disabled={busy} onClick={() => setEditingEvent(null)}>
+                                                        Bekor qilish
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </li>
+                                    ) : (
                                     <li key={ev.id} className={`work-item work-item--${ev.status}`}>
                                         <div className="work-main">
                                             <span className="work-title">
@@ -943,7 +1036,19 @@ function AnimalCard() {
                                             </span>
                                             {ev.description && <span className="work-desc">{ev.description}</span>}
                                         </div>
+                                        {canEditEvent(ev) && (
+                                            <div className="work-side animal-actions">
+                                                <button type="button" className="btn-ghost" onClick={() => startEditEvent(ev)}>
+                                                    Tahrirlash
+                                                </button>
+                                                <button type="button" className="farm-item-action farm-item-action--danger"
+                                                    onClick={() => handleDeleteEvent(ev)}>
+                                                    O'chirish
+                                                </button>
+                                            </div>
+                                        )}
                                     </li>
+                                    )
                                 ))}
                             </ul>
                         )}

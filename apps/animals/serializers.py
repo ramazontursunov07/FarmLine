@@ -50,11 +50,12 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     # Tug'ilish bilan birga ochiladigan buzoq kartochkalari (faqat yozishda; ixtiyoriy)
     calves = CalfInputSerializer(many=True, write_only=True, required=False)
     calves_created = serializers.SerializerMethodField()
+    newborn_cards = serializers.SerializerMethodField()
 
     class Meta:
         model = AnimalEvent
         fields = ['id', 'farm', 'animal_group', 'animal_group_label', 'animal_group_count',
-                  'animal', 'animal_tag', 'calves', 'calves_created',
+                  'animal', 'animal_tag', 'calves', 'calves_created', 'newborn_cards',
                   'event_type', 'event_type_display', 'animal_count', 'title', 'description',
                   'status', 'status_display', 'start_date', 'end_date',
                   'recorded_by', 'recorded_by_username', 'recorded_by_name',
@@ -74,6 +75,10 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     def get_calves_created(self, obj):
         # View tug'ilishda ochilgan kartochkalarni `_calves_created` ga qo'yadi; boshqa yozuvlarda bo'sh
         return [{'id': a.id, 'tag_number': a.tag_number} for a in getattr(obj, '_calves_created', [])]
+
+    def get_newborn_cards(self, obj):
+        """Shu tug'ilish bilan birga ochilgan va hali faol buzoq kartochkalari soni."""
+        return obj.newborns.filter(status='faol').count()
 
     def create(self, validated_data):
         validated_data.pop('calves', None)  # kartochkalarni view ochadi, AnimalEvent modeliga bu maydon yo'q

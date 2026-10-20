@@ -89,10 +89,10 @@ function AnimalCards() {
 
     const activeGroups = groups.filter((g) => g.status === 'faol');
 
-    const openAdd = () => {
+    const openAdd = (groupId) => {
         setAddError('');
         setAddForm({
-            group: groupFilter || (activeGroups[0] ? String(activeGroups[0].id) : ''),
+            group: groupId || groupFilter || (activeGroups[0] ? String(activeGroups[0].id) : ''),
             tag_number: '', name: '', sex: 'urgochi', birth_date: '',
         });
         setAdding(true);
@@ -165,6 +165,16 @@ function AnimalCards() {
         }
     };
 
+    // Kartochkasi ochilmagan hayvonlar: guruhdagi soni - faol kartochkalar soni
+    const uncarded = useMemo(() => groups
+        .filter((g) => g.status === 'faol' && (!groupFilter || String(g.id) === groupFilter))
+        .map((g) => ({
+            group: g,
+            rest: g.count - animals.filter((a) => a.group === g.id && a.status === 'faol').length,
+        }))
+        .filter((x) => x.rest > 0), [groups, animals, groupFilter]);
+    const uncardedTotal = uncarded.reduce((s, x) => s + x.rest, 0);
+
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
         return animals.filter(
@@ -206,7 +216,7 @@ function AnimalCards() {
                         <MilkReport farmId={farmId} refreshKey={reloadKey} />
 
                         {isOwner && !adding && (
-                            <button type="button" className="btn-primary btn-auto" onClick={openAdd}>
+                            <button type="button" className="btn-primary btn-auto" onClick={() => openAdd()}>
                                 + Hayvon qo'shish
                             </button>
                         )}
@@ -288,6 +298,33 @@ function AnimalCards() {
                                 {Object.entries(STATUSES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                             </select>
                         </div>
+
+                        {(statusFilter === '' || statusFilter === 'faol') && !search.trim() && uncarded.length > 0 && (
+                            <>
+                                <h3 className="section-title">Kartochkasiz hayvonlar: {uncardedTotal} ta</h3>
+                                <ul className="work-list">
+                                    {uncarded.map(({ group: g, rest }) => (
+                                        <li key={g.id} className="work-item">
+                                            <div className="work-main">
+                                                <span className="work-title">
+                                                    {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
+                                                </span>
+                                                <span className="work-meta">
+                                                    {rest} ta hayvon, kartochkasi ochilmagan (guruhda jami {g.count} ta)
+                                                </span>
+                                            </div>
+                                            {isOwner && (
+                                                <div className="work-side animal-actions">
+                                                    <button type="button" className="btn-ghost" onClick={() => openAdd(String(g.id))}>
+                                                        Kartochka ochish
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
 
                         {visible.length === 0 ? (
                             <p className="empty-state">

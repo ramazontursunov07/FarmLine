@@ -203,7 +203,8 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             created = [
                 Animal.objects.create(
                     farm_id=group.farm_id, group=group, tag_number=c['tag_number'], name=c.get('name', ''),
-                    sex=c.get('sex', 'urgochi'), birth_date=event.start_date, mother=event.animal, status='faol')
+                    sex=c.get('sex', 'urgochi'), birth_date=event.start_date, mother=event.animal, status='faol',
+                    birth_event=event)
                 for c in calves
             ]
         except IntegrityError:  # bir vaqtda boshqa so'rov shu quloq raqamini band qilgan bo'lsa
@@ -243,6 +244,9 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     raise ValidationError(
                         "Bu tug'ilishni o'chirib bo'lmaydi: undan keyin hayvonlar kamaygan, soni yetmay qoladi.")
                 locked.count -= instance.animal_count
+                if self.request.query_params.get('delete_calves') in ('1', 'true'):
+                    # Tug'ilish bilan birga ochilgan buzoq kartochkalari ham o'chadi (ularning soni shu yozuv sonida)
+                    Animal.objects.filter(birth_event=instance, status='faol').delete()
                 cards = Animal.objects.filter(group=locked, status='faol').count()
                 if locked.count < cards:
                     raise ValidationError(
