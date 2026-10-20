@@ -37,16 +37,16 @@ FORGOT_PASSWORD_DETAIL = (
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = RegisterSerializer
-    permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer #serializatsiya classi
+    permission_classes = [AllowAny] #hamma uchun
     authentication_classes = []  # eskirgan token ochiq endpointni 401 bilan to'sib qo'ymasin
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        serializer = self.get_serializer(data=request.data) #ma'lumotni serializatsiya qilamiz.
+        serializer.is_valid(raise_exception=True) #tekshiramiz.
+        user = serializer.save() #saqlaymiz.
 
         refresh = RefreshToken.for_user(user)
 
@@ -64,8 +64,8 @@ class RegisterView(generics.CreateAPIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'login'
+    throttle_classes = [ScopedRateThrottle] #ma'lum vaqt ichida nechta so'rov yuborish mumkinligi.
+    throttle_scope = 'login' #bir daqiqada nechta so'rov yuborishi mumkinligi.
 
 
 class ChangePasswordView(generics.UpdateAPIView):

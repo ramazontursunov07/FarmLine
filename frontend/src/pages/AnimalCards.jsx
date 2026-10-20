@@ -5,6 +5,7 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
 import MilkReport from '../components/MilkReport';
+import MilkSales from '../components/MilkSales';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
@@ -201,6 +202,7 @@ function AnimalCards() {
                             Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
                         </p>
 
+                        <MilkSales farmId={farmId} refreshKey={reloadKey} />
                         <MilkReport farmId={farmId} refreshKey={reloadKey} />
 
                         {isOwner && !adding && (

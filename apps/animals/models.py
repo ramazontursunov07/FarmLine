@@ -197,3 +197,27 @@ class MilkRecord(models.Model):
     def __str__(self):
         return f"{self.animal} - {self.liters} l ({self.date}, {self.session})"
 
+
+class MilkSale(models.Model):
+    """Sotilgan sut (litr). Ombordagi sut kamayadi, puli moliyada "Kirim" bo'lib yoziladi."""
+    farm = models.ForeignKey('farms.Farm', on_delete=models.CASCADE, related_name='milk_sales')
+    date = models.DateField()
+    liters = models.DecimalField(max_digits=8, decimal_places=1)
+    price_per_liter = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # liters * price_per_liter
+    note = models.CharField(max_length=200, blank=True)  # kimga sotildi va h.k.
+    finance_transaction = models.OneToOneField(
+        'finance.Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='milk_sale'
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_milk_sales'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+        verbose_name = "Sotilgan sut"
+        verbose_name_plural = "Sotilgan sutlar"
+
+    def __str__(self):
+        return f"{self.farm}: {self.liters} l ({self.date})"

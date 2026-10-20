@@ -12,13 +12,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.mixins import IdempotentCreateMixin
+from apps.finance.models import Transaction as FinanceTransaction
 from apps.farms.models import Farm, Worker
+from apps.users.digest import money
 from apps.users.notify import display_name, notify_users
 from apps.users.permissions import IsAppAdmin, is_app_admin
-from .models import COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, WeightRecord
+from .models import (COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, MilkSale,
+                     WeightRecord)
 from .permissions import IsFarmOwnerOrWorker
 from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer,
-                          AnimalSerializer, WeightRecordSerializer, MilkRecordSerializer)
+                          AnimalSerializer, WeightRecordSerializer, MilkRecordSerializer, MilkSaleSerializer)
 
 
 def one_decimal(value):
@@ -459,11 +462,38 @@ class WeightRecordViewSet(_AnimalRecordViewSet):
     serializer_class = WeightRecordSerializer
 
 
+def milk_balance(farm_id):
+    """Sut ombori: (sog'ilgan, sotilgan) jami litr. Qolgan sut = sog'ilgan - sotilgan."""
+    produced = MilkRecord.objects.filter(animal__farm_id=farm_id).aggregate(t=Sum('liters'))['t'] or Decimal('0')
+    sold = MilkSale.objects.filter(farm_id=farm_id).aggregate(t=Sum('liters'))['t'] or Decimal('0')
+    return produced, sold
+
+
 class MilkRecordViewSet(_AnimalRecordViewSet):
     """Sut miqdori. Filtrlar: ?farm= ?animal= ?date_from= ?date_to="""
     model = MilkRecord
     queryset = MilkRecord.objects.all()
     serializer_class = MilkRecordSerializer
+
+    def _ensure_not_sold(self, farm_id, removed_liters):
+        """Allaqachon sotilgan sutni kamaytirib/o'chirib bo'lmaydi (ombor manfiy bo'lib qolmasin)."""
+        produced, sold = milk_balance(farm_id)
+        if produced - removed_liters < sold:
+            raise ValidationError({'liters': (
+                "Bu sutning bir qismi allaqachon sotilgan: o'zgartirsangiz, ombordagi sut manfiy bo'lib qoladi.")})
+
+    def perform_update(self, serializer):
+        record = serializer.instance
+        self._ensure_can_modify(record)
+        new_liters = serializer.validated_data.get('liters', record.liters)
+        if new_liters < record.liters:
+            self._ensure_not_sold(record.animal.farm_id, record.liters - new_liters)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_can_modify(instance)
+        self._ensure_not_sold(instance.animal.farm_id, instance.liters)
+        instance.delete()
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -538,3 +568,93 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
             'animals_count': sum(1 for a in animals if Decimal(a['liters']) > 0),
             'animals': animals,
         })
+
+
+class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
+    """
+    Sut sotish. Sotilgan sut ombordan ayriladi, puli moliyada "Kirim" (Sotuv) bo'lib yoziladi.
+    Sotish va sotuvlar tarixi: ferma egasi yoki moliya huquqi bor ishchi.
+    Ombor qoldig'ini fermaning har bir a'zosi ko'radi: GET /animals-milk-sale/stock/?farm=<id>
+    Filtr: ?farm= ?date_from= ?date_to=. O'zgartirib bo'lmaydi: xato bo'lsa o'chirib, qayta yozing.
+    """
+    queryset = MilkSale.objects.all()
+    serializer_class = MilkSaleSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        from apps.finance.views import finance_farms
+        qs = MilkSale.objects.select_related('recorded_by').filter(
+            farm__in=finance_farms(self.request.user).values('pk'))
+        p = self.request.query_params
+        if p.get('farm', '').isdigit():
+            qs = qs.filter(farm_id=int(p['farm']))
+        for param, lookup in (('date_from', 'date__gte'), ('date_to', 'date__lte')):
+            if p.get(param):
+                value = parse_date(p[param])
+                if value is None:
+                    raise ValidationError({param: "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak"})
+                qs = qs.filter(**{lookup: value})
+        return qs.order_by('-date', '-id')
+
+    def _ensure_can_sell(self, farm):
+        from apps.finance.views import finance_farms
+        if not finance_farms(self.request.user).filter(pk=farm.pk).exists():
+            raise PermissionDenied("Sut sotishni faqat ferma egasi yoki moliya huquqi bor ishchi yoza oladi.")
+
+    @action(detail=False, methods=['get'])
+    def stock(self, request):
+        """Ombordagi sut: sog'ilgan, sotilgan va qolgan litr (?farm=<id>)."""
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        user = request.user
+        farm = Farm.objects.filter(
+            Q(owner=user) | Q(workers__user=user), pk=int(farm_id)).distinct().first()
+        if farm is None:
+            raise PermissionDenied("Siz bu fermani ko'ra olmaysiz.")
+        produced, sold = milk_balance(farm.pk)
+        from apps.finance.views import finance_farms
+        return Response({
+            'farm': farm.pk,
+            'produced': one_decimal(produced),
+            'sold': one_decimal(sold),
+            'available': one_decimal(max(produced - sold, Decimal('0'))),
+            'can_sell': finance_farms(user).filter(pk=farm.pk).exists(),
+        })
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        farm = serializer.validated_data['farm']
+        self._ensure_can_sell(farm)
+        liters = serializer.validated_data['liters']
+        price = serializer.validated_data['price_per_liter']
+        amount = (liters * price).quantize(Decimal('0.01'))
+        with transaction.atomic():
+            Farm.objects.select_for_update().get(pk=farm.pk)  # bir vaqtda ikki marta sotib yubormaslik uchun
+            produced, sold = milk_balance(farm.pk)
+            available = produced - sold
+            if liters > available:
+                raise ValidationError({'liters': (
+                    f"Omborda faqat {one_decimal(max(available, Decimal('0')))} litr sut bor")})
+            note = serializer.validated_data.get('note', '')
+            description = f"Sut sotildi: {one_decimal(liters)} l × {money(price)} so'm"
+            if note:
+                description += f" ({note})"
+            tx = FinanceTransaction.objects.create(
+                farm=farm, transaction_type='kirim', category='sotuv', amount=amount,
+                description=description, date=serializer.validated_data['date'], recorded_by=user)
+            sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=tx)
+        if user.id != farm.owner_id:
+            notify_users([farm.owner], (
+                f"🥛 Sut sotildi ({farm.name}):\n"
+                f"{one_decimal(sale.liters)} l × {money(sale.price_per_liter)} so'm = {money(sale.amount)} so'm\n"
+                f"Kim: {display_name(user)}"))
+
+    def perform_destroy(self, instance):
+        self._ensure_can_sell(instance.farm)
+        with transaction.atomic():
+            tx = instance.finance_transaction
+            instance.delete()
+            if tx is not None:
+                tx.delete()  # sotuv bekor qilinsa, pul ham balansdan olib tashlanadi

@@ -4,7 +4,8 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import COUNT_EVENT_TYPES, Animal, AnimalType, AnimalGroup, AnimalEvent, MilkRecord, WeightRecord
+from .models import (COUNT_EVENT_TYPES, Animal, AnimalType, AnimalGroup, AnimalEvent, MilkRecord, MilkSale,
+                     WeightRecord)
 
 
 class AnimalTypeSerializer(serializers.ModelSerializer):
@@ -383,3 +384,32 @@ class MilkRecordSerializer(_AnimalRecordSerializer):
                                "Ertalab/kechqurunni alohida yozish uchun avval butun kunlik yozuvni o'chiring."
                 })
         return attrs
+
+
+class MilkSaleSerializer(serializers.ModelSerializer):
+    recorded_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MilkSale
+        fields = ['id', 'farm', 'date', 'liters', 'price_per_liter', 'amount', 'note',
+                  'recorded_by', 'recorded_by_name', 'created_at']
+        read_only_fields = ['amount', 'recorded_by', 'created_at']
+
+    def get_recorded_by_name(self, obj):
+        user = obj.recorded_by
+        return (user.get_full_name() or user.username) if user else None
+
+    def validate_liters(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Litr 0 dan katta bo'lishi kerak")
+        return value
+
+    def validate_price_per_liter(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Narx 0 dan katta bo'lishi kerak")
+        return value
+
+    def validate_date(self, value):
+        if value > timezone.localdate():
+            raise serializers.ValidationError("Sana kelajakda bo'lishi mumkin emas")
+        return value
