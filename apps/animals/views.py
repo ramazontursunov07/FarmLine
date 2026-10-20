@@ -497,9 +497,10 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
         rows = list(
             records.filter(date__gte=prev_start, date__lt=next_start).order_by()
             .values('animal_id', 'animal__tag_number', 'animal__name')
+            # Annotatsiya nomi model maydoni bilan (liters) bir xil bo'lishi mumkin emas, shuning uchun month_/prev_
             .annotate(
-                liters=Sum('liters', filter=in_month),
-                previous=Sum('liters', filter=in_prev),
+                month_liters=Sum('liters', filter=in_month),
+                prev_liters=Sum('liters', filter=in_prev),
                 days=Count('date', filter=in_month, distinct=True),
             )
         )
@@ -507,8 +508,8 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
         zero = Decimal('0')
         animals = []
         for row in rows:
-            liters = row['liters'] or zero
-            previous = row['previous'] or zero
+            liters = row['month_liters'] or zero
+            previous = row['prev_liters'] or zero
             days = row['days']
             animals.append({
                 'animal': row['animal_id'],

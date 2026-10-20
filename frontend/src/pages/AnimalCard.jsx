@@ -8,6 +8,8 @@ import InstallButton from '../components/InstallButton';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const SESSIONS = { kun: 'Butun kun', ertalab: 'Ertalab', kechqurun: 'Kechqurun' };
+const EMPTY_CALF = { tag_number: '', name: '', sex: 'urgochi' };
+const MAX_CALF_CARDS = 10;
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -134,6 +136,8 @@ function AnimalCard() {
     const [milkError, setMilkError] = useState('');
     const [calvingForm, setCalvingForm] = useState({ start_date: today(), animal_count: '1' });
     const [calvingError, setCalvingError] = useState('');
+    const [calves, setCalves] = useState([]);
+    const [withCards, setWithCards] = useState(true);
     const [pregForm, setPregForm] = useState({ pregnant_since: today(), due_date: '' });
     const [dueEdit, setDueEdit] = useState(null);
     const [pregError, setPregError] = useState('');
@@ -232,20 +236,52 @@ function AnimalCard() {
         );
     };
 
-    const handleCalving = (e) => {
+    const handleCalfChange = (index, field, value) =>
+        setCalves((prev) => {
+            const next = Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => prev[i] || EMPTY_CALF);
+            next[index] = { ...next[index], [field]: value };
+            return next;
+        });
+
+    const handleCalving = async (e) => {
         e.preventDefault();
-        submit(
-            () => api.post('animals-event/', {
-                animal_group: animal.group,
-                animal: Number(animalId),
-                event_type: 'tugilish',
-                title: `№${animal.tag_number} tug'di`,
-                animal_count: Number(calvingForm.animal_count),
-                start_date: calvingForm.start_date,
-            }),
-            setCalvingError,
-            "Tug'ishni saqlab bo'lmadi"
-        );
+        const payload = {
+            animal_group: animal.group,
+            animal: Number(animalId),
+            event_type: 'tugilish',
+            title: `№${animal.tag_number} tug'di`,
+            animal_count: Number(calvingForm.animal_count),
+            start_date: calvingForm.start_date,
+        };
+        if (openCards) {
+            payload.calves = Array.from({ length: birthCount }, (_, i) => ({ ...EMPTY_CALF, ...calves[i] })).map((c) => ({
+                tag_number: c.tag_number.trim(),
+                name: c.name.trim(),
+                sex: c.sex,
+            }));
+            if (payload.calves.some((c) => !c.tag_number)) {
+                setCalvingError("Har bir buzoq uchun quloq raqamini kiriting");
+                return;
+            }
+        }
+        setBusy(true);
+        setCalvingError('');
+        try {
+            const res = await api.post('animals-event/', payload);
+            const made = res?.data?.calves_created ?? [];
+            setNotice(
+                made.length
+                    ? `Buzoq kartochkasi ochildi: ${made.map((a) => `№${a.tag_number}`).join(', ')}`
+                    : (res?.data?._pending ? "Internet yo'q: yozuv saqlandi va ulanganda serverga yuboriladi." : '')
+            );
+            setCalvingForm({ start_date: today(), animal_count: '1' });
+            setCalves([]);
+            reload();
+        } catch (err) {
+            setCalvingError(getErrorMessage(err, "Tug'ishni saqlab bo'lmadi"));
+        } finally {
+            setBusy(false);
+        }
     };
 
     const handleMarkPregnant = (e) => {
@@ -441,6 +477,9 @@ function AnimalCard() {
     const isYoung = age != null && age < 12;
     const showMilk = isFemale && (!isYoung || (milk?.days_recorded ?? 0) > 0);
     const canBreed = isFemale && isActive && (!isYoung || Boolean(animal?.is_pregnant));
+    const birthCount = Number(calvingForm.animal_count) || 0;
+    const canOpenCards = isOwner && birthCount >= 1 && birthCount <= MAX_CALF_CARDS;
+    const openCards = canOpenCards && withCards;
 
     return (
         <div className="app-shell">
@@ -810,7 +849,55 @@ function AnimalCard() {
                                                     onChange={(e) => setCalvingForm({ ...calvingForm, animal_count: e.target.value })} required />
                                             </div>
                                         </div>
-                                        <p className="workers-hint">Guruhdagi hayvonlar soni shuncha ko'payadi. Buzoq kartochkasini keyin "Kartochkalar" sahifasidan onasini tanlab qo'shing.</p>
+                                        <p className="workers-hint">
+                                            {openCards
+                                                ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
+                                                : "Guruhdagi hayvonlar soni shuncha ko'payadi. Buzoq kartochkasini keyin \"Kartochkalar\" sahifasidan onasini tanlab qo'shing."}
+                                        </p>
+                                        {isOwner && birthCount > MAX_CALF_CARDS && (
+                                            <p className="workers-hint">
+                                                {MAX_CALF_CARDS} tadan ko'p buzoq bo'lsa, kartochkalarni keyin
+                                                "Hayvon kartochkalari" sahifasida oching.
+                                            </p>
+                                        )}
+                                        {canOpenCards && (
+                                            <div className="form-field">
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                                    <input type="checkbox" checked={withCards}
+                                                        style={{ width: 'auto', margin: 0 }}
+                                                        onChange={(e) => setWithCards(e.target.checked)} />
+                                                    Buzoq kartochkasini ham ochish
+                                                </label>
+                                            </div>
+                                        )}
+                                        {openCards && Array.from({ length: birthCount }, (_, i) => {
+                                            const calf = calves[i] || EMPTY_CALF;
+                                            return (
+                                                <div className="work-card" key={i} style={{ marginBottom: 12 }}>
+                                                    <p className="workers-hint" style={{ marginTop: 0 }}>{i + 1}-buzoq</p>
+                                                    <div className="form-row">
+                                                        <div className="form-field">
+                                                            <label>Quloq raqami</label>
+                                                            <input type="text" value={calf.tag_number} maxLength={30} required
+                                                                placeholder="Masalan: 21"
+                                                                onChange={(e) => handleCalfChange(i, 'tag_number', e.target.value)} />
+                                                        </div>
+                                                        <div className="form-field">
+                                                            <label>Jinsi</label>
+                                                            <select value={calf.sex}
+                                                                onChange={(e) => handleCalfChange(i, 'sex', e.target.value)}>
+                                                                {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="form-field">
+                                                        <label>Laqabi (ixtiyoriy)</label>
+                                                        <input type="text" value={calf.name} maxLength={100}
+                                                            onChange={(e) => handleCalfChange(i, 'name', e.target.value)} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                         {calvingError && <p className="error-text" role="alert">{calvingError}</p>}
                                         <button type="submit" className="btn-primary btn-auto" disabled={busy}>Tug'ishni yozish</button>
                                     </form>
