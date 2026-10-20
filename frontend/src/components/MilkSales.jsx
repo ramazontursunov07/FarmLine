@@ -64,10 +64,11 @@ function MilkSales({ farmId, refreshKey }) {
         }
     };
 
+    // Ro'yxatdan o'chirish: faqat yozuv yo'qoladi, balans va sotilgan sut hisobi o'zgarmaydi
     const handleDelete = async (s) => {
         const ok = window.confirm(
-            `${formatDate(s.date)} dagi ${num(s.liters)} l sotuvni o'chirasizmi?\n\n` +
-            `Sut omborga qaytadi, ${formatMoney(s.amount)} esa kirimdan olib tashlanadi.`
+            `${formatDate(s.date)} dagi ${num(s.liters)} l sotuv yozuvini ro'yxatdan o'chirasizmi?\n\n` +
+            `Faqat yozuv o'chadi: balans (${formatMoney(s.amount)} kirim) va sotilgan sut hisobi o'zgarmaydi.`
         );
         if (!ok) return;
         try {
@@ -75,6 +76,21 @@ function MilkSales({ farmId, refreshKey }) {
             setVersion((v) => v + 1);
         } catch (err) {
             window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+        }
+    };
+
+    // Xato kiritilgan sotuvni bekor qilish: sut omborga qaytadi, pul kirimdan olib tashlanadi
+    const handleCancel = async (s) => {
+        const ok = window.confirm(
+            `${formatDate(s.date)} dagi ${num(s.liters)} l sotuv xato kiritilganmi?\n\n` +
+            `Bekor qilinsa, sut omborga qaytadi, ${formatMoney(s.amount)} esa kirimdan olib tashlanadi.`
+        );
+        if (!ok) return;
+        try {
+            await api.post(`animals-milk-sale/${s.id}/cancel/`);
+            setVersion((v) => v + 1);
+        } catch (err) {
+            window.alert(getErrorMessage(err, "Bekor qilib bo'lmadi"));
         }
     };
 
@@ -149,9 +165,13 @@ function MilkSales({ farmId, refreshKey }) {
                                         </span>
                                     </div>
                                     <div className="work-side">
-                                        <button type="button" className="farm-item-action farm-item-action--danger"
+                                        <button type="button" className="farm-item-action"
                                             onClick={() => handleDelete(s)}>
                                             O'chirish
+                                        </button>
+                                        <button type="button" className="farm-item-action farm-item-action--danger"
+                                            onClick={() => handleCancel(s)}>
+                                            Xato — bekor qilish
                                         </button>
                                     </div>
                                 </li>

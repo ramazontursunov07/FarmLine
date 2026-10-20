@@ -5,7 +5,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -579,7 +579,9 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     Sut sotish. Sotilgan sut ombordan ayriladi, puli moliyada "Kirim" (Sotuv) bo'lib yoziladi.
     Sotish va sotuvlar tarixi: ferma egasi yoki moliya huquqi bor ishchi.
     Ombor qoldig'ini fermaning har bir a'zosi ko'radi: GET /animals-milk-sale/stock/?farm=<id>
-    Filtr: ?farm= ?date_from= ?date_to=. O'zgartirib bo'lmaydi: xato bo'lsa o'chirib, qayta yozing.
+    Filtr: ?farm= ?date_from= ?date_to=. O'zgartirib bo'lmaydi.
+    DELETE: yozuv faqat ro'yxatdan o'chadi (sut hisobi va balans o'zgarmaydi).
+    POST /<id>/cancel/: xato kiritilgan sotuvni to'liq bekor qilish (sut omborga qaytadi, pul kirimdan olib tashlanadi).
     """
     queryset = MilkSale.objects.all()
     serializer_class = MilkSaleSerializer
@@ -589,7 +591,7 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         from apps.finance.views import finance_farms
         qs = MilkSale.objects.select_related('recorded_by').filter(
-            farm__in=finance_farms(self.request.user).values('pk'))
+            farm__in=finance_farms(self.request.user).values('pk'), is_hidden=False)
         p = self.request.query_params
         if p.get('farm', '').isdigit():
             qs = qs.filter(farm_id=int(p['farm']))
@@ -656,9 +658,19 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 f"Kim: {display_name(user)}"))
 
     def perform_destroy(self, instance):
+        """Faqat yozuvni ro'yxatdan o'chiradi: sotilgan sut hisobi va moliyadagi kirim (balans) o'zgarmaydi."""
         self._ensure_can_sell(instance.farm)
+        instance.is_hidden = True
+        instance.save(update_fields=['is_hidden'])
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Xato kiritilgan sotuvni to'liq bekor qilish: sut omborga qaytadi, pul balansdan olib tashlanadi."""
+        sale = self.get_object()
+        self._ensure_can_sell(sale.farm)
         with transaction.atomic():
-            tx = instance.finance_transaction
-            instance.delete()
+            tx = sale.finance_transaction
+            sale.delete()
             if tx is not None:
-                tx.delete()  # sotuv bekor qilinsa, pul ham balansdan olib tashlanadi
+                tx.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -58,11 +58,60 @@ class MilkSaleTests(AnimalCardBase):
         self.assertEqual(self.sell(liters='0').status_code, 400)
         self.assertEqual(self.sell(date=str(self.today + timedelta(days=1))).status_code, 400)
 
-    def test_deleting_sale_restores_stock_and_removes_income(self):
-        sale_id = self.sell('12').json()['id']
+    def balance(self):
+        summary = self.client.get('/api/finance/summary/', {'farm': self.farm.pk}).json()
+        return Decimal(str(summary['balance']))
+
+    def rows(self):
+        data = self.client.get(SALES, {'farm': self.farm.pk}).json()
+        return data['results'] if isinstance(data, dict) else data
+
+    def test_deleting_sale_only_hides_the_record(self):
+        sale_id = self.sell('12', '4000').json()['id']
+        self.assertEqual(self.balance(), Decimal('48000'))
+
         self.assertEqual(self.client.delete(f'{SALES}{sale_id}/').status_code, 204)
+
+        self.assertEqual(self.rows(), [])                       # yozuv ro'yxatdan yo'qoldi
+        self.assertEqual(Transaction.objects.count(), 1)        # moliyadagi kirim qoldi
+        self.assertEqual(self.balance(), Decimal('48000'))      # balans o'zgarmadi
+        s = self.stock()
+        self.assertEqual((s['sold'], s['available']), ('12.0', '6.0'))  # sotilgan sut hisobi ham o'zgarmadi
+
+    def test_deleted_sale_cannot_be_deleted_or_cancelled_again(self):
+        sale_id = self.sell('12').json()['id']
+        self.client.delete(f'{SALES}{sale_id}/')
+        self.assertEqual(self.client.delete(f'{SALES}{sale_id}/').status_code, 404)
+        self.assertEqual(self.client.post(f'{SALES}{sale_id}/cancel/').status_code, 404)
+        self.assertEqual(Transaction.objects.count(), 1)
+
+    def test_hidden_sale_still_counts_when_selling_more(self):
+        sale_id = self.sell('12').json()['id']
+        self.client.delete(f'{SALES}{sale_id}/')
+        self.assertEqual(self.sell('7').status_code, 400)       # 18 dan 12 sotilgan, 6 l qoldi
+        self.assertEqual(self.sell('6').status_code, 201)
+
+    def test_hidden_sale_keeps_milk_records_protected(self):
+        sale_id = self.sell('12').json()['id']
+        self.client.delete(f'{SALES}{sale_id}/')
+        self.assertEqual(self.client.delete(f'{MILK}{self.m2.pk}/').status_code, 400)
+
+    def test_cancel_sale_restores_stock_and_removes_income(self):
+        sale_id = self.sell('12', '4000').json()['id']
+        self.assertEqual(self.client.post(f'{SALES}{sale_id}/cancel/').status_code, 204)
         self.assertEqual(Transaction.objects.count(), 0)
+        self.assertEqual(self.balance(), Decimal('0'))
         self.assertEqual(self.stock()['available'], '18.0')
+        self.assertEqual(self.rows(), [])
+
+    def test_worker_without_finance_right_cannot_delete_or_cancel(self):
+        sale_id = self.sell('12').json()['id']
+        self.client.force_authenticate(self.worker)
+        self.assertEqual(self.client.delete(f'{SALES}{sale_id}/').status_code, 404)
+        self.assertEqual(self.client.post(f'{SALES}{sale_id}/cancel/').status_code, 404)
+        self.client.force_authenticate(self.owner)
+        self.assertEqual(len(self.rows()), 1)
+        self.assertEqual(Transaction.objects.count(), 1)
 
     def test_sold_milk_record_cannot_be_removed(self):
         self.sell('12')  # 18 l dan 12 l sotildi: 8 l li yozuvni o'chirsak, 10 l qoladi (12 dan kam)

@@ -202,7 +202,10 @@ class MilkRecord(models.Model):
 
 
 class MilkSale(models.Model):
-    """Sotilgan sut (litr). Ombordagi sut kamayadi, puli moliyada "Kirim" bo'lib yoziladi."""
+    """
+    Sotilgan sut (litr). Ombordagi sut kamayadi, puli moliyada "Kirim" bo'lib yoziladi.
+    Yozuv ro'yxatdan "o'chirilganda" (is_hidden=True) faqat ko'rinmay qoladi: sut hisobi va balans o'zgarmaydi.
+    """
     farm = models.ForeignKey('farms.Farm', on_delete=models.CASCADE, related_name='milk_sales')
     date = models.DateField()
     liters = models.DecimalField(max_digits=8, decimal_places=1)
@@ -216,6 +219,8 @@ class MilkSale(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_milk_sales'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    # Tarixdan o'chirilgan: ro'yxatda ko'rinmaydi, lekin sotilgan sut hisobida va moliyadagi kirimda qoladi
+    is_hidden = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-date', '-id']
