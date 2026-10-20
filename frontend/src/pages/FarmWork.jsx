@@ -15,6 +15,10 @@ const EVENT_TYPES = {
     vazn_olchash: "Vazn o'lchash",
 };
 
+// "Yangi ish yozuvi" formasida ko'rsatilmaydigan ish turlari: ular "Barcha hayvonlar" bo'limida, hayvon kartochkasidan yoziladi.
+// Eski yozuvlar tarixda va filtrda qoladi. Tug'ilishni shu formada ham yozish kerak bo'lsa, 'tugilish' ni ro'yxatdan olib tashlang.
+const HIDDEN_IN_FORM = ['tugilish', 'vazn_olchash'];
+
 // Guruhdagi hayvonlar sonini o'zgartiradigan ish turlari: nechta ekani majburiy
 const COUNT_HINTS = {
     olim: "Guruhdagi hayvonlar soni shuncha kamayadi.",
@@ -450,9 +454,11 @@ function FarmWork() {
                                         <div className="form-field">
                                             <label>Ish turi</label>
                                             <select name="event_type" value={eventForm.event_type} onChange={handleEventChange}>
-                                                {Object.entries(EVENT_TYPES).map(([v, l]) => (
-                                                    <option key={v} value={v}>{l}</option>
-                                                ))}
+                                                {Object.entries(EVENT_TYPES)
+                                                    .filter(([v]) => !HIDDEN_IN_FORM.includes(v))
+                                                    .map(([v, l]) => (
+                                                        <option key={v} value={v}>{l}</option>
+                                                    ))}
                                             </select>
                                         </div>
                                     </div>
