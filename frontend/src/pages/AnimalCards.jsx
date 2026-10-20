@@ -38,9 +38,10 @@ function AnimalCards() {
     const [saving, setSaving] = useState(false);
 
     const [adding, setAdding] = useState(false);
-    const [addForm, setAddForm] = useState({ group: '', tag_number: '', name: '', sex: 'urgochi', birth_date: '' });
+    const [addForm, setAddForm] = useState({ group: '', tag_number: '', name: '', sex: 'urgochi', birth_date: '', mother: '' });
     const [addError, setAddError] = useState('');
     const [addSaving, setAddSaving] = useState(false);
+    const [calfMode, setCalfMode] = useState(false);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('faol');
@@ -90,14 +91,17 @@ function AnimalCards() {
 
     const activeGroups = groups.filter((g) => g.status === 'faol');
 
-    const openAdd = (groupId) => {
+    const openAdd = (groupId, isCalf = false) => {
         setAddError('');
         setAddForm({
             group: groupId || groupFilter || (activeGroups[0] ? String(activeGroups[0].id) : ''),
-            tag_number: '', name: '', sex: 'urgochi', birth_date: '',
+            tag_number: '', name: '', sex: 'urgochi', birth_date: '', mother: '',
         });
+        setCalfMode(isCalf);
         setAdding(true);
     };
+
+    const mothers = animals.filter((m) => m.sex === 'urgochi' && m.status !== 'olgan');
 
     const handleAddChange = (e) => setAddForm({ ...addForm, [e.target.name]: e.target.value });
 
@@ -112,6 +116,7 @@ function AnimalCards() {
                 name: addForm.name.trim(),
                 sex: addForm.sex,
                 birth_date: addForm.birth_date,
+                mother: addForm.mother ? Number(addForm.mother) : null,
             });
             setAdding(false);
             reload();
@@ -233,6 +238,7 @@ function AnimalCards() {
                                     </>
                                 ) : (
                                     <form className="animal-inline-form" onSubmit={handleAdd}>
+                                        {calfMode && <h4 className="section-title">Buzoq kartochkasi</h4>}
                                         <div className="form-row">
                                             <div className="form-field">
                                                 <label>Guruhi</label>
@@ -263,10 +269,23 @@ function AnimalCards() {
                                                 </select>
                                             </div>
                                         </div>
-                                        <div className="form-field">
-                                            <label>Tug'ilgan sana</label>
-                                            <input type="date" name="birth_date" value={addForm.birth_date}
-                                                max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} required />
+                                        <div className="form-row">
+                                            <div className="form-field">
+                                                <label>Tug'ilgan sana</label>
+                                                <input type="date" name="birth_date" value={addForm.birth_date}
+                                                    max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} required />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Onasi (ixtiyoriy)</label>
+                                                <select name="mother" value={addForm.mother} onChange={handleAddChange}>
+                                                    <option value="">—</option>
+                                                    {mothers.map((m) => (
+                                                        <option key={m.id} value={m.id}>
+                                                            №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
                                         <p className="workers-hint">Guruhdagi hayvonlar soni 1 taga ko'payadi.</p>
                                         {addError && <p className="error-text" role="alert">{addError}</p>}
@@ -317,7 +336,7 @@ function AnimalCards() {
                                             </div>
                                             {isOwner && (
                                                 <div className="work-side animal-actions">
-                                                    <button type="button" className="btn-ghost" onClick={() => openAdd(String(g.id))}>
+                                                    <button type="button" className="btn-ghost" onClick={() => openAdd(String(g.id), true)}>
                                                         Kartochka ochish
                                                     </button>
                                                 </div>
