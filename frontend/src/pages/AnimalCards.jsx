@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import MilkEntry from '../components/MilkEntry';
 import MilkReport from '../components/MilkReport';
 import MilkSales from '../components/MilkSales';
 
@@ -212,6 +213,7 @@ function AnimalCards() {
                             Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
                         </p>
 
+                        <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
                         <MilkSales farmId={farmId} refreshKey={reloadKey} />
                         <MilkReport farmId={farmId} refreshKey={reloadKey} />
 

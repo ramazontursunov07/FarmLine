@@ -1,0 +1,126 @@
+/* Hamma sigirning sutini birdaniga yozish paneli (MilkEntry.jsx) */
+.milk-entry {
+    margin-bottom: 16px;
+}
+
+.milk-entry-card {
+    margin-top: 12px;
+}
+
+.milk-entry-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.milk-entry-seg {
+    display: flex;
+}
+
+.milk-entry-seg button {
+    flex: 1;
+    padding: 10px 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.milk-entry-seg button + button {
+    border-left: 0;
+}
+
+.milk-entry-seg button.is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.milk-entry-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-border);
+}
+
+.milk-entry-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.milk-entry-name {
+    font-weight: 600;
+}
+
+.milk-entry-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.milk-entry-field input {
+    width: 96px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border-radius: 2px;
+    font: inherit;
+    text-align: right;
+}
+
+.milk-entry-field input:focus {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+    outline: none;
+}
+
+.milk-entry-field input[aria-invalid="true"] {
+    border-color: var(--color-error);
+}
+
+.milk-entry-unit {
+    color: var(--color-text-muted);
+}
+
+.milk-entry-done {
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+.milk-entry-row.is-done .milk-entry-name {
+    color: var(--color-text-muted);
+}
+
+.milk-entry-error {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 13px;
+}
+
+.milk-entry-notice {
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.milk-entry-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.milk-entry-total {
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
