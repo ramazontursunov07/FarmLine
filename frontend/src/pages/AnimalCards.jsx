@@ -45,6 +45,7 @@ function AnimalCards() {
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('faol');
+    const [sexFilter, setSexFilter] = useState('');
     const groupFilter = searchParams.get('group') || '';
 
     useEffect(() => {
@@ -181,7 +182,8 @@ function AnimalCards() {
         .filter((x) => x.rest > 0), [groups, animals, groupFilter]);
     const uncardedTotal = uncarded.reduce((s, x) => s + x.rest, 0);
 
-    const visible = useMemo(() => {
+    // Jinsdan tashqari barcha filtrlar; jins bo'yicha sanoq shundan olinadi
+    const matched = useMemo(() => {
         const q = search.trim().toLowerCase();
         return animals.filter(
             (a) =>
@@ -190,6 +192,17 @@ function AnimalCards() {
                 (!q || a.tag_number.toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q))
         );
     }, [animals, groupFilter, statusFilter, search]);
+    const females = matched.filter((a) => a.sex === 'urgochi');
+    const males = matched.filter((a) => a.sex === 'erkak');
+    const visible = sexFilter === 'urgochi' ? females : sexFilter === 'erkak' ? males : matched;
+
+    // "Hammasi" tanlansa ikki alohida bo'lim: avval urg'ochilar, keyin erkaklar
+    const sections = sexFilter
+        ? [{ key: sexFilter, title: '', items: visible }]
+        : [
+            { key: 'urgochi', title: "Urg'ochi hayvonlar", items: females },
+            { key: 'erkak', title: 'Erkak hayvonlar', items: males },
+        ].filter((s) => s.items.length > 0);
 
     return (
         <div className="app-shell">
@@ -314,6 +327,11 @@ function AnimalCards() {
                                     </option>
                                 ))}
                             </select>
+                            <select value={sexFilter} onChange={(e) => setSexFilter(e.target.value)}>
+                                <option value="">Urg'ochi va erkak ({matched.length})</option>
+                                <option value="urgochi">Faqat urg'ochi ({females.length})</option>
+                                <option value="erkak">Faqat erkak ({males.length})</option>
+                            </select>
                             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                                 <option value="">Barcha holatlar</option>
                                 {Object.entries(STATUSES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -352,127 +370,135 @@ function AnimalCards() {
                                 {animals.length === 0 ? "Hozircha hayvon kartochkasi yo'q" : 'Bunday kartochka topilmadi'}
                             </p>
                         ) : (
-                            <ul className="work-list">
-                                {visible.map((a) => (
-                                    editingId === a.id ? (
-                                        <li key={a.id} className="work-item animal-edit">
-                                            <form className="animal-edit-form" onSubmit={(e) => handleSave(e, a)}>
-                                                <div className="form-row">
-                                                    <div className="form-field">
-                                                        <label>Quloq raqami</label>
-                                                        <input type="text" name="tag_number" value={editForm.tag_number}
-                                                            onChange={handleEditChange} maxLength={30} required />
-                                                    </div>
-                                                    <div className="form-field">
-                                                        <label>Laqabi (ixtiyoriy)</label>
-                                                        <input type="text" name="name" value={editForm.name}
-                                                            onChange={handleEditChange} maxLength={100} />
-                                                    </div>
-                                                </div>
-                                                <div className="form-row">
-                                                    <div className="form-field">
-                                                        <label>Jinsi</label>
-                                                        <select name="sex" value={editForm.sex} onChange={handleEditChange}>
-                                                            {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div className="form-field">
-                                                        <label>Tug'ilgan sana</label>
-                                                        <input type="date" name="birth_date" value={editForm.birth_date}
-                                                            max={new Date().toLocaleDateString('en-CA')} onChange={handleEditChange} required />
-                                                    </div>
-                                                </div>
-                                                <div className="form-row">
-                                                    <div className="form-field">
-                                                        <label>Guruhi</label>
-                                                        <select name="group" value={editForm.group} onChange={handleEditChange}>
-                                                            {groups
-                                                                .filter((g) => g.status === 'faol' || String(g.id) === editForm.group)
-                                                                .map((g) => (
-                                                                    <option key={g.id} value={g.id}>
-                                                                        {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
-                                                                    </option>
-                                                                ))}
-                                                        </select>
-                                                    </div>
-                                                    <div className="form-field">
-                                                        <label>Onasi (ixtiyoriy)</label>
-                                                        <select name="mother" value={editForm.mother} onChange={handleEditChange}>
-                                                            <option value="">—</option>
-                                                            {animals
-                                                                .filter((m) => m.sex === 'urgochi' && m.status !== 'olgan' && m.id !== a.id)
-                                                                .map((m) => (
-                                                                    <option key={m.id} value={m.id}>
-                                                                        №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
-                                                                    </option>
-                                                                ))}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                {a.status !== 'olgan' && (
-                                                    <div className="form-field">
-                                                        <label>Holati</label>
-                                                        <select name="status" value={editForm.status} onChange={handleEditChange}>
-                                                            <option value="faol">Faol</option>
-                                                            <option value="sotilgan">Sotilgan</option>
-                                                        </select>
-                                                    </div>
-                                                )}
-                                                {editError && <p className="error-text" role="alert">{editError}</p>}
-                                                <div className="farm-edit-actions">
-                                                    <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                                                        {saving ? 'Kuting...' : 'Saqlash'}
-                                                    </button>
-                                                    <button type="button" className="btn-ghost" disabled={saving}
-                                                        onClick={() => setEditingId(null)}>
-                                                        Bekor qilish
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </li>
-                                    ) : (
-                                    <li key={a.id} className={`work-item animal-item--${a.status}`}>
-                                        <div className="work-main">
-                                            <span className="work-title">
-                                                <Link to={`/farms/${farmId}/animals/${a.id}`} className="animal-link">
-                                                    №{a.tag_number}{a.name ? ` · ${a.name}` : ''}
-                                                </Link>
-                                                {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
-                                                {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
-                                                {a.withdrawal && (
-                                                    <span className="work-badge work-badge--shoshilinch">
-                                                        {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}
+                            sections.map((sec) => (
+                                <div key={sec.key}>
+                                    {sec.title && (
+                                        <h3 className="section-title">{sec.title}: {sec.items.length} ta</h3>
+                                    )}
+                                    <ul className="work-list">
+                                        {sec.items.map((a) => (
+                                            editingId === a.id ? (
+                                                <li key={a.id} className="work-item animal-edit">
+                                                    <form className="animal-edit-form" onSubmit={(e) => handleSave(e, a)}>
+                                                        <div className="form-row">
+                                                            <div className="form-field">
+                                                                <label>Quloq raqami</label>
+                                                                <input type="text" name="tag_number" value={editForm.tag_number}
+                                                                    onChange={handleEditChange} maxLength={30} required />
+                                                            </div>
+                                                            <div className="form-field">
+                                                                <label>Laqabi (ixtiyoriy)</label>
+                                                                <input type="text" name="name" value={editForm.name}
+                                                                    onChange={handleEditChange} maxLength={100} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="form-row">
+                                                            <div className="form-field">
+                                                                <label>Jinsi</label>
+                                                                <select name="sex" value={editForm.sex} onChange={handleEditChange}>
+                                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                                </select>
+                                                            </div>
+                                                            <div className="form-field">
+                                                                <label>Tug'ilgan sana</label>
+                                                                <input type="date" name="birth_date" value={editForm.birth_date}
+                                                                    max={new Date().toLocaleDateString('en-CA')} onChange={handleEditChange} required />
+                                                            </div>
+                                                        </div>
+                                                        <div className="form-row">
+                                                            <div className="form-field">
+                                                                <label>Guruhi</label>
+                                                                <select name="group" value={editForm.group} onChange={handleEditChange}>
+                                                                    {groups
+                                                                        .filter((g) => g.status === 'faol' || String(g.id) === editForm.group)
+                                                                        .map((g) => (
+                                                                            <option key={g.id} value={g.id}>
+                                                                                {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                </select>
+                                                            </div>
+                                                            <div className="form-field">
+                                                                <label>Onasi (ixtiyoriy)</label>
+                                                                <select name="mother" value={editForm.mother} onChange={handleEditChange}>
+                                                                    <option value="">—</option>
+                                                                    {animals
+                                                                        .filter((m) => m.sex === 'urgochi' && m.status !== 'olgan' && m.id !== a.id)
+                                                                        .map((m) => (
+                                                                            <option key={m.id} value={m.id}>
+                                                                                №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        {a.status !== 'olgan' && (
+                                                            <div className="form-field">
+                                                                <label>Holati</label>
+                                                                <select name="status" value={editForm.status} onChange={handleEditChange}>
+                                                                    <option value="faol">Faol</option>
+                                                                    <option value="sotilgan">Sotilgan</option>
+                                                                </select>
+                                                            </div>
+                                                        )}
+                                                        {editError && <p className="error-text" role="alert">{editError}</p>}
+                                                        <div className="farm-edit-actions">
+                                                            <button type="submit" className="btn-primary btn-auto" disabled={saving}>
+                                                                {saving ? 'Kuting...' : 'Saqlash'}
+                                                            </button>
+                                                            <button type="button" className="btn-ghost" disabled={saving}
+                                                                onClick={() => setEditingId(null)}>
+                                                                Bekor qilish
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </li>
+                                            ) : (
+                                            <li key={a.id} className={`work-item animal-item--${a.status}`}>
+                                                <div className="work-main">
+                                                    <span className="work-title">
+                                                        <Link to={`/farms/${farmId}/animals/${a.id}`} className="animal-link">
+                                                            №{a.tag_number}{a.name ? ` · ${a.name}` : ''}
+                                                        </Link>
+                                                        {a.status === 'faol' && a.stage_display && <span className="work-badge">{a.stage_display}</span>}
+                                                        {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
+                                                        {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
+                                                        {a.withdrawal && (
+                                                            <span className="work-badge work-badge--shoshilinch">
+                                                                {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </span>
-                                            <span className="work-meta">
-                                                {a.group_label} · {SEXES[a.sex] || a.sex}
-                                                {a.birth_date ? ` · tug'ilgan: ${formatDate(a.birth_date)}` : ''}
-                                            </span>
-                                            <span className="work-meta">
-                                                {a.last_weight ? `Vazni: ${a.last_weight} kg (${formatDate(a.last_weight_date)})` : "Vazn yozilmagan"}
-                                                {a.last_calving_date ? ` · oxirgi tug'ish: ${formatDate(a.last_calving_date)}` : ''}
-                                                {a.is_pregnant && a.due_date ? ` · tug'ishi: ${formatDate(a.due_date)}` : ''}
-                                            </span>
-                                        </div>
-                                        <div className="work-side animal-actions">
-                                            <Link to={`/farms/${farmId}/animals/${a.id}`} className="btn-ghost animal-open">Ochish</Link>
-                                            {isOwner && (
-                                                <>
-                                                    <button type="button" className="btn-ghost" onClick={() => startEdit(a)}>
-                                                        Tahrirlash
-                                                    </button>
-                                                    <button type="button" className="farm-item-action farm-item-action--danger"
-                                                        onClick={() => handleDelete(a)}>
-                                                        O'chirish
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </li>
-                                    )
-                                ))}
-                            </ul>
+                                                    <span className="work-meta">
+                                                        {a.group_label} · {SEXES[a.sex] || a.sex}
+                                                        {a.birth_date ? ` · tug'ilgan: ${formatDate(a.birth_date)}` : ''}
+                                                    </span>
+                                                    <span className="work-meta">
+                                                        {a.last_weight ? `Vazni: ${a.last_weight} kg (${formatDate(a.last_weight_date)})` : "Vazn yozilmagan"}
+                                                        {a.last_calving_date ? ` · oxirgi tug'ish: ${formatDate(a.last_calving_date)}` : ''}
+                                                        {a.is_pregnant && a.due_date ? ` · tug'ishi: ${formatDate(a.due_date)}` : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="work-side animal-actions">
+                                                    <Link to={`/farms/${farmId}/animals/${a.id}`} className="btn-ghost animal-open">Ochish</Link>
+                                                    {isOwner && (
+                                                        <>
+                                                            <button type="button" className="btn-ghost" onClick={() => startEdit(a)}>
+                                                                Tahrirlash
+                                                            </button>
+                                                            <button type="button" className="farm-item-action farm-item-action--danger"
+                                                                onClick={() => handleDelete(a)}>
+                                                                O'chirish
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </li>
+                                            )
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))
                         )}
                     </>
                 )}

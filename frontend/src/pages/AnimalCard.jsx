@@ -531,9 +531,9 @@ function AnimalCard() {
     const age = monthsOld(animal?.birth_date);
     const isYoung = age != null && age < 12;
     const showMilk = isFemale && (!isYoung || (milk?.days_recorded ?? 0) > 0);
-    const canBreed = isFemale && isActive && (!isYoung || Boolean(animal?.is_pregnant));
+    const canBreed = isFemale && isActive && animal?.stage !== 'buzoq';
     const birthCount = Number(calvingForm.animal_count) || 0;
-    const canOpenCards = isOwner && birthCount >= 1 && birthCount <= MAX_CALF_CARDS;
+    const canOpenCards = birthCount >= 1 && birthCount <= MAX_CALF_CARDS;
     const openCards = canOpenCards && withCards;
 
     return (
@@ -559,6 +559,7 @@ function AnimalCard() {
                     <>
                         <h2 className="panel-title">
                             №{animal.tag_number}{animal.name ? ` · ${animal.name}` : ''}
+                            {isActive && animal.stage_display && <span className="work-badge">{animal.stage_display}</span>}
                             {!isActive && <span className="work-badge">{animal.status_display}</span>}
                         </h2>
                         <p className="panel-subtitle">
@@ -832,6 +833,15 @@ function AnimalCard() {
                             </>
                         )}
 
+                        {isFemale && isActive && !canBreed && (
+                            <div className="work-card">
+                                <p className="work-meta">
+                                    Bu hali buzoq ({ageText(animal.birth_date)}). 12 oyga to'lgach «Bug'ozlik» va «Tug'ish»
+                                    bo'limlari o'zi ochiladi. Bug'ozlik yozilishi bilan hayvon avtomatik «Sigir» davriga o'tadi.
+                                </p>
+                            </div>
+                        )}
+
                         {/* Bug'ozlik */}
                         {canBreed && (
                             <>
@@ -921,7 +931,7 @@ function AnimalCard() {
                                                 ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
                                                 : "Guruhdagi hayvonlar soni shuncha ko'payadi. Buzoq kartochkasini keyin \"Kartochkalar\" sahifasidan onasini tanlab qo'shing."}
                                         </p>
-                                        {isOwner && birthCount > MAX_CALF_CARDS && (
+                                        {birthCount > MAX_CALF_CARDS && (
                                             <p className="workers-hint">
                                                 {MAX_CALF_CARDS} tadan ko'p buzoq bo'lsa, kartochkalarni keyin
                                                 "Hayvon kartochkalari" sahifasida oching.

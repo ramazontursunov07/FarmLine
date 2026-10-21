@@ -141,11 +141,8 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         if not is_farm_member(user, group.farm):
             raise PermissionDenied("Siz bu fermaga yozuv qo'sha olmaysiz.")
 
-        # Tug'ilish bilan birga buzoq kartochkalarini ochish (kartochkalarni faqat ferma egasi boshqaradi)
+        # Tug'ilish bilan birga buzoq kartochkalarini ochish (ferma egasi ham, ishchi ham: buzoq kartasiz qolmasin)
         calves = serializer.validated_data.get('calves') or []
-        if calves and group.farm.owner_id != user.id:
-            raise PermissionDenied("Buzoq kartochkalarini faqat ferma egasi ochadi. "
-                                   "Tug'ilishni kartochkasiz yozing.")
 
         event_type = serializer.validated_data['event_type']
         if event_type not in COUNT_EVENT_TYPES:

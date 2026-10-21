@@ -556,11 +556,13 @@ class CalvingWithCardsTests(AnimalCardBase):
             (self.group.count, AnimalEvent.objects.count(), list(Animal.objects.values_list('tag_number', flat=True))),
             (3, 0, ['7']))
 
-    def test_worker_cannot_open_cards(self):
+    def test_worker_can_open_cards(self):
+        # Ishchi tug'ishni yozganda ham buzoq kartasiz qolmaydi
         self.client.force_authenticate(self.worker)
         r = self.calving([{'tag_number': '21'}], count=1)
-        self.assertEqual(r.status_code, 403)
-        self.assert_nothing_saved()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.group.refresh_from_db()
+        self.assertEqual((self.group.count, Animal.objects.filter(tag_number='21').count()), (4, 1))
 
     def test_worker_can_still_record_birth_without_cards(self):
         self.client.force_authenticate(self.worker)
@@ -764,3 +766,42 @@ class TelegramNotifyTests(AnimalCardBase):
         with patch('apps.animals.views.notify_users') as notify:
             self.post_event(event_type='kasallik', title='Mastit')
         notify.assert_not_called()
+
+
+class AnimalStageTests(AnimalCardBase):
+    """Davr (buzoq -> g'unajin -> sigir) yoshi va tug'ish/bug'ozlik tarixidan o'zi aniqlanadi."""
+
+    def stage(self, animal):
+        return self.client.get(f'{CARDS}{animal.pk}/').json()['stage']
+
+    def born(self, months):
+        return self.today - timedelta(days=30 * months + 3)
+
+    def test_female_calf_is_buzoq(self):
+        self.assertEqual(self.stage(self.make_animal('1', birth_date=self.born(5))), 'buzoq')
+
+    def test_heifer_between_one_and_two_years(self):
+        self.assertEqual(self.stage(self.make_animal('2', birth_date=self.born(16))), 'gunajin')
+
+    def test_old_cow_without_history_is_sigir(self):
+        self.assertEqual(self.stage(self.make_animal('3', birth_date=self.born(60))), 'sigir')
+
+    def test_pregnancy_turns_heifer_into_sigir(self):
+        heifer = self.make_animal('4', birth_date=self.born(16))
+        self.assertEqual(self.stage(heifer), 'gunajin')
+        r = self.client.patch(f'{CARDS}{heifer.pk}/', {'pregnant_since': str(self.today)}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['stage'], 'sigir')
+
+    def test_birth_turns_heifer_into_sigir_and_calf_is_buzoq(self):
+        heifer = self.make_animal('5', birth_date=self.born(20))
+        r = self.client.post(EVENTS, {
+            'animal_group': self.group.pk, 'event_type': 'tugilish', 'title': "Tug'di", 'animal_count': 1,
+            'start_date': str(self.today), 'animal': heifer.pk, 'calves': [{'tag_number': '50'}]}, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.stage(heifer), 'sigir')
+        self.assertEqual(self.stage(Animal.objects.get(tag_number='50')), 'buzoq')
+
+    def test_male_stages(self):
+        self.assertEqual(self.stage(self.make_animal('6', sex='erkak', birth_date=self.born(3))), 'buzoq')
+        self.assertEqual(self.stage(self.make_animal('7', sex='erkak', birth_date=self.born(30))), 'buqa')

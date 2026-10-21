@@ -206,6 +206,36 @@ def gestation_days(type_name):
     return None
 
 
+def months_between(born, today):
+    months = (today.year - born.year) * 12 + today.month - born.month
+    return months - 1 if today.day < born.day else months
+
+
+# Hayvon davrlari: yoshi va tug'ish/bug'ozlik tarixidan avtomatik aniqlanadi (qo'lda o'zgartirilmaydi)
+BREEDING_AGE_MONTHS = 12   # shu yoshdan keyin urug'lantirish/bug'ozlik yozish mumkin
+ADULT_AGE_MONTHS = 24      # tug'magan bo'lsa ham shu yoshdan keyin "sigir" hisoblanadi
+STAGE_LABELS = {
+    'buzoq': 'Buzoq', 'gunajin': "G'unajin", 'sigir': 'Sigir', 'buqa': 'Buqa',
+}
+
+
+def animal_stage(animal, calved, today=None):
+    """
+    Urg'ochi: buzoq (12 oygacha) -> g'unajin (12-24 oy, hali tug'magan) -> sigir.
+    Bug'ozlik yoki tug'ish yozilishi bilan hayvon darhol "sigir" davriga o'tadi.
+    Erkak: buzoq (12 oygacha) -> buqa.
+    """
+    today = today or timezone.localdate()
+    age = months_between(animal.birth_date, today) if animal.birth_date else None
+    if animal.sex == 'erkak':
+        return 'buzoq' if age is not None and age < BREEDING_AGE_MONTHS else 'buqa'
+    if calved or animal.pregnant_since is not None:
+        return 'sigir'
+    if age is None or age >= ADULT_AGE_MONTHS:
+        return 'sigir'
+    return 'buzoq' if age < BREEDING_AGE_MONTHS else 'gunajin'
+
+
 class AnimalSerializer(serializers.ModelSerializer):
     farm = serializers.IntegerField(source='group.farm_id', read_only=True)
     group_label = serializers.SerializerMethodField()
@@ -218,11 +248,14 @@ class AnimalSerializer(serializers.ModelSerializer):
     last_calving_date = serializers.SerializerMethodField()
     is_pregnant = serializers.SerializerMethodField()
     days_to_calving = serializers.SerializerMethodField()
+    stage = serializers.SerializerMethodField()
+    stage_display = serializers.SerializerMethodField()
     withdrawal = serializers.SerializerMethodField()
 
     class Meta:
         model = Animal
         fields = ['id', 'farm', 'group', 'group_label', 'tag_number', 'name', 'sex', 'sex_display',
+                  'stage', 'stage_display',
                   'birth_date', 'mother', 'mother_tag', 'status', 'status_display', 'notes',
                   'pregnant_since', 'due_date', 'is_pregnant', 'days_to_calving',
                   'withdrawal',
@@ -248,6 +281,15 @@ class AnimalSerializer(serializers.ModelSerializer):
 
     def get_is_pregnant(self, obj):
         return obj.pregnant_since is not None
+
+    def get_stage(self, obj):
+        calved = getattr(obj, 'last_calving_date', None) is not None
+        if not calved and obj.sex == 'urgochi' and obj.pk:
+            calved = obj.calves.exists()  # annotate bo'lmagan joyda (masalan yangi yaratilganda)
+        return animal_stage(obj, calved)
+
+    def get_stage_display(self, obj):
+        return STAGE_LABELS[self.get_stage(obj)]
 
     def get_days_to_calving(self, obj):
         if obj.pregnant_since is None or obj.due_date is None:
