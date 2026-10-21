@@ -235,13 +235,22 @@ class CalvingTests(CalvingBase):
                               due_date=TODAY + timedelta(days=3))
         self.assertEqual(calving_lines(self.farm, TODAY), [])
 
-    def test_sorted_by_due_date_and_long_list_is_trimmed(self):
+    def test_sorted_by_due_date(self):
+        self.cow(9, tag='A', name='Kech')
+        self.cow(1, tag='B', name='Erta')
+        self.cow(5, tag='C', name='Orta')
+        text = "\n".join(calving_lines(self.farm, TODAY))
+        self.assertLess(text.index("Erta"), text.index("Orta"))
+        self.assertLess(text.index("Orta"), text.index("Kech"))
+
+    def test_long_list_is_trimmed_keeping_the_nearest(self):
         self.cow(9, tag='A', name='Kech')
         self.cow(1, tag='B', name='Erta')
         for i in range(5):
             self.cow(7, tag=f'X{i}', name='Oddiy')
         text = "\n".join(calving_lines(self.farm, TODAY))
-        self.assertLess(text.index("Erta"), text.index("Kech"))
+        self.assertIn("Erta", text)
+        self.assertNotIn("Kech", text)  # eng uzoq muddatlisi ro'yxatga sig'maydi
         self.assertIn("va yana 2 ta", text)
 
     def test_recording_the_birth_stops_the_reminder(self):
@@ -291,4 +300,3 @@ class WorkerCalvingDigestTests(CalvingBase):
         self.cow(1)
         stranger = User.objects.create_user(username='begona', password='Kuchli-Parol-2026', role='ishchi')
         self.assertIsNone(build_worker_digest(stranger, TODAY))
-
