@@ -5,6 +5,7 @@ Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 2. Chiqim ogohlantirishi -- "bu oy chiqim o'tgan oyning shu davridan 40% ko'p"
 3. Vaksinatsiya eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan vaksinatsiyalar
 4. Tug'ish eslatmasi -- tug'ishi yaqin yoki muddati o'tib ketgan bug'oz hayvonlar
+5. Dori ushlab turish muddati -- davolangan hayvonlarning sutini/go'shtini hali sotib bo'lmaydi
 
 Har bir funksiya matn qatorlari ro'yxatini qaytaradi (ogohlantirish bo'lmasa -- bo'sh ro'yxat).
 Chegaralarni shu fayl tepasidagi sozlamalardan o'zgartirish mumkin.
@@ -223,13 +224,34 @@ def calving_lines(farm, today):
 
 
 # ---------------------------------------------------------------- Hammasi birga
+# ---------------------------------------------------------------- 5. Dori ushlab turish muddati
+def withdrawal_lines(farm, today):
+    """Davolashdan keyin sut va go'shtni sotib bo'lmaydigan hayvonlar (qolgan kunlari bilan)."""
+    from apps.animals.withdrawal import active_withdrawals
+    rows = active_withdrawals(farm.pk, today)
+    if not rows:
+        return []
+    lines = [f"⛔ Sut va go'shtni sotmang: {len(rows)} ta hayvon"]
+    for r in rows[:MAX_ITEMS]:
+        a = r['animal']
+        who = f"№{a.tag_number}" + (f" {a.name}" if a.name else '')
+        if r['until'] is None:
+            when = "davolash davom etmoqda"
+        elif r['days_left'] == 0:
+            when = "bugun oxirgi kun, ertadan sotsa bo'ladi"
+        else:
+            when = f"{r['until']:%d.%m} gacha ({r['days_left']} kun qoldi)"
+        lines.append(f"  • {who} — {r['medicine']}: {when}")
+    return lines + _more(len(rows))
+
+
 def build_alert_lines(farm, today):
     """
     Fermaning barcha aqlli ogohlantirishlari. Birortasida xato chiqsa ham, kunlik hisobot
     to'xtab qolmasligi uchun xato log'ga yoziladi va qolganlari davom etadi.
     """
     lines = []
-    for builder in (calving_lines, vaccination_lines, feed_forecast_lines, spending_alert_lines):
+    for builder in (calving_lines, withdrawal_lines, vaccination_lines, feed_forecast_lines, spending_alert_lines):
         try:
             lines += builder(farm, today)
         except Exception:

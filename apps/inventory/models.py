@@ -19,6 +19,8 @@ class InventoryItem(models.Model):
     quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit = models.CharField(max_length=20)
     low_stock_threshold = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Dori uchun: davolashdan keyin sut va go'shtni necha kun sotib bo'lmaydi (0 = cheklov yo'q)
+    withdrawal_days = models.PositiveSmallIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -76,4 +78,3 @@ class InventoryTransaction(models.Model):
 
     def __str__(self):
         return f"{self.get_transaction_type_display()} - {self.quantity} ({self.inventory_item.item_name})"
-    

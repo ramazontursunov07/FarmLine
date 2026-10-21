@@ -342,7 +342,11 @@ function AnimalCard() {
     };
 
     const handleSold = async () => {
-        if (!window.confirm(`№${animal.tag_number} sotildi deb belgilaysizmi?`)) return;
+        const wd = animal.withdrawal;
+        const warning = wd
+            ? `⛔ DIQQAT: bu hayvon ${wd.medicine} bilan davolangan, go'shtini ${wd.until ? `${formatDate(wd.until)} gacha` : 'davolash tugagach yana bir necha kun'} sotib bo'lmaydi!\n\n`
+            : '';
+        if (!window.confirm(`${warning}№${animal.tag_number} sotildi deb belgilaysizmi?`)) return;
         try {
             await api.patch(`animals-card/${animalId}/`, { status: 'sotilgan' });
             reload();
@@ -617,6 +621,18 @@ function AnimalCard() {
                             </form>
                         )}
                         {notice && <p className="workers-hint" role="status">{notice}</p>}
+
+                        {animal.withdrawal && (
+                            <div className="withdrawal-box" role="alert">
+                                <strong>⛔ Sut va go'shtni sotmang</strong>
+                                <span>
+                                    {animal.withdrawal.medicine} bilan davolangan.{' '}
+                                    {animal.withdrawal.until
+                                        ? `${formatDate(animal.withdrawal.until)} gacha (${animal.withdrawal.days_left} kun qoldi) sotib bo'lmaydi.`
+                                        : "Davolash tugamagan: tugagach ham ushlab turish muddati o'tishi kerak."}
+                                </span>
+                            </div>
+                        )}
 
                         <div className="animal-stats">
                             <div className="animal-stat">

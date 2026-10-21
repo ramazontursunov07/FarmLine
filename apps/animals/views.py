@@ -20,6 +20,7 @@ from apps.users.permissions import IsAppAdmin, is_app_admin
 from .models import (COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, MilkSale,
                      WeightRecord)
 from .permissions import IsFarmOwnerOrWorker
+from .withdrawal import active_withdrawals, withheld_liters
 from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer,
                           AnimalSerializer, WeightRecordSerializer, MilkRecordSerializer, MilkSaleSerializer)
 
@@ -148,7 +149,9 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
         event_type = serializer.validated_data['event_type']
         if event_type not in COUNT_EVENT_TYPES:
-            serializer.save(recorded_by=user)
+            event = serializer.save(recorded_by=user)
+            if event.event_type == 'davolash' and event.withdrawal_days:
+                self._notify_withdrawal(event, group, user)
             return
 
         # O'lim/tug'ilish: guruh soni avtomatik yangilanadi (sotuvdagi kabi, qulflab)
@@ -209,6 +212,23 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 lines.append("Kartochkalar: " + ", ".join(f"№{c.tag_number}" for c in cards))
             lines.append(f"Guruhda endi: {group_count} ta")
         lines.append(f"Sana: {event.start_date:%d.%m.%Y}")
+        lines.append(f"Kim: {display_name(user)}")
+        notify_users([group.farm.owner], "\n".join(lines))
+
+    @staticmethod
+    def _notify_withdrawal(event, group, user):
+        """Davolash yozildi va dorida ushlab turish muddati bor: egasiga "sut/go'shtni sotmang" deb xabar."""
+        kind = group.animal_type.name + (f" ({group.breed})" if group.breed else '')
+        animal = event.animal
+        target = f"№{animal.tag_number}" + (f" · {animal.name}" if animal and animal.name else '') if animal else kind
+        lines = [f"💊 Davolash yozildi ({group.farm.name})", f"Hayvon: {target}"]
+        if event.medicine_id:
+            lines.append(f"Dori: {event.medicine.item_name}")
+        if event.end_date:
+            until = event.end_date + timedelta(days=event.withdrawal_days)
+            lines.append(f"⛔ Sut va go'shtni {until:%d.%m.%Y} gacha sotmang ({event.withdrawal_days} kun)")
+        else:
+            lines.append(f"⛔ Davolash tugagach yana {event.withdrawal_days} kun sut va go'shtni sotmang")
         lines.append(f"Kim: {display_name(user)}")
         notify_users([group.farm.owner], "\n".join(lines))
 
@@ -636,12 +656,22 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         if farm is None:
             raise PermissionDenied("Siz bu fermani ko'ra olmaysiz.")
         produced, sold = milk_balance(farm.pk)
+        today = timezone.localdate()
+        withheld = withheld_liters(farm.pk, today)
+        available = max(produced - sold, Decimal('0'))
         from apps.finance.views import finance_farms
         return Response({
             'farm': farm.pk,
             'produced': one_decimal(produced),
             'sold': one_decimal(sold),
-            'available': one_decimal(max(produced - sold, Decimal('0'))),
+            'available': one_decimal(available),
+            # Ushlab turish muddatidagi (dori ta'siri bor) sut: ombordagi sutning shu qismini sotib bo'lmaydi
+            'withheld': one_decimal(min(withheld, available)),
+            'sellable': one_decimal(max(available - withheld, Decimal('0'))),
+            'withdrawals': [{
+                'animal': r['animal'].pk, 'tag_number': r['animal'].tag_number, 'name': r['animal'].name,
+                'until': r['until'], 'days_left': r['days_left'], 'medicine': r['medicine'],
+            } for r in active_withdrawals(farm.pk, today)],
             'can_sell': finance_farms(user).filter(pk=farm.pk).exists(),
         })
 
@@ -659,6 +689,15 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             if liters > available:
                 raise ValidationError({'liters': (
                     f"Omborda faqat {one_decimal(max(available, Decimal('0')))} litr sut bor")})
+            withheld = min(withheld_liters(farm.pk, serializer.validated_data['date']), max(available, Decimal('0')))
+            sellable = available - withheld
+            confirmed = str(self.request.data.get('confirm_withheld', '')).lower() in ('1', 'true')
+            if liters > sellable and not confirmed:
+                raise ValidationError({'liters': (
+                    f"Diqqat: {one_decimal(withheld)} litr sut dori ushlab turish muddatida (antibiotik bilan "
+                    f"davolangan sigirlardan), uni sotib bo'lmaydi. Sotsa bo'ladigan sut: "
+                    f"{one_decimal(max(sellable, Decimal('0')))} litr."),
+                    'code': 'withheld_milk'})
             note = serializer.validated_data.get('note', '')
             description = f"Sut sotildi: {one_decimal(liters)} l × {money(price)} so'm"
             if note:

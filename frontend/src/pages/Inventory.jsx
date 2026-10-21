@@ -19,7 +19,7 @@ function formatDate(iso) {
     return `${d}.${m}.${y}`;
 }
 
-const EMPTY_ITEM = { item_name: '', item_type: 'ozuqa', unit: 'kg', quantity: '0', low_stock_threshold: '0', initial_amount: '' };
+const EMPTY_ITEM = { item_name: '', item_type: 'ozuqa', unit: 'kg', quantity: '0', low_stock_threshold: '0', withdrawal_days: '0', initial_amount: '' };
 const makeTx = () => ({ inventory_item: '', transaction_type: 'sarf', quantity: '', date: today(), note: '', amount: '' });
 const EMPTY_FILTERS = { inventory_item: '', transaction_type: '' };
 
@@ -108,6 +108,7 @@ function Inventory() {
             const payload = { ...itemForm, farm: Number(farmId) };
             // Narx faqat boshlang'ich miqdor bo'lganda yuboriladi
             if (!hasStock || payload.initial_amount === '') delete payload.initial_amount;
+            payload.withdrawal_days = payload.item_type === 'dori' ? Number(payload.withdrawal_days) || 0 : 0;
             await api.post('inventory-item/', payload);
             setItemForm(EMPTY_ITEM);
             reload();
@@ -158,6 +159,25 @@ function Inventory() {
         }
         try {
             await api.patch(`inventory-item/${item.id}/`, { low_stock_threshold: n });
+            reload();
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+        }
+    };
+
+    const handleWithdrawal = async (item) => {
+        const value = window.prompt(
+            `"${item.item_name}" bilan davolangan hayvonning sutini va go'shtini necha kun sotib bo'lmaydi? (0 = cheklov yo'q)`,
+            item.withdrawal_days
+        );
+        if (value === null) return;
+        const n = Number(value);
+        if (value.trim() === '' || !Number.isInteger(n) || n < 0 || n > 365) {
+            window.alert("Iltimos, 0 dan 365 gacha butun son kiriting");
+            return;
+        }
+        try {
+            await api.patch(`inventory-item/${item.id}/`, { withdrawal_days: n });
             reload();
         } catch (err) {
             window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
@@ -239,6 +259,9 @@ function Inventory() {
                                                 {item.item_name}
                                                 <span className="work-badge">{item.item_type_display}</span>
                                                 {item.is_low_stock && <span className="work-badge work-badge--shoshilinch">Kam qoldi</span>}
+                                                {item.item_type === 'dori' && item.withdrawal_days > 0 && (
+                                                    <span className="work-badge work-badge--shoshilinch">Ushlab turish: {item.withdrawal_days} kun</span>
+                                                )}
                                             </span>
                                             <span className="stock-amount">{qty(item.quantity)} {item.unit}</span>
                                             <span className="work-meta">
@@ -253,6 +276,11 @@ function Inventory() {
                                                     <button type="button" className="farm-item-action" onClick={() => handleThreshold(item)}>
                                                         Chegara
                                                     </button>
+                                                    {item.item_type === 'dori' && (
+                                                        <button type="button" className="farm-item-action" onClick={() => handleWithdrawal(item)}>
+                                                            Muddat
+                                                        </button>
+                                                    )}
                                                     <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteItem(item)}>
                                                         O'chirish
                                                     </button>
@@ -360,6 +388,17 @@ function Inventory() {
                                             <input type="number" name="low_stock_threshold" min="0" step="0.01"
                                                 value={itemForm.low_stock_threshold} onChange={handleItemChange} required />
                                         </div>
+                                        {itemForm.item_type === 'dori' && (
+                                            <div className="form-field">
+                                                <label>Ushlab turish muddati (kun)</label>
+                                                <input type="number" name="withdrawal_days" min="0" max="365" step="1"
+                                                    value={itemForm.withdrawal_days} onChange={handleItemChange} />
+                                                <p className="workers-hint">
+                                                    Shu dori bilan davolangan sigirning sutini va go'shtini necha kun sotib bo'lmaydi
+                                                    (dori qutisida yozilgan). Antibiotikda odatda 3–7 kun. Bilmasangiz, 0 qoldiring.
+                                                </p>
+                                            </div>
+                                        )}
                                         {farm.can_view_finance && Number(itemForm.quantity) > 0 && (
                                             <div className="form-field">
                                                 <label>Jami narxi, so'm</label>

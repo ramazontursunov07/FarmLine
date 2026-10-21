@@ -876,6 +876,22 @@
     color: var(--color-primary);
     border-color: var(--color-primary);
 }
+.withdrawal-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 12px 0;
+    padding: 12px 14px;
+    border: 1px solid var(--color-error);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--color-error) 8%, transparent);
+    color: var(--color-error);
+    font-size: 14px;
+}
+.withdrawal-box ul {
+    margin: 0;
+    padding-left: 18px;
+}
 .work-badge--muhim {
     border-color: var(--color-accent);
 }

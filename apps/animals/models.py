@@ -90,6 +90,10 @@ class AnimalEvent(models.Model):  # ishlar
     end_date = models.DateField(null=True, blank=True)
     # Nechta hayvonga tegishli. O'lim/tug'ilishda majburiy va guruh sonini o'zgartiradi
     animal_count = models.PositiveIntegerField(null=True, blank=True)
+    # Davolashda ishlatilgan dori (ombordan) va "ushlab turish" muddati: shuncha kun sut/go'sht sotib bo'lmaydi
+    medicine = models.ForeignKey(
+        'inventory.InventoryItem', on_delete=models.SET_NULL, null=True, blank=True, related_name='treatments')
+    withdrawal_days = models.PositiveSmallIntegerField(default=0)
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

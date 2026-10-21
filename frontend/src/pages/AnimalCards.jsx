@@ -439,6 +439,11 @@ function AnimalCards() {
                                                 </Link>
                                                 {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
                                                 {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
+                                                {a.withdrawal && (
+                                                    <span className="work-badge work-badge--shoshilinch">
+                                                        {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}
+                                                    </span>
+                                                )}
                                             </span>
                                             <span className="work-meta">
                                                 {a.group_label} · {SEXES[a.sex] || a.sex}

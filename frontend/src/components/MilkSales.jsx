@@ -43,8 +43,7 @@ function MilkSales({ farmId, refreshKey }) {
 
     const total = (Number(form.liters) || 0) * (Number(form.price_per_liter) || 0);
 
-    const handleSell = async (e) => {
-        e.preventDefault();
+    const sell = async (confirmWithheld) => {
         setSaving(true);
         setFormError('');
         try {
@@ -54,14 +53,31 @@ function MilkSales({ farmId, refreshKey }) {
                 liters: form.liters,
                 price_per_liter: form.price_per_liter,
                 note: form.note.trim(),
+                ...(confirmWithheld ? { confirm_withheld: true } : {}),
             });
             setForm({ ...form, liters: '', note: '' });
             setVersion((v) => v + 1);
         } catch (err) {
-            setFormError(getErrorMessage(err, "Sutni sotib bo'lmadi (internet bormi?)"));
+            const message = getErrorMessage(err, "Sutni sotib bo'lmadi (internet bormi?)");
+            // Dori ushlab turish muddatidagi sut: ogohlantiramiz, fermer o'zi qaror qiladi
+            if (!confirmWithheld && message.includes('ushlab turish')) {
+                setSaving(false);
+                if (window.confirm(`${message}\n\nAntibiotikli sut odamni kasal qilishi yoki sutni qaytarishga olib kelishi mumkin. Baribir sotasizmi?`)) {
+                    await sell(true);
+                } else {
+                    setFormError(message);
+                }
+                return;
+            }
+            setFormError(message);
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSell = (e) => {
+        e.preventDefault();
+        sell(false);
     };
 
     // Ro'yxatdan o'chirish: faqat yozuv yo'qoladi, balans va sotilgan sut hisobi o'zgarmaydi
@@ -114,6 +130,24 @@ function MilkSales({ farmId, refreshKey }) {
                     <span className="stat-label">Omborda qolgan</span>
                 </div>
             </div>
+
+            {stock.withdrawals?.length > 0 && (
+                <div className="withdrawal-box" role="alert">
+                    <strong>⛔ Dori ushlab turish muddati: {stock.withdrawals.length} ta sigir</strong>
+                    <span>
+                        Bu sigirlarning sutini va go'shtini hozircha sotmang.
+                        {Number(stock.withheld) > 0 && ` Ombordagi ${num(stock.withheld)} l sut sotuvga yaroqsiz, sotsa bo'ladigani: ${num(stock.sellable)} l.`}
+                    </span>
+                    <ul>
+                        {stock.withdrawals.map((w) => (
+                            <li key={w.animal}>
+                                №{w.tag_number}{w.name ? ` ${w.name}` : ''} — {w.medicine}:{' '}
+                                {w.until ? `${formatDate(w.until)} gacha (${w.days_left} kun qoldi)` : 'davolash davom etmoqda'}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
 
             {stock.can_sell && (
                 <div className="work-card">

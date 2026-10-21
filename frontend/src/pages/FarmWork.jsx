@@ -60,6 +60,8 @@ const makeEventForm = () => ({
     description: '',
     start_date: today(),
     status: 'davom_etmoqda',
+    medicine: '',
+    withdrawal_days: '',
 });
 
 const EMPTY_GROUP_FORM = { animal_type_name: '', breed: '' };
@@ -85,6 +87,7 @@ function FarmWork() {
 
     const [eventForm, setEventForm] = useState(makeEventForm);
     const [animals, setAnimals] = useState([]);
+    const [medicines, setMedicines] = useState([]);
     const [calves, setCalves] = useState([]);
     const [withCards, setWithCards] = useState(true);
     const [eventNotice, setEventNotice] = useState('');
@@ -107,14 +110,16 @@ function FarmWork() {
             api.get('animals-event/', { params: { farm: farmId } }),
             api.get('animals-type/'),
             api.get('animals-card/', { params: { farm: farmId } }).catch(() => ({ data: [] })),
+            api.get('inventory-item/', { params: { farm: farmId } }).catch(() => ({ data: [] })),
         ])
-            .then(([farmRes, groupsRes, eventsRes, typesRes, animalsRes]) => {
+            .then(([farmRes, groupsRes, eventsRes, typesRes, animalsRes, inventoryRes]) => {
                 if (cancelled) return;
                 setFarm(farmRes.data);
                 setGroups(asList(groupsRes.data));
                 setEvents(asList(eventsRes.data));
                 setTypes(asList(typesRes.data));
                 setAnimals(asList(animalsRes.data));
+                setMedicines(asList(inventoryRes.data).filter((i) => i.item_type === 'dori'));
                 setError('');
             })
             .catch((err) => {
@@ -191,6 +196,10 @@ function FarmWork() {
             ...eventForm,
             [name]: value,
             ...(name === 'animal_group' ? { mother: '', animal_tag: '' } : {}),
+            // Dori tanlansa, uning odatdagi ushlab turish muddati o'zi yoziladi
+            ...(name === 'medicine'
+                ? { withdrawal_days: String(medicines.find((m) => String(m.id) === value)?.withdrawal_days || '') }
+                : {}),
         });
     };
 
@@ -211,6 +220,8 @@ function FarmWork() {
             ...fields,
             animal_group: Number(selectedGroup),
             animal_count: eventForm.animal_count ? Number(eventForm.animal_count) : null,
+            medicine: eventForm.event_type === 'davolash' && fields.medicine ? Number(fields.medicine) : null,
+            withdrawal_days: eventForm.event_type === 'davolash' ? Number(fields.withdrawal_days) || 0 : 0,
         };
         if (needsAnimal) {
             if (tagTyped && !pickedAnimal) {
@@ -360,7 +371,15 @@ function FarmWork() {
                     <span className="work-badge">
                         {ev.event_type_display}{ev.animal_count ? `: ${ev.animal_count} ta` : ''}
                     </span>
+                    {ev.withdrawal_days > 0 && (
+                        <span className="work-badge work-badge--shoshilinch">
+                            {ev.withdrawal_until
+                                ? `Sut/go'sht ${formatDate(ev.withdrawal_until)} gacha sotilmaydi`
+                                : `Ushlab turish: tugagach +${ev.withdrawal_days} kun`}
+                        </span>
+                    )}
                 </span>
+                {ev.medicine_name && <span className="work-meta">Dori: {ev.medicine_name}</span>}
                 <span className="work-meta">
                     {ev.animal_group_label}{ev.animal_tag ? ` · №${ev.animal_tag}` : ''} · {ev.animal_group_count} ta · {formatDate(ev.start_date)}
                     {ev.status !== 'yakunlangan' && ` · ${ev.days_since_start} kun`}
@@ -576,6 +595,30 @@ function FarmWork() {
                                                 : 'Masalan: 10 ta tovuq antibiotik bilan davolanyapti'}
                                             required={!isBirth && !pickedAnimal} />
                                     </div>
+                                    {eventForm.event_type === 'davolash' && (
+                                        <div className="form-row">
+                                            <div className="form-field">
+                                                <label>Qaysi dori (ixtiyoriy)</label>
+                                                <select name="medicine" value={eventForm.medicine} onChange={handleEventChange}>
+                                                    <option value="">— Tanlanmagan —</option>
+                                                    {medicines.map((m) => (
+                                                        <option key={m.id} value={m.id}>
+                                                            {m.item_name}{m.withdrawal_days > 0 ? ` (${m.withdrawal_days} kun)` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Ushlab turish (kun)</label>
+                                                <input type="number" name="withdrawal_days" min="0" max="365" step="1"
+                                                    value={eventForm.withdrawal_days} onChange={handleEventChange} placeholder="0" />
+                                            </div>
+                                            <p className="workers-hint">
+                                                Davolashdan keyin shuncha kun sut va go'shtni sotib bo'lmaydi.
+                                                Tizim sotishda ogohlantiradi va Telegramga xabar yuboradi.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>
                                         <input type="text" name="description" value={eventForm.description} onChange={handleEventChange} />

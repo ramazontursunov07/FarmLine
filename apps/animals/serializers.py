@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
+from .withdrawal import withdrawal_map
 from .models import (COUNT_EVENT_TYPES, Animal, AnimalType, AnimalGroup, AnimalEvent, MilkRecord, MilkSale,
                      WeightRecord)
 
@@ -51,6 +52,8 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     calves = CalfInputSerializer(many=True, write_only=True, required=False)
     calves_created = serializers.SerializerMethodField()
     newborn_cards = serializers.SerializerMethodField()
+    medicine_name = serializers.CharField(source='medicine.item_name', read_only=True, default=None)
+    withdrawal_until = serializers.SerializerMethodField()
 
     class Meta:
         model = AnimalEvent
@@ -58,6 +61,7 @@ class AnimalEventSerializer(serializers.ModelSerializer):
                   'animal', 'animal_tag', 'calves', 'calves_created', 'newborn_cards',
                   'event_type', 'event_type_display', 'animal_count', 'title', 'description',
                   'status', 'status_display', 'start_date', 'end_date',
+                  'medicine', 'medicine_name', 'withdrawal_days', 'withdrawal_until',
                   'recorded_by', 'recorded_by_username', 'recorded_by_name',
                   'days_since_start', 'created_at', 'updated_at']
         read_only_fields = ['recorded_by', 'created_at', 'updated_at']
@@ -75,6 +79,12 @@ class AnimalEventSerializer(serializers.ModelSerializer):
     def get_calves_created(self, obj):
         # View tug'ilishda ochilgan kartochkalarni `_calves_created` ga qo'yadi; boshqa yozuvlarda bo'sh
         return [{'id': a.id, 'tag_number': a.tag_number} for a in getattr(obj, '_calves_created', [])]
+
+    def get_withdrawal_until(self, obj):
+        """Sut/go'sht sotib bo'lmaydigan oxirgi kun (davolash tugamagan bo'lsa None)."""
+        if obj.event_type != 'davolash' or not obj.withdrawal_days or not obj.end_date:
+            return None
+        return obj.end_date + timedelta(days=obj.withdrawal_days)
 
     def get_newborn_cards(self, obj):
         """Shu tug'ilish bilan birga ochilgan va hali faol buzoq kartochkalari soni."""
@@ -122,6 +132,22 @@ class AnimalEventSerializer(serializers.ModelSerializer):
             group_for_animal = attrs.get('animal_group', getattr(self.instance, 'animal_group', None))
             if group_for_animal and animal.group_id != group_for_animal.id:
                 raise serializers.ValidationError({'animal': "Bu hayvon tanlangan guruhga tegishli emas"})
+
+        # Dori va ushlab turish muddati faqat davolash uchun
+        event_type_now = attrs.get('event_type', getattr(self.instance, 'event_type', None))
+        medicine = attrs.get('medicine')
+        group_now = attrs.get('animal_group', getattr(self.instance, 'animal_group', None))
+        if event_type_now != 'davolash':
+            attrs['medicine'] = None
+            attrs['withdrawal_days'] = 0
+        else:
+            if medicine is not None:
+                if group_now and medicine.farm_id != group_now.farm_id:
+                    raise serializers.ValidationError({'medicine': "Bu dori boshqa fermaniki"})
+                if medicine.item_type != 'dori':
+                    raise serializers.ValidationError({'medicine': "Faqat ombordagi dori-darmonni tanlash mumkin"})
+                if 'withdrawal_days' not in attrs:
+                    attrs['withdrawal_days'] = medicine.withdrawal_days  # dorining odatdagi muddati
 
         if self.instance is None:
             event_type = attrs.get('event_type')
@@ -192,14 +218,29 @@ class AnimalSerializer(serializers.ModelSerializer):
     last_calving_date = serializers.SerializerMethodField()
     is_pregnant = serializers.SerializerMethodField()
     days_to_calving = serializers.SerializerMethodField()
+    withdrawal = serializers.SerializerMethodField()
 
     class Meta:
         model = Animal
         fields = ['id', 'farm', 'group', 'group_label', 'tag_number', 'name', 'sex', 'sex_display',
                   'birth_date', 'mother', 'mother_tag', 'status', 'status_display', 'notes',
                   'pregnant_since', 'due_date', 'is_pregnant', 'days_to_calving',
+                  'withdrawal',
                   'last_weight', 'last_weight_date', 'last_calving_date', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_withdrawal(self, obj):
+        """Davolashdan keyingi ushlab turish: sut va go'shtni sotib bo'lmaydi (yo'q bo'lsa None)."""
+        if obj.status != 'faol':
+            return None
+        cache = self.context.setdefault('_withdrawals', {})
+        if obj.farm_id not in cache:
+            cache[obj.farm_id] = withdrawal_map(obj.farm_id, timezone.localdate())
+        row = cache[obj.farm_id].get(obj.pk)
+        if row is None:
+            return None
+        return {'until': row['until'], 'ongoing': row['until'] is None,
+                'days_left': row['days_left'], 'medicine': row['medicine']}
 
     def get_group_label(self, obj):
         group = obj.group
