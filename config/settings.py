@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'apps.animals',
     'apps.farms',
     'apps.finance',
+    'apps.debts',
     'apps.inventory',
     'apps.tasks',
     'apps.users',

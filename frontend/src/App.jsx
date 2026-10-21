@@ -5,6 +5,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
+import Debts from './pages/Debts';
 import FarmWork from './pages/FarmWork';
 import AnimalCards from './pages/AnimalCards';
 import AnimalCard from './pages/AnimalCard';
@@ -97,6 +98,15 @@ function App() {
                 element={
                     <PrivateRoute>
                         <Finance />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/debts"
+                element={
+                    <PrivateRoute>
+                        <Debts />
                     </PrivateRoute>
                 }
             />

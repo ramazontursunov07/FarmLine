@@ -52,7 +52,7 @@ function FarmRow({ to, icon, title, status, alert, onClick, expanded }) {
     );
 }
 
-function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, onDeleted }) {
+function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpdated, onDeleted }) {
     const [editing, setEditing] = useState(false);
     const [showWorkers, setShowWorkers] = useState(false);
     const [formData, setFormData] = useState({
@@ -141,6 +141,11 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
         ? `${tasks.overdue} ta muddati o'tgan`
         : tasks.open > 0 ? `${tasks.open} ta ochiq` : "Ochiq vazifa yo'q";
     const stockStatus = lowStock > 0 ? `${lowStock} ta kam qolgan` : 'Zaxira yetarli';
+    const debtStatus = !showFinance
+        ? "Ko'rishga ruxsat yo'q"
+        : debts.overdue_count > 0
+            ? `${debts.overdue_count} ta muddati o'tgan`
+            : 'Kim qancha qarz';
 
     return (
         <li className="db-farm">
@@ -184,6 +189,13 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, onUpdated, on
                     icon={showFinance ? 'money' : 'lock'}
                     title="Kirim-chiqim"
                     status={showFinance ? 'Hisob-kitob' : "Ko'rishga ruxsat yo'q"}
+                />
+                <FarmRow
+                    to={showFinance ? `/farms/${farm.id}/debts` : null}
+                    icon={showFinance ? 'debt' : 'lock'}
+                    title="Qarzlar"
+                    status={debtStatus}
+                    alert={showFinance && debts.overdue_count > 0}
                 />
                 {canManage && (
                     <>
@@ -239,7 +251,7 @@ function NewFarm({ onCreated, first }) {
     );
 }
 
-function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdated, onDeleted, extra }) {
+function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, debtCounts, onUpdated, onDeleted, extra }) {
     return (
         <ul className="db-farms">
             {farms.map((farm) => (
@@ -250,6 +262,7 @@ function FarmList({ farms, currentUsername, taskCounts, lowStockCounts, onUpdate
                     canManage={farm.owner_username === currentUsername}
                     tasks={taskCounts[farm.id] || { open: 0, overdue: 0 }}
                     lowStock={lowStockCounts[farm.id] || 0}
+                    debts={debtCounts[farm.id] || { overdue_count: 0 }}
                     onUpdated={onUpdated}
                     onDeleted={onDeleted}
                 />
@@ -265,6 +278,7 @@ function Dashboard() {
     const [farms, setFarms] = useState([]);
     const [taskCounts, setTaskCounts] = useState({});
     const [lowStockCounts, setLowStockCounts] = useState({});
+    const [debtCounts, setDebtCounts] = useState({});
     const [dataVersion, setDataVersion] = useState(0); // AI amal bajargach oshadi: raqamlar qayta yuklanadi
     const isAdmin = user.role === 'admin';
     const [loading, setLoading] = useState(!isAdmin);
@@ -330,6 +344,25 @@ function Dashboard() {
         };
     }, [isAdmin, dataVersion]);
 
+    // Muddati o'tgan qarzlar soni (moliya huquqi bor fermalar uchun)
+    useEffect(() => {
+        if (isAdmin) return;
+        let cancelled = false;
+        api.get('debt/overview/')
+            .then(({ data }) => {
+                if (cancelled) return;
+                const counts = {};
+                (Array.isArray(data) ? data : []).forEach((r) => {
+                    counts[r.farm] = r;
+                });
+                setDebtCounts(counts);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [isAdmin, dataVersion]);
+
     const handleRetry = () => {
         setLoading(true);
         fetchFarms();
@@ -368,6 +401,7 @@ function Dashboard() {
                 currentUsername={user.username}
                 taskCounts={taskCounts}
                 lowStockCounts={lowStockCounts}
+                debtCounts={debtCounts}
                 onUpdated={handleFarmUpdated}
                 onDeleted={handleFarmDeleted}
                 extra={user.role === 'fermer' ? <NewFarm onCreated={handleFarmCreated} first={farms.length === 0} /> : null}

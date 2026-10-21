@@ -6,6 +6,7 @@ Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 3. Vaksinatsiya eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan vaksinatsiyalar
 4. Tug'ish eslatmasi -- tug'ishi yaqin yoki muddati o'tib ketgan bug'oz hayvonlar
 5. Dori ushlab turish muddati -- davolangan hayvonlarning sutini/go'shtini hali sotib bo'lmaydi
+6. Qarz eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan nasiyalar (mijozlar va yetkazib beruvchilar)
 
 Har bir funksiya matn qatorlari ro'yxatini qaytaradi (ogohlantirish bo'lmasa -- bo'sh ro'yxat).
 Chegaralarni shu fayl tepasidagi sozlamalardan o'zgartirish mumkin.
@@ -45,6 +46,9 @@ VACCINE_OVERDUE_DAYS = 7   # muddati o'tganlarni necha kungacha eslatamiz
 CALVING_DAYS_AHEAD = 14     # tug'ishga necha kun qolganda eslatma boshlanadi
 CALVING_URGENT_DAYS = 3     # shu kundan kam qolsa, xabar "shoshilinch" belgisi (🚨) bilan chiqadi
 CALVING_OVERDUE_DAYS = 21   # muddati o'tib ketganlarni necha kungacha eslatamiz
+
+# Qarz eslatmasi: muddatiga shuncha kun qolganda boshlanadi, to'langunча har kuni eslatiladi
+DEBT_DAYS_AHEAD = 3
 
 
 def _money(value):
@@ -245,13 +249,45 @@ def withdrawal_lines(farm, today):
     return lines + _more(len(rows))
 
 
+def debt_lines(farm, today):
+    """
+    Muddati yaqinlashgan yoki o'tib ketgan qarzlar: mijozlardan olinadigan va yetkazib beruvchilarga beriladigan.
+    Qarz to'liq to'langach eslatma o'zi to'xtaydi. Mijoz bo'yicha jamlanadi: bir odamning bir necha qarzi bitta qator.
+    """
+    from apps.debts import stats
+
+    horizon = today + timedelta(days=DEBT_DAYS_AHEAD)
+    groups = {'mijoz': {}, 'taminotchi': {}}
+    for d in stats.debts_with_paid(farm_id=farm.pk):
+        left = stats.remaining(d)
+        if left <= 0 or d.due_date is None or d.due_date > horizon:
+            continue
+        row = groups[d.party.kind].setdefault(d.party_id, {'name': d.party.name, 'left': Decimal('0'), 'due': d.due_date})
+        row['left'] += left
+        row['due'] = min(row['due'], d.due_date)  # eng erta muddat
+
+    lines = []
+    for kind, title in (('mijoz', "💳 Mijozlardan to'lov kutilmoqda"),
+                        ('taminotchi', "💸 Yetkazib beruvchilarga to'lash kerak")):
+        rows = sorted(groups[kind].values(), key=lambda r: (r['due'], r['name']))
+        if not rows:
+            continue
+        total = sum((r['left'] for r in rows), Decimal('0'))
+        lines.append(f"{title}: {len(rows)} ta, jami {_money(total)} so'm")
+        for r in rows[:MAX_ITEMS]:
+            lines.append(f"  • {r['name']} — {_money(r['left'])} so'm, {_when(r['due'], today)}")
+        lines += _more(len(rows))
+    return lines
+
+
 def build_alert_lines(farm, today):
     """
     Fermaning barcha aqlli ogohlantirishlari. Birortasida xato chiqsa ham, kunlik hisobot
     to'xtab qolmasligi uchun xato log'ga yoziladi va qolganlari davom etadi.
     """
     lines = []
-    for builder in (calving_lines, withdrawal_lines, vaccination_lines, feed_forecast_lines, spending_alert_lines):
+    for builder in (calving_lines, debt_lines, withdrawal_lines, vaccination_lines, feed_forecast_lines,
+                    spending_alert_lines):
         try:
             lines += builder(farm, today)
         except Exception:
