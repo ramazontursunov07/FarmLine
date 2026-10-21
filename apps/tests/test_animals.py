@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 from decimal import Decimal
 
 from django.utils import timezone
@@ -721,3 +722,45 @@ class DeleteBirthWithCalvesTests(AnimalCardBase):
         r = self.client.patch(f'{EVENTS}{event_id}/', {'title': 'Yangi', 'description': 'Izoh'}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.json()['title'], 'Yangi')
+
+
+class TelegramNotifyTests(AnimalCardBase):
+    def post_event(self, **extra):
+        data = {'animal_group': self.group.pk, 'start_date': str(self.today), 'title': 'Yozuv'}
+        data.update(extra)
+        return self.client.post(EVENTS, data, format='json')
+
+    def test_death_notifies_owner_even_when_owner_records(self):
+        cow = self.make_animal('77', name='Oqtosh')
+        with patch('apps.animals.views.notify_users') as notify:
+            r = self.post_event(event_type='olim', animal=cow.pk, animal_count=1)
+        self.assertEqual(r.status_code, 201, r.content)
+        notify.assert_called_once()
+        users, text = notify.call_args.args
+        self.assertEqual(users, [self.owner])
+        self.assertIn("O'lim", text)
+        self.assertIn('№77', text)
+        self.assertIn('Guruhda qoldi: 2 ta', text)
+
+    def test_birth_notifies_with_cards(self):
+        with patch('apps.animals.views.notify_users') as notify:
+            r = self.post_event(event_type='tugilish', animal_count=2,
+                                calves=[{'tag_number': '21'}, {'tag_number': '22'}])
+        self.assertEqual(r.status_code, 201, r.content)
+        notify.assert_called_once()
+        text = notify.call_args.args[1]
+        self.assertIn("Tug'ilish", text)
+        self.assertIn('№21', text)
+        self.assertIn('Guruhda endi: 5 ta', text)
+
+    def test_worker_death_also_notifies_owner(self):
+        self.client.force_authenticate(self.worker)
+        with patch('apps.animals.views.notify_users') as notify:
+            r = self.post_event(event_type='olim', animal_count=1)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertIn('Kim: ishchi', notify.call_args.args[1])
+
+    def test_other_events_do_not_notify(self):
+        with patch('apps.animals.views.notify_users') as notify:
+            self.post_event(event_type='kasallik', title='Mastit')
+        notify.assert_not_called()

@@ -188,13 +188,29 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 Animal.objects.filter(pk=serializer.validated_data['animal'].pk).update(
                     pregnant_since=None, due_date=None)
 
-            if event_type == 'olim' and user.id != group.farm.owner_id:
-                notify_users([group.farm.owner], (
-                    f"⚠️ O'lim yozildi ({group.farm.name}):\n"
-                    f"{group.animal_type.name}: {count} ta\n"
-                    f"Guruhda qoldi: {locked.count} ta\n"
-                    f"Kim: {display_name(user)}"
-                ))
+            # Ferma egasiga Telegramda xabar: o'lim va tug'ilish haqida (kim yozganidan qat'i nazar)
+            self._notify_owner(event, group, locked.count, count, user,
+                               animal=serializer.validated_data.get('animal'))
+
+    @staticmethod
+    def _notify_owner(event, group, group_count, count, user, animal=None):
+        kind = group.animal_type.name + (f" ({group.breed})" if group.breed else '')
+        who = f"№{animal.tag_number}" + (f" · {animal.name}" if animal.name else '') if animal else ''
+        lines = []
+        if event.event_type == 'olim':
+            lines.append(f"⚠️ O'lim yozildi ({group.farm.name})")
+            lines.append(f"{kind}: {count} ta" + (f" ({who})" if who else ''))
+            lines.append(f"Guruhda qoldi: {group_count} ta")
+        else:
+            lines.append(f"🐄 Tug'ilish yozildi ({group.farm.name})")
+            lines.append(f"{kind}: {count} ta tug'ildi" + (f" (ona: {who})" if who else ''))
+            cards = getattr(event, '_calves_created', [])
+            if cards:
+                lines.append("Kartochkalar: " + ", ".join(f"№{c.tag_number}" for c in cards))
+            lines.append(f"Guruhda endi: {group_count} ta")
+        lines.append(f"Sana: {event.start_date:%d.%m.%Y}")
+        lines.append(f"Kim: {display_name(user)}")
+        notify_users([group.farm.owner], "\n".join(lines))
 
     @staticmethod
     def _create_calves(event, group, calves):
