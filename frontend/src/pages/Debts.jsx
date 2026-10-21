@@ -53,7 +53,7 @@ function Debts() {
     const [error, setError] = useState('');
     const [reloadKey, setReloadKey] = useState(0);
 
-    const [onlyOpen, setOnlyOpen] = useState(true);
+    const [onlyOpen, setOnlyOpen] = useState(false);
     const [onlyOverdue, setOnlyOverdue] = useState(false);
     const [openParty, setOpenParty] = useState(null);
 
@@ -157,6 +157,9 @@ function Debts() {
         if (ok) {
             setPartyForm({ name: '', phone: '' });
             setShowPartyForm(false);
+            // Yangi odamning hali qarzi yo'q: filtr uni yashirib qo'ymasin
+            setOnlyOpen(false);
+            setOnlyOverdue(false);
         }
     };
 
