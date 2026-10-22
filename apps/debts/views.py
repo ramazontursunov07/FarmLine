@@ -14,7 +14,7 @@ from apps.farms.models import Farm
 from apps.finance.views import finance_farms
 from apps.users.permissions import is_app_admin
 
-from . import stats
+from . import credit, stats
 from .models import Debt, DebtPayment, Party
 from .serializers import DebtSerializer, PartySerializer, PaymentSerializer
 
@@ -137,7 +137,7 @@ class DebtViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         ensure_can_write(self.request.user, instance.farm)
-        instance.delete()  # to'lovlari ham o'chadi
+        credit.delete_debt(instance)  # to'lovlari (va ularning moliyadagi yozuvlari) ham o'chadi
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -210,7 +210,10 @@ class DebtPaymentViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         ensure_can_write(self.request.user, debt.farm)
         with transaction.atomic():
             self._check_not_overpaid(debt.pk, serializer.validated_data['amount'])
-            serializer.save(recorded_by=self.request.user)
+            data = serializer.validated_data
+            # Nasiyaga sotilgan/olingan qarzda to'lov moliyada ham (kirim/chiqim) yoziladi
+            serializer.instance = credit.add_payment(
+                debt, data['amount'], data['date'], data.get('note', ''), self.request.user)
 
     def perform_update(self, serializer):
         payment = serializer.instance
@@ -218,9 +221,9 @@ class DebtPaymentViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         with transaction.atomic():
             if 'amount' in serializer.validated_data:
                 self._check_not_overpaid(payment.debt_id, serializer.validated_data['amount'], exclude_pk=payment.pk)
-            serializer.save()
+            payment = serializer.save()
+            credit.update_payment_transaction(payment)
 
     def perform_destroy(self, instance):
         ensure_can_write(self.request.user, instance.debt.farm)
-        instance.delete()
-        
+        credit.delete_payment(instance)

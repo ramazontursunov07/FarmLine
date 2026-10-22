@@ -40,6 +40,13 @@ class Debt(models.Model):
     date = models.DateField()
     due_date = models.DateField(null=True, blank=True)  # to'lash muddati (bo'sh bo'lsa muddatsiz)
     description = models.CharField(max_length=200, blank=True)  # masalan: "120 litr sut"
+    # Sotuv/xarid nasiyaga berilganda true: to'langan pul moliyada (balansda) kirim/chiqim bo'lib yoziladi
+    affects_balance = models.BooleanField(default=False)
+    balance_category = models.CharField(max_length=20, blank=True)  # to'lov yoziladigan moliya kategoriyasi
+    # Nasiyaga sotilgan hayvonlar: qarz o'chirilsa, shu son guruhga qaytariladi
+    animal_group = models.ForeignKey(
+        'animals.AnimalGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_sales')
+    animal_count = models.PositiveIntegerField(null=True, blank=True)
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_debts'
     )
@@ -60,6 +67,9 @@ class DebtPayment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField()
     note = models.CharField(max_length=200, blank=True)
+    # affects_balance qarzda: shu to'lovning moliyadagi yozuvi (balansga ta'sir qiladi)
+    finance_transaction = models.OneToOneField(
+        'finance.Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='debt_payment')
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_debt_payments'
     )
@@ -70,4 +80,3 @@ class DebtPayment(models.Model):
 
     def __str__(self):
         return f"{self.debt_id}: {self.amount} ({self.date})"
-    

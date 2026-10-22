@@ -476,12 +476,28 @@ class MilkRecordSerializer(_AnimalRecordSerializer):
 
 class MilkSaleSerializer(serializers.ModelSerializer):
     recorded_by_name = serializers.SerializerMethodField()
+    on_credit = serializers.SerializerMethodField()
+    party_name = serializers.SerializerMethodField()
+    debt_remaining = serializers.SerializerMethodField()
 
     class Meta:
         model = MilkSale
         fields = ['id', 'farm', 'date', 'liters', 'price_per_liter', 'amount', 'note',
+                  'on_credit', 'party_name', 'debt_remaining',
                   'recorded_by', 'recorded_by_name', 'created_at']
         read_only_fields = ['amount', 'recorded_by', 'created_at']
+
+    def get_on_credit(self, obj):
+        return obj.debt_id is not None
+
+    def get_party_name(self, obj):
+        return obj.debt.party.name if obj.debt_id else None
+
+    def get_debt_remaining(self, obj):
+        if not obj.debt_id:
+            return None
+        paid = sum((p.amount for p in obj.debt.payments.all()), Decimal('0'))
+        return str(obj.debt.amount - paid)
 
     def get_recorded_by_name(self, obj):
         user = obj.recorded_by

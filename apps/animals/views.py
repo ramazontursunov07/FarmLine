@@ -19,6 +19,7 @@ from apps.users.notify import display_name, notify_users
 from apps.users.permissions import IsAppAdmin, is_app_admin
 from .models import (COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, MilkSale,
                      WeightRecord)
+from apps.debts import credit
 from .permissions import IsFarmOwnerOrWorker
 from .withdrawal import active_withdrawals, withheld_liters
 from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer,
@@ -679,6 +680,7 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         liters = serializer.validated_data['liters']
         price = serializer.validated_data['price_per_liter']
         amount = (liters * price).quantize(Decimal('0.01'))
+        credit_info = credit.parse_credit(self.request.data, farm, amount, serializer.validated_data['date'])
         with transaction.atomic():
             Farm.objects.select_for_update().get(pk=farm.pk)  # bir vaqtda ikki marta sotib yubormaslik uchun
             produced, sold = milk_balance(farm.pk)
@@ -699,14 +701,22 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             description = f"Sut sotildi: {one_decimal(liters)} l × {money(price)} so'm"
             if note:
                 description += f" ({note})"
-            tx = FinanceTransaction.objects.create(
-                farm=farm, transaction_type='kirim', category='sotuv', amount=amount,
-                description=description, date=serializer.validated_data['date'], recorded_by=user)
-            sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=tx)
+            if credit_info:
+                # Nasiyaga: pul hozir balansga tushmaydi, qarz ochiladi (to'langan sari kirim bo'ladi)
+                debt = credit.open_credit(
+                    farm=farm, kind='mijoz', credit=credit_info, total=amount, date=serializer.validated_data['date'],
+                    description=f"{one_decimal(liters)} l sut", user=user, category='sotuv')
+                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=None, debt=debt)
+            else:
+                tx = FinanceTransaction.objects.create(
+                    farm=farm, transaction_type='kirim', category='sotuv', amount=amount,
+                    description=description, date=serializer.validated_data['date'], recorded_by=user)
+                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=tx)
         if user.id != farm.owner_id:
+            how = f"\nNasiyaga: {sale.debt.party.name}" if sale.debt_id else ''
             notify_users([farm.owner], (
                 f"🥛 Sut sotildi ({farm.name}):\n"
-                f"{one_decimal(sale.liters)} l × {money(sale.price_per_liter)} so'm = {money(sale.amount)} so'm\n"
+                f"{one_decimal(sale.liters)} l × {money(sale.price_per_liter)} so'm = {money(sale.amount)} so'm{how}\n"
                 f"Kim: {display_name(user)}"))
 
     def perform_destroy(self, instance):
@@ -722,7 +732,10 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         self._ensure_can_sell(sale.farm)
         with transaction.atomic():
             tx = sale.finance_transaction
+            debt = sale.debt
             sale.delete()
             if tx is not None:
                 tx.delete()
+            if debt is not None:
+                credit.delete_debt(debt)  # nasiya qarzi va u bo'yicha olingan pullar ham qaytariladi
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -6,6 +6,8 @@ import { getErrorMessage } from "../utils/errors";
 import { formatMoney, formatPeriod, today } from "../utils/format";
 import InstallButton from '../components/InstallButton';
 import ReportDownload from '../components/ReportDownload';
+import CreditFields from '../components/CreditFields';
+import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
 
 const TYPES = { kirim: "Kirim", chiqim: "Chiqim" };
 
@@ -55,6 +57,8 @@ function Finance() {
 
     const [form, setForm] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState("");
+    const [formNotice, setFormNotice] = useState("");
+    const [credit, setCredit] = useState(EMPTY_CREDIT);
     const [saving, setSaving] = useState(false);
 
     // Ferma nomini olish
@@ -155,6 +159,7 @@ function Finance() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setFormError("");
+        setFormNotice("");
         setSaving(true);
         try {
             const payload = {
@@ -169,9 +174,14 @@ function Finance() {
                 payload.animal_group = Number(form.animal_group);
                 if (form.animal_count) payload.animal_count = Number(form.animal_count);
             }
+            Object.assign(payload, creditPayload(credit));
             await api.post("finance/", payload);
             // tur va kategoriya saqlanadi, summa va izoh tozalanadi (ketma-ket kiritish qulay bo'lsin)
             setForm((prev) => ({ ...prev, amount: "", description: "", animal_group: "", animal_count: "" }));
+            if (credit.on_credit) {
+                setFormNotice("Nasiya yozildi: u \"Qarzlar\" sahifasida turadi. Pul to'langanda balansga qo'shiladi.");
+            }
+            setCredit(EMPTY_CREDIT());
             reload();
         } catch (err) {
             setFormError(getErrorMessage(err, "Saqlashda xatolik yuz berdi"));
@@ -347,12 +357,15 @@ function Finance() {
                                     Guruhda hozir {selectedGroup.count} ta bor. Saqlaganingizda sotilgan soni avtomatik ayriladi.
                                 </p>
                             )}
+                            <CreditFields farmId={farmId} kind={form.transaction_type === "kirim" ? "mijoz" : "taminotchi"}
+                                total={form.amount} value={credit} onChange={setCredit} />
                             <div className="form-field">
                                 <label htmlFor="tx-desc">Izoh (ixtiyoriy)</label>
                                 <input id="tx-desc" type="text" name="description" value={form.description}
                                     onChange={handleFormChange} />
                             </div>
                             {formError && <p className="error-text" role="alert">{formError}</p>}
+                            {formNotice && <p className="workers-hint" role="status">{formNotice}</p>}
                             <button type="submit" className="btn-primary" disabled={saving}>
                                 {saving ? "Saqlanmoqda..." : "Saqlash"}
                             </button>

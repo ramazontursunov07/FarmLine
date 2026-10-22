@@ -219,6 +219,9 @@ class MilkSale(models.Model):
     finance_transaction = models.OneToOneField(
         'finance.Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='milk_sale'
     )
+    # Nasiyaga sotilgan bo'lsa: ochilgan qarz (pul to'langan sari balansga tushadi)
+    debt = models.OneToOneField(
+        'debts.Debt', on_delete=models.SET_NULL, null=True, blank=True, related_name='milk_sale')
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recorded_milk_sales'
     )

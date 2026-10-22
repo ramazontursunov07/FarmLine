@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.mixins import IdempotentCreateMixin
+from apps.debts import credit
 from apps.farms.models import Worker
 from apps.finance.models import Transaction as FinanceTransaction
 from apps.finance.views import finance_farms
@@ -142,6 +143,11 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         qty = serializer.validated_data['quantity']
         kind = serializer.validated_data['transaction_type']
         amount = serializer.validated_data.get('amount')
+        credit_info = None
+        if credit.parse_credit_flag(self.request.data):
+            if kind != 'kirim' or not amount:
+                raise ValidationError({'amount': "Nasiyaga olish uchun kirim va jami narxni kiriting"})
+            credit_info = credit.parse_credit(self.request.data, item.farm, amount, serializer.validated_data['date'])
 
         # Narx moliyada chiqim bo'lib yoziladi, shuning uchun moliyani o'zgartirish huquqi kerak
         if amount and not finance_farms(user).filter(pk=item.farm_id).exists():
@@ -165,7 +171,13 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             inv_tx = serializer.save(recorded_by=user)
 
             # Kirim narx bilan yozilsa, shu summa moliyada avtomatik "Chiqim" bo'ladi (balansdan ayriladi)
-            if kind == 'kirim' and amount:
+            if kind == 'kirim' and amount and credit_info:
+                # Nasiyaga olindi: pul hozir balansdan ayrilmaydi, qarz ochiladi (to'langan sari chiqim bo'ladi)
+                inv_tx.debt = credit.open_credit(
+                    farm=item.farm, kind='taminotchi', credit=credit_info, total=amount, date=inv_tx.date,
+                    description=f"{item.item_name}, {fmt(qty)} {item.unit}", user=user, category=item.item_type)
+                inv_tx.save(update_fields=['debt'])
+            elif kind == 'kirim' and amount:
                 create_purchase_expense(inv_tx, locked, user, amount)
 
             # Faqat zaxira chegaradan YUQORIDAN pastga o'tgan paytda ogohlantiramiz (har sarfda emas)
@@ -194,7 +206,10 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 locked.quantity -= instance.quantity
             locked.save(update_fields=['quantity', 'updated_at'])
             finance_tx = instance.finance_transaction
+            debt = instance.debt
             instance.delete()
+            if debt is not None:
+                credit.delete_debt(debt)  # nasiya qarzi va u bo'yicha to'langan pullar ham qaytariladi
             # Kirim bilan birga yozilgan moliyaviy chiqim ham o'chadi (balans qaytadi)
             if finance_tx is not None:
                 finance_tx.delete()

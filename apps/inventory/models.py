@@ -63,6 +63,10 @@ class InventoryTransaction(models.Model):
         editable=False,
         related_name='inventory_purchase'
     )
+    # Nasiyaga olingan bo'lsa: ochilgan qarz (to'langan sari balansdan ayriladi)
+    debt = models.OneToOneField(
+        'debts.Debt', on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+        related_name='inventory_purchase')
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

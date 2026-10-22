@@ -215,7 +215,11 @@ function Debts() {
     };
 
     const handleDeleteDebt = async (d) => {
-        if (!window.confirm(`${formatMoney(d.amount)} qarzni o'chirasizmi?\n\nUning barcha to'lovlari ham o'chadi. Buni qaytarib bo'lmaydi.`)) return;
+        const extra = d.affects_balance
+            ? "\n\nBu qarz sotuv/xarid bilan bog'liq: to'langan pullar balansdan ham olib tashlanadi" +
+              "\n(sotilgan hayvonlar bo'lsa, guruhga qaytadi). Sut sotuvi bo'lsa, uni sut sahifasidan bekor qilish to'g'riroq."
+            : '';
+        if (!window.confirm(`${formatMoney(d.amount)} qarzni o'chirasizmi?\n\nUning barcha to'lovlari ham o'chadi. Buni qaytarib bo'lmaydi.${extra}`)) return;
         try {
             await api.delete(`debt/${d.id}/`);
             reload();
@@ -479,6 +483,7 @@ function PartyRows({ p, t, isOpen, debts, onToggle, onDeleteParty, onDeleteDebt,
                                                 {d.is_overdue && (
                                                     <span className="work-badge work-badge--shoshilinch">{d.days_overdue} kun kechikdi</span>
                                                 )}
+                                                {d.affects_balance && <span className="work-badge work-badge--credit">Balansga ta'sir qiladi</span>}
                                             </span>
                                             <span className="work-meta">
                                                 Berilgan: {formatDate(d.date)}
@@ -513,6 +518,13 @@ function PartyRows({ p, t, isOpen, debts, onToggle, onDeleteParty, onDeleteDebt,
                                                             onChange={(e) => setPayForm({ ...payForm, date: e.target.value })} />
                                                     </div>
                                                 </div>
+                                                {d.affects_balance && (
+                                                    <p className="workers-hint">
+                                                        {kind === 'mijoz'
+                                                            ? "Bu to'lov balansga kirim bo'lib qo'shiladi."
+                                                            : "Bu to'lov balansdan chiqim bo'lib ayriladi."}
+                                                    </p>
+                                                )}
                                                 {payError && <p className="error-text" role="alert">{payError}</p>}
                                                 <div className="animal-actions">
                                                     <button type="submit" className="btn-primary btn-auto" disabled={busy}>To'lovni saqlash</button>

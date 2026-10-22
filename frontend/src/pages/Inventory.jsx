@@ -5,6 +5,8 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today, formatMoney } from '../utils/format';
 import InstallButton from '../components/InstallButton';
+import CreditFields from '../components/CreditFields';
+import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
 
 const ITEM_TYPES = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
 const TX_TYPES = { sarf: 'Sarf (ishlatildi)', kirim: 'Kirim (olib kelindi)' };
@@ -21,6 +23,7 @@ function formatDate(iso) {
 
 const EMPTY_ITEM = { item_name: '', item_type: 'ozuqa', unit: 'kg', quantity: '0', low_stock_threshold: '0', withdrawal_days: '0', initial_amount: '' };
 const makeTx = () => ({ inventory_item: '', transaction_type: 'sarf', quantity: '', date: today(), note: '', amount: '' });
+const buyOnCredit = (txForm, credit) => txForm.transaction_type === 'kirim' && credit.on_credit;
 const EMPTY_FILTERS = { inventory_item: '', transaction_type: '' };
 
 function Inventory() {
@@ -39,6 +42,7 @@ function Inventory() {
     const [savingItem, setSavingItem] = useState(false);
 
     const [txForm, setTxForm] = useState(makeTx);
+    const [credit, setCredit] = useState(EMPTY_CREDIT);
     const [txError, setTxError] = useState('');
     const [savingTx, setSavingTx] = useState(false);
 
@@ -121,6 +125,10 @@ function Inventory() {
 
     const handleAddTx = async (e) => {
         e.preventDefault();
+        if (buyOnCredit(txForm, credit) && (txForm.amount === '' || Number(txForm.amount) <= 0)) {
+            setTxError("Nasiyaga olish uchun jami narxni kiriting");
+            return;
+        }
         if (txForm.transaction_type === 'kirim' && farm.can_view_finance && txForm.amount === ''
             && !window.confirm("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?")) return;
         setSavingTx(true);
@@ -129,7 +137,9 @@ function Inventory() {
             const payload = { ...txForm, inventory_item: Number(selectedItemId) };
             // Narx faqat kirimda yuboriladi; bo'sh bo'lsa umuman yuborilmaydi
             if (payload.transaction_type !== 'kirim' || payload.amount === '') delete payload.amount;
+            if (payload.transaction_type === 'kirim') Object.assign(payload, creditPayload(credit));
             await api.post('inventory-transaction/', payload);
+            setCredit(EMPTY_CREDIT());
             setTxForm({ ...makeTx(), inventory_item: selectedItemId, transaction_type: txForm.transaction_type });
             reload();
         } catch (err) {
@@ -335,6 +345,10 @@ function Inventory() {
                                                 Kiritilgan summa moliyada avtomatik "Chiqim" bo'lib yoziladi va balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.
                                             </p>
                                         </div>
+                                    )}
+                                    {txForm.transaction_type === 'kirim' && farm.can_view_finance && (
+                                        <CreditFields farmId={farmId} kind="taminotchi" total={txForm.amount}
+                                            value={credit} onChange={setCredit} />
                                     )}
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>

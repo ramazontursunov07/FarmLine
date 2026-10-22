@@ -66,16 +66,25 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
     farm = serializers.IntegerField(source='inventory_item.farm_id', read_only=True)
     transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
     recorded_by_name = serializers.SerializerMethodField()
+    on_credit = serializers.SerializerMethodField()
+    party_name = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryTransaction
         fields = [
             'id', 'farm', 'inventory_item', 'inventory_name', 'inventory_unit',
             'transaction_type', 'transaction_type_display', 'quantity', 'amount', 'finance_transaction',
+            'on_credit', 'party_name',
             'date', 'note',
             'recorded_by', 'recorded_by_name', 'created_at',
         ]
         read_only_fields = ['recorded_by', 'finance_transaction']
+
+    def get_on_credit(self, obj):
+        return obj.debt_id is not None
+
+    def get_party_name(self, obj):
+        return obj.debt.party.name if obj.debt_id else None
 
     def get_recorded_by_name(self, obj):
         user = obj.recorded_by
@@ -105,4 +114,6 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         if instance.inventory_item.farm_id not in allowed:
             data.pop('amount', None)
             data.pop('finance_transaction', None)
+            data.pop('on_credit', None)
+            data.pop('party_name', None)
         return data

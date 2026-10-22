@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.animals.models import AnimalGroup
+from apps.debts import credit
 from apps.farms.models import Farm
 from apps.core.mixins import IdempotentCreateMixin
 from apps.users.digest import money
@@ -100,8 +101,50 @@ class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         lines.append(f"Kim: {display_name(user)}")
         notify_users([owner], "\n".join(lines))
 
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        debt = getattr(self, "_credit_debt", None)
+        if debt is not None:
+            response.data["on_credit"] = True
+            response.data["debt"] = debt.pk
+        return response
+
+    def _create_on_credit(self, serializer, credit_info):
+        """
+        Nasiyaga sotish (kirim) yoki nasiyaga olish (chiqim): balansga hozir ta'sir qilmaydi, qarz ochiladi.
+        Sotilgan hayvonlar soni esa darhol guruhdan ayriladi (qarz o'chirilsa, qaytadi).
+        """
+        data = serializer.validated_data
+        kind = "mijoz" if data["transaction_type"] == "kirim" else "taminotchi"
+        count = data.get("animal_count")
+        group = data.get("animal_group")
+        with db_transaction.atomic():
+            if count:
+                group = AnimalGroup.objects.select_for_update().get(pk=group.pk)
+                if count > group.count:
+                    raise ValidationError({"animal_count": f"Guruhda faqat {group.count} ta hayvon bor"})
+                group.count -= count
+                if group.count == 0:
+                    group.status = "sotilgan"
+                group.save(update_fields=["count", "status", "updated_at"])
+            description = data.get("description") or data["category"]
+            if count:
+                description = f"{count} ta hayvon" + (f": {data['description']}" if data.get("description") else "")
+            debt = credit.open_credit(
+                farm=data["farm"], kind=kind, credit=credit_info, total=data["amount"], date=data["date"],
+                description=description, user=self.request.user, category=data["category"],
+                animal_group=group if count else None, animal_count=count)
+        self._credit_debt = debt
+        # Javob uchun saqlanmagan yozuv: moliya ro'yxatiga qo'shilmaydi, chunki pul hali kelmagan/ketmagan
+        serializer.instance = Transaction(**{k: v for k, v in data.items()}, recorded_by=self.request.user)
+
     def perform_create(self, serializer):
         self._ensure_can_write(serializer.validated_data["farm"])
+        if credit.parse_credit_flag(self.request.data):
+            data = serializer.validated_data
+            credit_info = credit.parse_credit(self.request.data, data["farm"], data["amount"], data["date"])
+            self._create_on_credit(serializer, credit_info)
+            return
         count = serializer.validated_data.get("animal_count")
         if not count:
             tx = serializer.save(recorded_by=self.request.user)
@@ -224,3 +267,4 @@ class TransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="farmline-{farm.pk}-{month_value}.{file_type}"'
         response["Cache-Control"] = "no-store"
         return response
+    

@@ -83,8 +83,8 @@ class DebtSerializer(serializers.ModelSerializer):
     class Meta:
         model = Debt
         fields = ['id', 'farm', 'party', 'party_name', 'kind', 'amount', 'paid', 'remaining', 'date', 'due_date',
-                  'is_overdue', 'days_overdue', 'description', 'payments', 'created_at']
-        read_only_fields = ['created_at', 'farm']
+                  'is_overdue', 'days_overdue', 'description', 'payments', 'affects_balance', 'created_at']
+        read_only_fields = ['created_at', 'farm', 'affects_balance']
 
     def _paid(self, obj):
         value = getattr(obj, 'paid_total', None)
@@ -128,4 +128,3 @@ class DebtSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'amount': (
                     f"Qarz summasi allaqachon to'langan summadan ({_money(paid)}) kam bo'lishi mumkin emas")})
         return attrs
-    

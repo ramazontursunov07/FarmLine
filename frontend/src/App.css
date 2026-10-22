@@ -1477,3 +1477,34 @@ a.farm-tile:hover {
     gap: 12px;
     margin: 8px 0 32px;
 }
+
+.credit-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 4px 0 8px;
+}
+.credit-toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    border: 1px solid var(--color-primary);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.credit-opt {
+    padding: 8px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.credit-opt--on {
+    background: var(--color-primary);
+    color: #fff;
+}
+.work-badge--credit {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}

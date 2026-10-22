@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney, today } from '../utils/format';
+import CreditFields from './CreditFields';
+import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
@@ -17,6 +19,7 @@ function MilkSales({ farmId, refreshKey }) {
     const [sales, setSales] = useState([]);
     const [error, setError] = useState('');
     const [form, setForm] = useState({ liters: '', price_per_liter: '', date: today(), note: '' });
+    const [credit, setCredit] = useState(EMPTY_CREDIT);
     const [formError, setFormError] = useState('');
     const [saving, setSaving] = useState(false);
     const [version, setVersion] = useState(0);
@@ -53,9 +56,11 @@ function MilkSales({ farmId, refreshKey }) {
                 liters: form.liters,
                 price_per_liter: form.price_per_liter,
                 note: form.note.trim(),
+                ...creditPayload(credit),
                 ...(confirmWithheld ? { confirm_withheld: true } : {}),
             });
             setForm({ ...form, liters: '', note: '' });
+            setCredit(EMPTY_CREDIT());
             setVersion((v) => v + 1);
         } catch (err) {
             const message = getErrorMessage(err, "Sutni sotib bo'lmadi (internet bormi?)");
@@ -176,11 +181,14 @@ function MilkSales({ farmId, refreshKey }) {
                                     onChange={handleChange} />
                             </div>
                         </div>
-                        <p className="workers-hint">
-                            {total > 0
-                                ? `Jami: ${formatMoney(total)}. Sotilgach, bu pul kirim sifatida balansga qo'shiladi.`
-                                : "Sotilgach, pul kirim sifatida balansga qo'shiladi va sut ombordan ayriladi."}
-                        </p>
+                        <CreditFields farmId={farmId} kind="mijoz" total={total} value={credit} onChange={setCredit} />
+                        {!credit.on_credit && (
+                            <p className="workers-hint">
+                                {total > 0
+                                    ? `Jami: ${formatMoney(total)}. Sotilgach, bu pul kirim sifatida balansga qo'shiladi.`
+                                    : "Sotilgach, pul kirim sifatida balansga qo'shiladi va sut ombordan ayriladi."}
+                            </p>
+                        )}
                         {formError && <p className="error-text" role="alert">{formError}</p>}
                         <button type="submit" className="btn-primary btn-auto" disabled={saving || Number(stock.available) <= 0}>
                             {saving ? 'Kuting...' : 'Sutni sotish'}
@@ -192,9 +200,13 @@ function MilkSales({ farmId, refreshKey }) {
                             {sales.map((s) => (
                                 <li key={s.id} className="work-item">
                                     <div className="work-main">
-                                        <span className="work-title">{num(s.liters)} l × {formatMoney(s.price_per_liter)}</span>
+                                        <span className="work-title">
+                                            {num(s.liters)} l × {formatMoney(s.price_per_liter)}
+                                            {s.on_credit && <span className="work-badge work-badge--credit">Nasiya</span>}
+                                        </span>
                                         <span className="work-meta">
                                             {formatDate(s.date)} · jami {formatMoney(s.amount)}
+                                            {s.on_credit ? ` · ${s.party_name}, qolgan qarz: ${formatMoney(s.debt_remaining)}` : ''}
                                             {s.note ? ` · ${s.note}` : ''}
                                         </span>
                                     </div>
