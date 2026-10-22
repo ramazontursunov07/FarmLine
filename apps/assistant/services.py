@@ -1,4 +1,4 @@
- """AI provayderlar bilan ishlash. Provayder .env dagi AI_PROVIDER bilan tanlanadi:
+"""AI provayderlar bilan ishlash. Provayder .env dagi AI_PROVIDER bilan tanlanadi:
 
     gemini  (standart)  -- GEMINI_API_KEY kerak
     openai              -- OpenAI-mos API (Groq, OpenRouter va h.k.): AI_API_KEY, AI_BASE_URL kerak
