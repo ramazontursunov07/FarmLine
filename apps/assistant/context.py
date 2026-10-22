@@ -1,15 +1,23 @@
 """AI yordamchiga beriladigan foydalanuvchi ma'lumoti (ferma holati).
 
-Maxfiylik: fermer o'z fermalarini to'liq ko'radi; ishchi faqat o'z vazifalarini
-(moliya yo'q); admin uchun hech narsa berilmaydi.
+Maxfiylik: fermer o'z fermalarini to'liq ko'radi; ishchi faqat o'z vazifalarini va sut miqdorini
+(pulsiz) ko'radi; admin uchun hech narsa berilmaydi.
 Hajm cheklangan: har bir ro'yxatdan eng ko'pi bilan MAX_ROWS ta qator olinadi.
+
+AI faqat shu matndagi raqamlarga tayanadi, shuning uchun fermerlar ko'p so'raydigan narsalar
+(sut ombori, kirim-chiqim: kecha/hafta/oy/yil, oylar va kunlar kesimi, qarzlar) shu yerda tayyor turadi.
 """
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 
 from django.db.models import Q, Sum
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from apps.animals.models import AnimalEvent, AnimalGroup
+from apps.animals.models import AnimalEvent, AnimalGroup, MilkRecord, MilkSale
+from apps.animals.views import milk_balance
+from apps.animals.withdrawal import withheld_liters
+from apps.debts import stats as debt_stats
 from apps.farms.models import Farm
 from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem
@@ -28,6 +36,145 @@ def _period(farm, start, end):
     )
     income, expense = row['income'] or 0, row['expense'] or 0
     return income, expense, income - expense
+
+
+WEEKDAYS = ('dushanba', 'seshanba', 'chorshanba', 'payshanba', 'juma', 'shanba', 'yakshanba')
+MONTHS_BACK = 5  # shu oy bilan birga oxirgi 6 oy kesimi
+DAYS_BACK = 6  # bugun bilan birga oxirgi 7 kun
+
+
+def _month_start(day, back=0):
+    """`day` dan `back` oy oldingi oyning 1-kuni."""
+    index = day.year * 12 + (day.month - 1) - back
+    return date(index // 12, index % 12 + 1, 1)
+
+
+def _milk_between(farm, start, end):
+    total = MilkRecord.objects.filter(animal__farm=farm, date__gte=start, date__lte=end).aggregate(
+        t=Sum('liters'))['t']
+    return total or Decimal('0')
+
+
+def _milk_lines(farm, today, with_money, tag=''):
+    """Sut ombori (qolgan, sotilgan, dori ta'sirida) va sog'ilgan sut davrlar bo'yicha."""
+    produced, sold = milk_balance(farm.pk)
+    where = f" ({tag})" if tag else ''
+    if produced <= 0 and sold <= 0:
+        return [f"Sut ombori{where}: hali sog'ilgan sut kiritilmagan"]
+
+    available = max(produced - sold, Decimal('0'))
+    withheld = min(withheld_liters(farm.pk, today), available)
+    head = (f"Sut ombori{where}: omborda {qty(available)} l sut qolgan "
+            f"(jami sog'ilgan {qty(produced)} l, sotilgan {qty(sold)} l)")
+    if withheld > 0:
+        head += (f"; shundan {qty(withheld)} l dori ushlab turish muddatida (sotib bo'lmaydi), "
+                 f"sotsa bo'ladigani {qty(max(available - withheld, Decimal('0')))} l")
+    lines = [head]
+
+    yesterday = today - timedelta(days=1)
+    week_start = today - timedelta(days=DAYS_BACK)
+    month_start = today.replace(day=1)
+    lines.append(
+        "Sog'ilgan sut: "
+        f"bugun {qty(_milk_between(farm, today, today))} l, "
+        f"kecha {qty(_milk_between(farm, yesterday, yesterday))} l, "
+        f"oxirgi 7 kun {qty(_milk_between(farm, week_start, today))} l, "
+        f"shu oy {qty(_milk_between(farm, month_start, today))} l"
+    )
+    if with_money:
+        row = MilkSale.objects.filter(farm=farm, date__gte=month_start, date__lte=today).aggregate(
+            liters=Sum('liters'), amount=Sum('amount'))
+        if row['liters']:
+            lines.append(f"Sotilgan sut shu oy: {qty(row['liters'])} l, sotuv summasi {money(row['amount'])} so'm")
+    return lines
+
+
+def _daily_lines(farm, today, with_money):
+    """Oxirgi 7 kun: har bir kun uchun sog'ilgan sut va (fermer uchun) kirim-chiqim. Bo'sh kunlar tushiriladi."""
+    start = today - timedelta(days=DAYS_BACK)
+    milk = {
+        r['date']: r['liters']
+        for r in MilkRecord.objects.filter(animal__farm=farm, date__gte=start, date__lte=today)
+        .values('date').annotate(liters=Sum('liters')).order_by()
+    }
+    fin = {}
+    if with_money:
+        fin = {
+            r['date']: r
+            for r in Transaction.objects.filter(farm=farm, date__gte=start, date__lte=today)
+            .values('date').annotate(
+                income=Sum('amount', filter=Q(transaction_type='kirim')),
+                expense=Sum('amount', filter=Q(transaction_type='chiqim')),
+            ).order_by()
+        }
+    lines = []
+    for i in range(DAYS_BACK + 1):
+        day = today - timedelta(days=i)
+        parts = []
+        if milk.get(day):
+            parts.append(f"sut {qty(milk[day])} l")
+        if fin.get(day):
+            parts.append(f"kirim {money(fin[day]['income'])}, chiqim {money(fin[day]['expense'])}")
+        if parts:
+            lines.append(f"  • {day:%d.%m} ({WEEKDAYS[day.weekday()]}): " + ", ".join(parts))
+    return ["Kunlar bo'yicha (oxirgi 7 kun, bo'sh kunlar yo'q):"] + lines if lines else []
+
+
+def _monthly_lines(farm, today):
+    """Oxirgi 6 oy: har oyning kirim-chiqimi (bo'sh oylar tushiriladi)."""
+    rows = (
+        Transaction.objects.filter(farm=farm, date__gte=_month_start(today, MONTHS_BACK))
+        .annotate(month=TruncMonth('date')).values('month')
+        .annotate(income=Sum('amount', filter=Q(transaction_type='kirim')),
+                  expense=Sum('amount', filter=Q(transaction_type='chiqim')))
+        .order_by('month')
+    )
+    lines = [f"  • {r['month']:%Y-%m}: kirim {money(r['income'])}, chiqim {money(r['expense'])}"
+             for r in rows if r['income'] or r['expense']]
+    return ["Oylar bo'yicha (oxirgi 6 oy):"] + lines if lines else []
+
+
+def _debt_lines(farm, today):
+    """Qarzlar: kim fermerga qarzdor, fermer kimga qarzdor (qoldiq va muddati o'tganlari)."""
+    debts = list(debt_stats.debts_with_paid(farm_id=farm.pk))
+    if not debts:
+        return ["Qarzlar: kiritilmagan"]
+    lines = []
+    groups = (
+        ("Sizga qarzdorlar (mijozlar)", [d for d in debts if d.party.kind == 'mijoz']),
+        ("Siz qarzdorsiz (yetkazib beruvchilarga)", [d for d in debts if d.party.kind == 'taminotchi']),
+    )
+    for label, items in groups:
+        t = debt_stats.totals(items, today)
+        if not t['open_count']:
+            lines.append(f"{label}: ochiq qarz yo'q")
+            continue
+        text = f"{label}: jami qoldiq {money(t['remaining'])} so'm ({t['open_count']} ta qarz)"
+        if t['overdue_count']:
+            text += f", shundan muddati o'tgan {money(t['overdue_amount'])} so'm ({t['overdue_count']} ta)"
+        lines.append(text)
+
+        people = {}
+        for d in items:
+            left = debt_stats.remaining(d)
+            if left <= 0:
+                continue
+            row = people.setdefault(d.party_id, {'name': d.party.name, 'left': Decimal('0'),
+                                                 'due': None, 'overdue': False})
+            row['left'] += left
+            if d.due_date and (row['due'] is None or d.due_date < row['due']):
+                row['due'] = d.due_date
+            if debt_stats.is_overdue(d, today):
+                row['overdue'] = True
+        for row in sorted(people.values(), key=lambda r: r['left'], reverse=True)[:5]:
+            if row['overdue']:
+                extra = ", MUDDATI O'TGAN"
+            elif row['due']:
+                extra = f", muddat {row['due']:%d.%m.%Y}"
+            else:
+                extra = ''
+            lines.append(f"  • {row['name']}: {money(row['left'])} so'm{extra}")
+    return lines
 
 
 def _farm_context(farm, today):
@@ -52,24 +199,45 @@ def _farm_context(farm, today):
     else:
         lines.append("Hayvonlar: kiritilmagan")
 
-    # Moliya
+    # Sut (ombor va sog'ilgan miqdor)
+    lines += _milk_lines(farm, today, with_money=True)
+
+    # Moliya: haqiqiy to'langan pul bo'yicha
+    yesterday = today - timedelta(days=1)
+    week_start = today - timedelta(days=DAYS_BACK)
+    year_start = today.replace(month=1, day=1)
     for label, (start, end) in (
         ("Bugun", (today, today)),
+        ("Kecha", (yesterday, yesterday)),
+        (f"Oxirgi 7 kun ({week_start:%d.%m}–{today:%d.%m})", (week_start, today)),
         (f"Shu oy ({month_start:%d.%m}–{today:%d.%m})", (month_start, today)),
         ("O'tgan oy", (prev_start, prev_end)),
+        (f"Shu yil ({today.year})", (year_start, today)),
     ):
         inc, exp, profit = _period(farm, start, end)
         word = "foyda" if profit >= 0 else "zarar"
         lines.append(f"{label}: kirim {money(inc)}, chiqim {money(exp)}, {word} {money(abs(profit))} so'm")
+    lines.append("(Kirim-chiqim haqiqiy olingan/to'langan pul bo'yicha; nasiyaga berilgan va hali to'lanmagan pul "
+                 "kirimda emas, quyidagi qarzlarda.)")
+    lines += _monthly_lines(farm, today)
+    lines += _daily_lines(farm, today, with_money=True)
 
+    names = dict(Transaction.CATEGORY_CHOICES)
     top = (
         Transaction.objects.filter(farm=farm, transaction_type='chiqim', date__gte=month_start)
         .values('category').annotate(total=Sum('amount')).order_by('-total')[:5]
     )
     if top:
-        names = dict(Transaction.CATEGORY_CHOICES)
         lines.append("Shu oy eng katta chiqimlar: " + ", ".join(
             f"{names.get(t['category'], t['category'])} {money(t['total'])}" for t in top
+        ))
+    top_in = (
+        Transaction.objects.filter(farm=farm, transaction_type='kirim', date__gte=month_start)
+        .values('category').annotate(total=Sum('amount')).order_by('-total')[:5]
+    )
+    if top_in:
+        lines.append("Shu oy kirim manbalari: " + ", ".join(
+            f"{names.get(t['category'], t['category'])} {money(t['total'])}" for t in top_in
         ))
 
     recent = Transaction.objects.filter(farm=farm).order_by('-date', '-id')[:5]
@@ -80,6 +248,9 @@ def _farm_context(farm, today):
                 f"  • {t.date:%d.%m.%Y} {t.get_transaction_type_display()} {money(t.amount)} so'm "
                 f"({t.get_category_display()}){': ' + t.description[:60] if t.description else ''}"
             )
+
+    # Qarzlar (nasiya)
+    lines += _debt_lines(farm, today)
 
     # Ombor
     items = list(InventoryItem.objects.filter(farm=farm).order_by('item_name')[:MAX_ROWS * 2])
@@ -126,5 +297,11 @@ def build_context(user, today=None):
         text = build_worker_digest(user, today) or ''
         profile = user.worker_profiles.select_related('farm').first()
         weather = farm_weather_context(profile.farm) if profile else None
-        return "\n\n".join(p for p in (text, weather) if p)
+        # Ishchi sut miqdorini ko'ra oladi (pul ma'lumotisiz)
+        profiles = list(user.worker_profiles.select_related('farm')[:MAX_FARMS])
+        milk = []
+        for p in profiles:
+            milk += _milk_lines(p.farm, today, with_money=False, tag=p.farm.name)
+            milk += _daily_lines(p.farm, today, with_money=False)
+        return "\n\n".join(p for p in (text, "\n".join(milk), weather) if p)
     return ''
