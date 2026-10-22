@@ -33,6 +33,11 @@ AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
 AI_MODEL = os.getenv('AI_MODEL')  # bo'sh bo'lsa, provayderning standart modeli olinadi
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 AI_API_KEY = os.getenv('AI_API_KEY')
+# Telegram botdagi ovozli xabarlar uchun: bo'sh bo'lsa AI_PROVIDER ishlatiladi (gemini yoki openai/Groq whisper)
+STT_PROVIDER = os.getenv('STT_PROVIDER')
+STT_MODEL = os.getenv('STT_MODEL')
+# Bir foydalanuvchi botdan soatiga nechta AI so'rovi yubora oladi
+BOT_AI_PER_HOUR = int(os.getenv('BOT_AI_PER_HOUR', '40'))
 AI_BASE_URL = os.getenv('AI_BASE_URL')  # masalan https://api.groq.com/openai/v1
 
 FRONTEND_URL = (os.getenv('FRONTEND_URL') or os.getenv('RENDER_EXTERNAL_URL') or 'http://localhost:5173').rstrip('/')
@@ -205,3 +210,4 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # proxy orqali kelgan so'rov HTTPS ekanini biladi
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    

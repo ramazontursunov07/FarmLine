@@ -20,6 +20,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
 
+from apps.animals.models import Animal
+from apps.animals.serializers import MilkRecordSerializer
+from apps.animals.views import MilkRecordViewSet
 from apps.finance.models import Transaction
 from apps.finance.serializers import TransactionSerializer
 from apps.finance.views import TransactionViewSet, finance_farms
@@ -34,10 +37,13 @@ from .models import PendingAction
 MARKER = '[[ACTION]]'
 MAX_ACTIONS = 3        # bitta xabardan ko'pi bilan nechta amal
 MAX_PROMPT_ITEMS = 40  # AI ga ko'rsatiladigan ombor mahsulotlari soni
+MAX_PROMPT_COWS = 60   # AI ga ko'rsatiladigan sigirlar soni
+MAX_MILK_ENTRIES = 50  # bitta sut harakatida ko'pi bilan nechta sigir
+MILK_SESSIONS = {'ertalab': 'Ertalab', 'kechqurun': 'Kechqurun', 'kun': 'Butun kun'}
 KEEP_HISTORY_DAYS = 7  # tugagan yozuvlar shuncha kun saqlanadi
 
 INVENTORY_TYPES = {'inventory_use': 'sarf', 'inventory_add': 'kirim'}
-ALL_TYPES = set(INVENTORY_TYPES) | {'finance'}
+ALL_TYPES = set(INVENTORY_TYPES) | {'finance', 'milk'}
 FINANCE_KINDS = ('kirim', 'chiqim')
 
 
@@ -55,6 +61,15 @@ def _accessible_items(user):
     )
 
 
+def _accessible_cows(user):
+    """Foydalanuvchi sut yoza oladigan faol urg'ochi hayvonlar."""
+    return (
+        Animal.objects.select_related('farm')
+        .filter(Q(farm__owner=user) | Q(farm__workers__user=user), status='faol', sex='urgochi')
+        .distinct().order_by('farm__name', 'tag_number')
+    )
+
+
 def build_action_prompt(user, today=None):
     """AI ga harakat yozish qoidalarini va unga kerak ro'yxatlarni beradi. Harakat qila olmaydigan bo'lsa, ''."""
     if is_app_admin(user):
@@ -62,12 +77,13 @@ def build_action_prompt(user, today=None):
     today = today or timezone.localdate()
     items = list(_accessible_items(user)[:MAX_PROMPT_ITEMS])
     farms = list(finance_farms(user).order_by('name'))
-    if not items and not farms:
+    cows = list(_accessible_cows(user)[:MAX_PROMPT_COWS])
+    if not items and not farms and not cows:
         return ''
 
     lines = [
-        "HARAKATLAR. Foydalanuvchi ombor yoki kirim-chiqimga biror narsa YOZISHNI so'rasa "
-        "(masalan «ombordan 50 kg yem chiqar», «bugun 200 000 so'm yem uchun chiqim yoz»), "
+        "HARAKATLAR. Foydalanuvchi ombor, kirim-chiqim yoki sut miqdoriga biror narsa YOZISHNI so'rasa "
+        "(masalan «ombordan 50 kg yem chiqar», «bugun 200 000 so'm yem uchun chiqim yoz», «14-sigir 12 litr sut berdi»), "
         "javobingni 1 jumlada yoz va eng oxirida, alohida qatorda shu formatda harakat qo'sh:",
         f"{MARKER} [{{...}}, {{...}}]",
         "Qatorda faqat JSON ro'yxat bo'lsin (kod bloki, izoh, qo'shimcha matn yo'q).",
@@ -90,6 +106,9 @@ def build_action_prompt(user, today=None):
             + ('"amount": <jami narxi, so\'m>, ' if farms else '')
             + '"note": "<ixtiyoriy izoh>"}  -- omborga kirim (yangi keltirilgan)',
             "  «item» ni quyidagi ro'yxatdan AYNAN ko'chirib yoz. Ro'yxatda yo'q mahsulot uchun harakat yozma.",
+            "  «ishlatdim», «sarfladim», «berdim» (yem, dori) -> inventory_use; «keldi», «oldim», «sotib oldim» -> "
+            "inventory_add. Foydalanuvchi boshqa birlikda aytsa (masalan «5 qop») va mahsulot birligi boshqa bo'lsa "
+            "(masalan kg), 1 qop necha kg ekani noma'lum bo'lsa o'ylab topma: «1 qop necha kg?» deb so'ra.",
         ]
         if farms:
             lines.append(
@@ -106,6 +125,18 @@ def build_action_prompt(user, today=None):
             '"amount": <so\'m>, "description": "<qisqa izoh>", "date": "YYYY-MM-DD"}  -- kirim-chiqim yozish',
             f"  kategoriya: {cats}. «date» ni foydalanuvchi sana aytmasa, tushirib qoldir (bugun bo'ladi).",
         ]
+    if cows:
+        lines += [
+            '  {"type": "milk", "entries": [{"animal": "<quloq raqami>", "liters": <son>}, ...], '
+            '"session": "ertalab" yoki "kechqurun" yoki "kun", "date": "YYYY-MM-DD"}'
+            "  -- sigirlardan sog'ilgan sutni yozish",
+            "  Sut HAR BIR SIGIR bo'yicha alohida yoziladi: «animal» ni quyidagi ro'yxatdan quloq raqami bilan yoz. "
+            "Foydalanuvchi faqat umumiy litrni aytsa (masalan «bugun 85 litr sut») va qaysi sigirlardan ekanini "
+            "aytmasa, o'ylab topma va sigirlarga bo'lib yuborma: harakat qo'shmasdan «Qaysi sigirdan necha litr? "
+            "Masalan: 14-sigir 12 litr, 15-sigir 9 litr» deb so'ra.",
+            "  «session»: ertalab yoki kechqurun aytilsa shuni yoz, aytilmasa «kun» (butun kun). «date» ni "
+            "foydalanuvchi sana aytmasa, tushirib qoldir (bugun bo'ladi).",
+        ]
     if len(farms) > 1 or len({i.farm_id for i in items}) > 1:
         lines.append('  Bir nechta ferma bo\'lsa, ferma aytilganda "farm": "<ferma nomi>" ni ham qo\'sh.')
 
@@ -114,6 +145,10 @@ def build_action_prompt(user, today=None):
         lines.append("Ombordagi mahsulotlar (nomi — hozirgi miqdor — ferma):")
         for it in items:
             lines.append(f"  • {it.item_name} — {fmt(it.quantity)} {it.unit} — {it.farm.name}")
+    if cows:
+        lines.append("Sut yozish mumkin bo'lgan sigirlar (quloq raqami — laqabi — ferma):")
+        for c in cows:
+            lines.append(f"  • №{c.tag_number}" + (f" — {c.name}" if c.name else "") + f" — {c.farm.name}")
     if farms:
         lines.append("Kirim-chiqim yozish mumkin bo'lgan fermalar: " + ", ".join(f.name for f in farms))
     else:
@@ -357,12 +392,113 @@ def _resolve_finance(user, raw, today):
     }, None
 
 
+def _norm_tag(value):
+    """«№14», «14-sigir», «UZ-123» kabi yozuvlar quloq raqami bilan solishtirish uchun tozalanadi."""
+    return re.sub(r'[^0-9a-z]', '', str(value or '').lower().translate(_APOSTROPHES))
+
+
+def _find_cow(user, ref, farm_name):
+    """Sigirni quloq raqami (yoki laqabi) bo'yicha topadi. (hayvon, None) yoki (None, foydalanuvchiga xabar)."""
+    cows = list(_accessible_cows(user))
+    if farm_name:
+        ftokens = _tokens(farm_name)
+        in_farm = [c for c in cows if all(t in _tokens(c.farm.name) or t in c.farm.name.lower() for t in ftokens)]
+        cows = in_farm or cows
+    tokens = [t for t in _tokens(ref) if t not in ('sigir', 'no', 'nomer', 'raqam', 'raqamli', 'quloq')]
+    if not tokens:
+        return None, "Qaysi sigir ekani aytilmadi."
+
+    by_tag = [c for c in cows if _norm_tag(c.tag_number) and _norm_tag(c.tag_number) in {_norm_tag(t) for t in tokens}]
+    if not by_tag:
+        by_tag = [c for c in cows if _norm_tag(c.tag_number) == _norm_tag(ref)]
+    found = by_tag or [c for c in cows if c.name and all(t in _tokens(c.name) for t in tokens)]
+    if not found:
+        return None, f"«{ref}» raqamli faol sigir topilmadi."
+    if len(found) > 1:
+        listing = ", ".join(f"№{c.tag_number} ({c.farm.name})" for c in found[:6])
+        return None, f"«{ref}» deganda bir nechta sigir bor: {listing}. Qaysi fermadan?"
+    return found[0], None
+
+
+def _first_error(errors):
+    """DRF xatolar lug'atidan birinchi xabarni oladi."""
+    for value in errors.values():
+        first = value[0] if isinstance(value, (list, tuple)) and value else value
+        return str(first)
+    return "noto'g'ri ma'lumot"
+
+
+def _resolve_milk(user, raw, today, problems):
+    """Sut yozish: bir nechta sigir. Yaroqli yozuvlardan karta tuziladi, yaroqsizlari `problems` ga qo'shiladi."""
+    entries = raw.get('entries')
+    if not isinstance(entries, list):
+        entries = [{'animal': raw.get('animal'), 'liters': raw.get('liters')}] if raw.get('animal') else []
+    if not entries:
+        problems.append(Question("Qaysi sigirdan necha litr sut yozay? Masalan: 14-sigir 12 litr, 15-sigir 9 litr."))
+        return None
+
+    session = str(raw.get('session') or 'kun').lower()
+    if session not in MILK_SESSIONS:
+        session = 'kun'
+    date, problem = _validated_date(raw.get('date'), today)
+    if problem:
+        problems.append(problem)
+        return None
+
+    records, rows, seen = [], [], set()
+    for entry in entries[:MAX_MILK_ENTRIES]:
+        if not isinstance(entry, dict):
+            continue
+        cow, problem = _find_cow(user, entry.get('animal'), entry.get('farm') or raw.get('farm'))
+        if problem:
+            problems.append(problem)
+            continue
+        label = f"№{cow.tag_number}"
+        liters = _decimal(entry.get('liters'))
+        if liters is None or liters <= 0:
+            problems.append(f"{label}: litr aniq emas.")
+            continue
+        if liters > 100:
+            problems.append(f"{label}: bir sigirdan 100 litrdan ko'p bo'lmaydi, raqamni tekshiring.")
+            continue
+        if liters != liters.quantize(Decimal('0.1')):
+            problems.append(f"{label}: litr ko'pi bilan 1 ta kasr raqami bilan yoziladi (masalan 12.5).")
+            continue
+        if cow.pk in seen:
+            problems.append(f"{label}: bir xabarda ikki marta yozilgan.")
+            continue
+        data = {'animal': cow.pk, 'date': date.isoformat(), 'session': session, 'liters': str(liters)}
+        serializer = MilkRecordSerializer(data=data)
+        if not serializer.is_valid():
+            problems.append(f"{label}: {_first_error(serializer.errors)}")
+            continue
+        seen.add(cow.pk)
+        records.append(data)
+        rows.append((cow, liters))
+
+    if not records:
+        return None
+    total = sum((liters for _cow, liters in rows), Decimal('0'))
+    details = [f"Sana: {date:%d.%m.%Y}", f"Vaqt: {MILK_SESSIONS[session]}"]
+    for cow, liters in rows:
+        details.append(f"№{cow.tag_number}" + (f" · {cow.name}" if cow.name else "") + f": {fmt(liters)} l")
+    details.append(f"Jami: {fmt(total)} l ({len(rows)} ta sigir)")
+    if len({cow.farm_id for cow, _ in rows}) > 1:
+        details.append("Fermalar: " + ", ".join(sorted({cow.farm.name for cow, _ in rows})))
+    return {'type': 'milk', 'data': {'records': records}, 'title': "🥛 Sut yozish", 'details': details}
+
+
 def resolve_actions(user, raw_actions, today=None):
     """AI taklifini tekshiradi. (tayyor amallar ro'yxati, foydalanuvchiga aytiladigan muammolar) qaytaradi."""
     today = today or timezone.localdate()
     resolved, problems = [], []
     for raw in (raw_actions or [])[:MAX_ACTIONS]:
         if not isinstance(raw, dict) or raw.get('type') not in ALL_TYPES:
+            continue
+        if raw['type'] == 'milk':
+            action = _resolve_milk(user, raw, today, problems)
+            if action:
+                resolved.append(action)
             continue
         if raw['type'] == 'finance':
             action, problem = _resolve_finance(user, raw, today)
@@ -448,6 +584,17 @@ def execute(request, pending):
             tx = _run_serializer(TransactionViewSet, TransactionSerializer, action['data'], request)
             sign = "Chiqim" if tx.transaction_type == 'chiqim' else "Kirim"
             results.append(f"✅ {sign} yozildi: {money(tx.amount)} so'm ({tx.get_category_display()})")
+        elif action['type'] == 'milk':
+            records = action['data']['records']
+            total = Decimal('0')
+            for rec in records:
+                milk = _run_serializer(MilkRecordViewSet, MilkRecordSerializer, rec, request)
+                total += milk.liters
+            first = records[0]
+            results.append(
+                f"✅ Sut yozildi: {len(records)} ta sigir, jami {fmt(total)} l "
+                f"({MILK_SESSIONS[first['session']].lower()}, {parse_date(first['date']):%d.%m.%Y})"
+            )
         elif action['type'] in INVENTORY_TYPES:
             rec = _run_serializer(InventoryTransactionViewSet, InventoryTransactionSerializer,
                                   action['data'], request)
