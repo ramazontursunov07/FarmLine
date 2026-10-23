@@ -188,7 +188,7 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             if event_type == 'tugilish' and serializer.validated_data.get('animal') is not None:
                 # Ona tug'di: bug'ozlik tugaydi
                 Animal.objects.filter(pk=serializer.validated_data['animal'].pk).update(
-                    pregnant_since=None, due_date=None)
+                    pregnant_since=None, due_date=None, dried_off_on=None)
 
             # Ferma egasiga Telegramda xabar: o'lim va tug'ilish haqida (kim yozganidan qat'i nazar)
             self._notify_owner(event, group, locked.count, count, user,
@@ -335,6 +335,16 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         if p.get('search'):
             qs = qs.filter(Q(tag_number__icontains=p['search']) | Q(name__icontains=p['search']))
         return qs
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        if getattr(self, 'action', None) == 'list':
+            # Ro'yxatda tsikl ma'lumotini bir martalik so'rov bilan yig'amiz (N+1 bo'lmasligi uchun)
+            from . import reproduction
+            ids = list(self.filter_queryset(self.get_queryset()).filter(
+                sex='urgochi', status='faol').values_list('pk', flat=True))
+            ctx['repro'] = reproduction.collect(ids)
+        return ctx
 
     def _ensure_owner(self, farm):
         if farm.owner_id != self.request.user.id:

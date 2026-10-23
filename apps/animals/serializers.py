@@ -248,6 +248,7 @@ class AnimalSerializer(serializers.ModelSerializer):
     last_calving_date = serializers.SerializerMethodField()
     is_pregnant = serializers.SerializerMethodField()
     days_to_calving = serializers.SerializerMethodField()
+    reproduction = serializers.SerializerMethodField()
     stage = serializers.SerializerMethodField()
     stage_display = serializers.SerializerMethodField()
     withdrawal = serializers.SerializerMethodField()
@@ -257,7 +258,7 @@ class AnimalSerializer(serializers.ModelSerializer):
         fields = ['id', 'farm', 'group', 'group_label', 'tag_number', 'name', 'sex', 'sex_display',
                   'stage', 'stage_display',
                   'birth_date', 'mother', 'mother_tag', 'status', 'status_display', 'notes',
-                  'pregnant_since', 'due_date', 'is_pregnant', 'days_to_calving',
+                  'pregnant_since', 'due_date', 'is_pregnant', 'days_to_calving', 'dried_off_on', 'reproduction',
                   'withdrawal',
                   'last_weight', 'last_weight_date', 'last_calving_date', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
@@ -281,6 +282,14 @@ class AnimalSerializer(serializers.ModelSerializer):
 
     def get_is_pregnant(self, obj):
         return obj.pregnant_since is not None
+
+    def get_reproduction(self, obj):
+        """Quritish, qayta urug'lantirish va tug'ishlar orasi (apps/animals/reproduction.py). Qoramol bo'lmasa None."""
+        from . import reproduction
+        shared = self.context.get('repro')  # ro'yxatda view bir marta yig'adi (N+1 bo'lmasligi uchun)
+        if shared is None:
+            shared = reproduction.collect([obj.pk]) if obj.pk else {'calvings': {}, 'milk': {}}
+        return reproduction.info(obj, timezone.localdate(), shared['calvings'].get(obj.pk, []), shared['milk'].get(obj.pk))
 
     def get_stage(self, obj):
         calved = getattr(obj, 'last_calving_date', None) is not None
@@ -355,6 +364,7 @@ class AnimalSerializer(serializers.ModelSerializer):
         # Bug'ozlik tugadi: sana o'chsa, tug'ish sanasi ham o'chadi
         if 'pregnant_since' in attrs and attrs['pregnant_since'] is None:
             attrs['due_date'] = None
+            attrs['dried_off_on'] = None
             return
         # Hayvon sotilsa/o'lsa yoki erkak qilib o'zgartirilsa, bug'ozlik o'zi tugaydi
         if since is not None and (status != 'faol' or sex != 'urgochi'):
@@ -362,10 +372,13 @@ class AnimalSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'pregnant_since': "Faqat faol urg'ochi hayvon bug'oz bo'la oladi"})
             attrs['pregnant_since'] = None
             attrs['due_date'] = None
+            attrs['dried_off_on'] = None
             return
         if since is None:
             if attrs.get('due_date') is not None:
                 raise serializers.ValidationError({'due_date': "Avval bug'ozlik boshlangan sanani kiriting"})
+            if attrs.get('dried_off_on') is not None:
+                raise serializers.ValidationError({'dried_off_on': "Quritish faqat bug'oz sigir uchun belgilanadi"})
             return
 
         if 'pregnant_since' in attrs and since > timezone.localdate():
@@ -376,6 +389,13 @@ class AnimalSerializer(serializers.ModelSerializer):
         due = attrs.get('due_date', getattr(instance, 'due_date', None))
         if due is not None and due < since:
             raise serializers.ValidationError({'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
+        dried = attrs.get('dried_off_on', getattr(instance, 'dried_off_on', None))
+        if dried is not None:
+            if dried > timezone.localdate():
+                raise serializers.ValidationError({'dried_off_on': "Sana kelajakda bo'lishi mumkin emas"})
+            if dried < since:
+                raise serializers.ValidationError(
+                    {'dried_off_on': "Quritish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
 
 
 class _AnimalRecordSerializer(serializers.ModelSerializer):

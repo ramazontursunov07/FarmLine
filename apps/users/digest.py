@@ -1,4 +1,5 @@
 """Kunlik hisobot matnlarini tuzish (Telegram uchun). Yuborish -- send_daily_digest buyrug'ida."""
+import logging
 from decimal import Decimal
 
 from django.db.models import F, Q, Sum
@@ -9,7 +10,9 @@ from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem
 from apps.tasks.models import Task
 
-from .alerts import build_alert_lines, calving_lines
+from .alerts import build_alert_lines, calving_lines, dry_off_lines
+
+logger = logging.getLogger(__name__)
 
 MAX_ITEMS = 5  # har bir ro'yxatdan ko'pi bilan nechta qator ko'rsatiladi
 
@@ -74,10 +77,15 @@ def build_owner_digest(owner, today):
 
 
 def _worker_calving_lines(user, today):
-    """Ishchi ishlaydigan fermalardagi tug'ishi yaqin hayvonlar."""
+    """Ishchi ishlaydigan fermalardagi tug'ishi yaqin va quritilishi kerak hayvonlar."""
     lines = []
     for farm in Farm.objects.filter(workers__user=user).distinct().order_by('name'):
-        farm_lines = calving_lines(farm, today)
+        farm_lines = []
+        for builder in (calving_lines, dry_off_lines):
+            try:
+                farm_lines += builder(farm, today)
+            except Exception:
+                logger.exception("Ishchi hisobotida xato: %s", builder.__name__)
         if farm_lines:
             lines += [f"🏡 {farm.name}"] + farm_lines
     return lines

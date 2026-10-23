@@ -465,6 +465,12 @@ function AnimalCards() {
                                                         {a.status === 'faol' && a.stage_display && <span className="work-badge">{a.stage_display}</span>}
                                                         {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
                                                         {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
+                                                        {a.reproduction && ['soon', 'now', 'late'].includes(a.reproduction.dry_off_state) && (
+                                                            <span className="work-badge">Quritish vaqti</span>
+                                                        )}
+                                                        {a.reproduction && ['now', 'late', 'critical'].includes(a.reproduction.rebreed_state) && (
+                                                            <span className="work-badge">Urug'lantirish kerak</span>
+                                                        )}
                                                         {a.withdrawal && (
                                                             <span className="work-badge work-badge--shoshilinch">
                                                                 {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}

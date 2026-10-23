@@ -138,6 +138,7 @@ class Animal(models.Model):
     mother = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='calves')
     pregnant_since = models.DateField(null=True, blank=True)  # bug'ozlik boshlangan (urug'lantirilgan) sana
     due_date = models.DateField(null=True, blank=True)  # taxminiy tug'ish sanasi
+    dried_off_on = models.DateField(null=True, blank=True)  # quritilgan (sog'ish to'xtatilgan) sana; tug'ishda tozalanadi
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='faol')
     notes = models.TextField(blank=True)
     # Qaysi tug'ilish yozuvi bilan birga ochilgan (yozuv o'chirilganda buzoq kartochkasini ham o'chirish uchun)

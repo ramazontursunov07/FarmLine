@@ -303,6 +303,14 @@ function AnimalCard() {
         );
     };
 
+    const handleDriedOff = (value) => {
+        submit(
+            () => api.patch(`animals-card/${animalId}/`, { dried_off_on: value }),
+            setPregError,
+            "Quritishni saqlab bo'lmadi"
+        );
+    };
+
     const handleSaveDue = (e) => {
         e.preventDefault();
         submit(
@@ -881,6 +889,34 @@ function AnimalCard() {
                                                     </div>
                                                 )
                                             )}
+                                            {animal.reproduction && (() => {
+                                                const r = animal.reproduction;
+                                                const dryText = {
+                                                    done: `Quritilgan${r.dried_off_on ? ` (${formatDate(r.dried_off_on)})` : ''}`,
+                                                    soon: `Quritish vaqti yaqin: ${formatDate(r.dry_off_date)}`,
+                                                    now: 'Bugun quritish vaqti',
+                                                    late: `Quritish kechikdi (${formatDate(r.dry_off_date)})`,
+                                                }[r.dry_off_state];
+                                                return (
+                                                    <>
+                                                        <p className="work-meta">
+                                                            {dryText || (r.dry_off_date
+                                                                ? `Quritish: ${formatDate(r.dry_off_date)} (tug'ishdan 60 kun oldin)`
+                                                                : "Quritish sanasi tug'ish sanasi kiritilgach hisoblanadi.")}
+                                                        </p>
+                                                        {r.dry_off_state === 'late' && (
+                                                            <p className="error-text">Quritish kechiksa, keyingi laktatsiyada sut kamayadi.</p>
+                                                        )}
+                                                        {isOwner && (r.dried_off_on
+                                                            ? <button type="button" className="btn-ghost" disabled={busy}
+                                                                onClick={() => handleDriedOff(null)}>Quritilgan belgisini olib tashlash</button>
+                                                            : r.dry_off_date && r.dry_off_state !== 'done' && (
+                                                                <button type="button" className="btn-ghost" disabled={busy}
+                                                                    onClick={() => handleDriedOff(today())}>Quritildi</button>
+                                                            ))}
+                                                    </>
+                                                );
+                                            })()}
                                             <p className="workers-hint">Tug'ishni yozsangiz, bug'ozlik belgisi o'zi olib tashlanadi.</p>
                                         </>
                                     ) : isOwner ? (
@@ -903,6 +939,26 @@ function AnimalCard() {
                                         </form>
                                     ) : (
                                         <p className="work-meta">Bug'ozlik belgilanmagan.</p>
+                                    )}
+                                    {!animal.is_pregnant && animal.reproduction && animal.reproduction.days_since_calving != null && (() => {
+                                        const r = animal.reproduction;
+                                        const msg = {
+                                            waiting: `Urug'lantirish ${formatDate(r.rebreed_from)} dan boshlanadi.`,
+                                            now: "Urug'lantirish vaqti keldi.",
+                                            late: `Urug'lantirish kechikmoqda: ${formatDate(r.conceive_by)} gacha bug'oz bo'lishi kerak.`,
+                                            critical: "Tug'ishlar orasi 400 kundan oshadi: tezroq urug'lantiring.",
+                                        }[r.rebreed_state];
+                                        return (
+                                            <p className={r.rebreed_state === 'late' || r.rebreed_state === 'critical' ? 'error-text' : 'work-meta'}>
+                                                Tug'gandan {r.days_since_calving} kun o'tdi. {msg}
+                                            </p>
+                                        );
+                                    })()}
+                                    {animal.reproduction && animal.reproduction.calving_interval_days != null && (
+                                        <p className={animal.reproduction.interval_long ? 'error-text' : 'work-meta'}>
+                                            Oxirgi tug'ishlar orasi: {animal.reproduction.calving_interval_days} kun
+                                            {animal.reproduction.interval_long ? " (maqsad: 400 kundan oshmasin)" : ''}.
+                                        </p>
                                     )}
                                 </div>
                             </>
