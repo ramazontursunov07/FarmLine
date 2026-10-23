@@ -21,6 +21,13 @@ class InventoryItem(models.Model):
     low_stock_threshold = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     # Dori uchun: davolashdan keyin sut va go'shtni necha kun sotib bo'lmaydi (0 = cheklov yo'q)
     withdrawal_days = models.PositiveSmallIntegerField(default=0)
+    # Yem uchun: turi (bo'sh = nomidan avtomatik aniqlanadi) va 1 birlik necha kg (qop, dona kabi birliklar uchun)
+    FEED_KIND_CHOICES = (
+        ('dagal', "Dag'al yem"), ('shirali', 'Shirali yem'), ('konsentrat', 'Konsentrat'),
+        ('hisobsiz', 'Hisobga olinmasin'),
+    )
+    feed_kind = models.CharField(max_length=12, choices=FEED_KIND_CHOICES, blank=True, default='')
+    kg_per_unit = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

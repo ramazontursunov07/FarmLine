@@ -2,12 +2,16 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.mixins import IdempotentCreateMixin
 from apps.debts import credit
-from apps.farms.models import Worker
+from apps.farms.models import Farm, Worker
+from apps.users.permissions import is_app_admin
+from . import feed_need
 from apps.finance.models import Transaction as FinanceTransaction
 from apps.finance.views import finance_farms
 from apps.users.notify import display_name, notify_users
@@ -69,6 +73,20 @@ class InventoryItemViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
     def _ensure_owner(self, farm):
         if farm.owner_id != self.request.user.id:
             raise PermissionDenied("Ombor mahsulotlarini faqat ferma egasi boshqara oladi.")
+
+    @action(detail=False, methods=['get'], url_path='feed-need')
+    def feed_need(self, request):
+        """
+        Yem ehtiyoji: guruh vazni va sutiga qarab kuniga qancha yem kerakligi va omborga necha kunga yetishi.
+        ?farm=<id> (shart). Ferma egasi va ishchilar ko'ra oladi (pulsiz ma'lumot).
+        """
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        farm = Farm.objects.filter(pk=int(farm_id)).first()
+        if farm is None or not (is_app_admin(request.user) or is_farm_member(request.user, farm)):
+            raise PermissionDenied("Siz bu fermaning yem ehtiyojini ko'ra olmaysiz.")
+        return Response(feed_need.build_report(farm))
 
     def perform_create(self, serializer):
         self._ensure_owner(serializer.validated_data['farm'])

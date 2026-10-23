@@ -1,7 +1,8 @@
 """
 Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 
-1. Yem bashorati  -- "yem 5 kunga yetadi" (so'nggi kunlardagi sarf asosida)
+1. Yem bashorati  -- "yem 5 kunga yetadi": avvalo hayvonlar ehtiyoji (soni, vazni, suti) bo'yicha,
+                     hisoblab bo'lmaganlari uchun so'nggi kunlardagi sarf asosida
 2. Chiqim ogohlantirishi -- "bu oy chiqim o'tgan oyning shu davridan 40% ko'p"
 3. Vaksinatsiya eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan vaksinatsiyalar
 4. Tug'ish eslatmasi -- tug'ishi yaqin yoki muddati o'tib ketgan bug'oz hayvonlar
@@ -64,10 +65,56 @@ def _more(total):
 
 
 # ---------------------------------------------------------------- 1. Yem bashorati
+def _kg_text(value):
+    value = Decimal(value)
+    if value >= 1000:
+        return f"{(value / 1000).quantize(Decimal('0.1'))} tonna"
+    return f"{value.quantize(Decimal('1'))} kg"
+
+
+def feed_need_lines(farm, today):
+    """
+    Ehtiyojga asoslangan yem bashorati: hayvonlar soni, vazni va sutiga qarab kunlik ehtiyoj ombordagi zaxira bilan
+    solishtiriladi. (satrlar, shu tur yemlar o'z ichiga olgan mahsulot id lari).
+    """
+    from apps.inventory import feed_need
+    report = feed_need.build_report(farm, today)
+    covered, rows = set(), []
+    for k in report['kinds']:
+        if Decimal(k['need_kg_per_day']) <= 0 or not k['has_items']:
+            continue
+        covered.update(i['id'] for i in k['items'])
+        days = Decimal(k['days_left'])
+        if days <= FEED_WARN_DAYS:
+            rows.append((days, k))
+    if not rows:
+        return [], covered
+    rows.sort(key=lambda r: r[0])
+    lines = [f"🌾 Yem zaxirasi (hayvonlar ehtiyoji bo'yicha): {len(rows)} ta tur"]
+    for days, k in rows:
+        names = ", ".join(i['name'] for i in k['items'][:3])
+        if Decimal(k['stock_kg']) <= 0:
+            left = "tugagan"
+        elif days < 1:
+            left = "1 kundan kam yetadi"
+        else:
+            left = f"~{math.floor(days)} kunga yetadi"
+        lines.append(
+            f"  • {feed_need.KIND_LABELS[k['kind']].split(' (')[0]} ({names}): {left} "
+            f"(omborda {_kg_text(k['stock_kg'])}, kuniga ~{_kg_text(k['need_kg_per_day'])} kerak)")
+    return lines, covered
+
+
 def feed_forecast_lines(farm, today):
-    items = list(InventoryItem.objects.filter(farm=farm, item_type='ozuqa')) #shu fermadagi barcha ozuqalarni olib keladi.
-    if not items:  #agarda bo'lmasa deb tekshiradi.
-        return [] #quruq list
+    need_lines, covered = feed_need_lines(farm, today)
+    return need_lines + _feed_history_lines(farm, today, skip_ids=covered)
+
+
+def _feed_history_lines(farm, today, skip_ids=()):
+    """O'tgan sarfga asoslangan bashorat: ehtiyoj bo'yicha hisoblab bo'lmagan mahsulotlar uchun."""
+    items = list(InventoryItem.objects.filter(farm=farm, item_type='ozuqa').exclude(pk__in=skip_ids))
+    if not items:
+        return []
 
     since = today - timedelta(days=FEED_LOOKBACK_DAYS - 1)
     usage = {

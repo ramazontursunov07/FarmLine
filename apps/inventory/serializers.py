@@ -16,13 +16,19 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         model = InventoryItem
         fields = [
             'id', 'farm', 'farm_name', 'item_name', 'item_type', 'item_type_display',
-            'quantity', 'unit', 'low_stock_threshold', 'withdrawal_days', 'is_low_stock', 'initial_amount',
+            'quantity', 'unit', 'low_stock_threshold', 'withdrawal_days', 'feed_kind', 'kg_per_unit',
+            'is_low_stock', 'initial_amount',
             'updated_at', 'created_at',
         ]
 
     def validate_quantity(self, value):
         if value < 0:
             raise serializers.ValidationError("Miqdor manfiy bo'lishi mumkin emas")
+        return value
+
+    def validate_kg_per_unit(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Birlik og'irligi 0 dan katta bo'lishi kerak")
         return value
 
     def validate_withdrawal_days(self, value):
@@ -44,6 +50,9 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         item_type = attrs.get('item_type', getattr(self.instance, 'item_type', None))
         if item_type != 'dori':
             attrs['withdrawal_days'] = 0  # ushlab turish muddati faqat dori uchun
+        if item_type != 'ozuqa':
+            attrs['feed_kind'] = ''  # yem turi va birlik og'irligi faqat ozuqa uchun
+            attrs['kg_per_unit'] = None
         if self.instance is None and attrs.get('initial_amount') is not None and not (attrs.get('quantity') or 0) > 0:
             raise serializers.ValidationError({'initial_amount': "Narx faqat boshlang'ich miqdor bilan kiritiladi"})
         return attrs

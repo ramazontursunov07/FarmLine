@@ -6,9 +6,12 @@ import { getErrorMessage } from '../utils/errors';
 import { today, formatMoney } from '../utils/format';
 import InstallButton from '../components/InstallButton';
 import CreditFields from '../components/CreditFields';
+import FeedNeed from '../components/FeedNeed';
 import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
 
 const ITEM_TYPES = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
+const FEED_KINDS = { '': 'Avtomatik', dagal: "Dag'al", shirali: 'Shirali', konsentrat: 'Konsentrat', hisobsiz: 'Hisobga olinmasin' };
+const WEIGHT_UNITS = ['kg', 'kilogram', 'kilo', 'tonna', 't', 'tn', 'g', 'gr', 'gram'];
 const TX_TYPES = { sarf: 'Sarf (ishlatildi)', kirim: 'Kirim (olib kelindi)' };
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
@@ -175,6 +178,34 @@ function Inventory() {
         }
     };
 
+    const handleFeedKind = async (item, value) => {
+        try {
+            await api.patch(`inventory-item/${item.id}/`, { feed_kind: value });
+            reload();
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+        }
+    };
+
+    const handleKgPerUnit = async (item) => {
+        const value = window.prompt(
+            `"${item.item_name}": 1 ${item.unit} necha kg? (masalan, 1 qop = 50 kg)`,
+            item.kg_per_unit ?? ''
+        );
+        if (value === null) return;
+        const n = Number(value.replace(',', '.'));
+        if (value.trim() === '' || Number.isNaN(n) || n <= 0) {
+            window.alert("Iltimos, 0 dan katta son kiriting");
+            return;
+        }
+        try {
+            await api.patch(`inventory-item/${item.id}/`, { kg_per_unit: n });
+            reload();
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+        }
+    };
+
     const handleWithdrawal = async (item) => {
         const value = window.prompt(
             `"${item.item_name}" bilan davolangan hayvonning sutini va go'shtini necha kun sotib bo'lmaydi? (0 = cheklov yo'q)`,
@@ -286,6 +317,25 @@ function Inventory() {
                                                     <button type="button" className="farm-item-action" onClick={() => handleThreshold(item)}>
                                                         Chegara
                                                     </button>
+                                                    {item.item_type === 'ozuqa' && (
+                                                        <>
+                                                            <select
+                                                                className="farm-item-action"
+                                                                aria-label={`${item.item_name}: yem turi`}
+                                                                value={item.feed_kind || ''}
+                                                                onChange={(e) => handleFeedKind(item, e.target.value)}
+                                                            >
+                                                                {Object.entries(FEED_KINDS).map(([v, l]) => (
+                                                                    <option key={v} value={v}>{v ? l : 'Yem turi: avtomatik'}</option>
+                                                                ))}
+                                                            </select>
+                                                            {!WEIGHT_UNITS.includes(item.unit.trim().toLowerCase().replace(/\.$/, '')) && (
+                                                                <button type="button" className="farm-item-action" onClick={() => handleKgPerUnit(item)}>
+                                                                    Kg/birlik{item.kg_per_unit ? `: ${qty(item.kg_per_unit)}` : ''}
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
                                                     {item.item_type === 'dori' && (
                                                         <button type="button" className="farm-item-action" onClick={() => handleWithdrawal(item)}>
                                                             Muddat
@@ -301,6 +351,10 @@ function Inventory() {
                                 ))}
                             </ul>
                         )}
+
+                        {/* Yem ehtiyoji */}
+                        <h3 className="section-title">Yem ehtiyoji (hayvonlar bo'yicha)</h3>
+                        <FeedNeed farmId={farmId} refreshKey={reloadKey} />
 
                         {/* Kirim / sarf yozish */}
                         <h3 className="section-title">Kirim yoki sarf yozish</h3>
