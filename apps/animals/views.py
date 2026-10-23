@@ -21,6 +21,7 @@ from .models import (COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, Animal
                      WeightRecord)
 from apps.debts import credit
 from . import profit as profit_report
+from . import repro as repro_report
 from .permissions import IsFarmOwnerOrWorker
 from .withdrawal import active_withdrawals, withheld_liters
 from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer,
@@ -188,7 +189,7 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             if event_type == 'tugilish' and serializer.validated_data.get('animal') is not None:
                 # Ona tug'di: bug'ozlik tugaydi
                 Animal.objects.filter(pk=serializer.validated_data['animal'].pk).update(
-                    pregnant_since=None, due_date=None, dried_off_on=None)
+                    pregnant_since=None, due_date=None)
 
             # Ferma egasiga Telegramda xabar: o'lim va tug'ilish haqida (kim yozganidan qat'i nazar)
             self._notify_owner(event, group, locked.count, count, user,
@@ -336,16 +337,6 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             qs = qs.filter(Q(tag_number__icontains=p['search']) | Q(name__icontains=p['search']))
         return qs
 
-    def get_serializer_context(self):
-        ctx = super().get_serializer_context()
-        if getattr(self, 'action', None) == 'list':
-            # Ro'yxatda tsikl ma'lumotini bir martalik so'rov bilan yig'amiz (N+1 bo'lmasligi uchun)
-            from . import reproduction
-            ids = list(self.filter_queryset(self.get_queryset()).filter(
-                sex='urgochi', status='faol').values_list('pk', flat=True))
-            ctx['repro'] = reproduction.collect(ids)
-        return ctx
-
     def _ensure_owner(self, farm):
         if farm.owner_id != self.request.user.id:
             raise PermissionDenied("Hayvon kartochkalarini faqat ferma egasi boshqara oladi.")
@@ -399,6 +390,20 @@ class AnimalViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                     group.count -= 1
                     group.save(update_fields=['count', 'updated_at'])
             instance.delete()
+
+    @action(detail=False, methods=['get'])
+    def repro(self, request):
+        """
+        Ko'payish eslatmalari: quritish vaqti, qayta urug'lantirish va tug'ishlar orasidagi muddat.
+        ?farm=<id> (shart). Ferma egasi va ishchilar ko'ra oladi.
+        """
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        farm = Farm.objects.filter(pk=int(farm_id)).first()
+        if farm is None or not (is_app_admin(request.user) or is_farm_member(request.user, farm)):
+            raise PermissionDenied("Siz bu fermaning ma'lumotini ko'ra olmaysiz.")
+        return Response(repro_report.build_report(farm, timezone.localdate()))
 
     @action(detail=True, methods=['get'])
     def card(self, request, pk=None):
@@ -775,3 +780,4 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             if debt is not None:
                 credit.delete_debt(debt)  # nasiya qarzi va u bo'yicha olingan pullar ham qaytariladi
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
