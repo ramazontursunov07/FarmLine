@@ -8,7 +8,6 @@ import MilkEntry from '../components/MilkEntry';
 import MilkReport from '../components/MilkReport';
 import MilkSales from '../components/MilkSales';
 import MilkProfit from '../components/MilkProfit';
-import ReproPlan from '../components/ReproPlan';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
@@ -236,7 +235,6 @@ function AnimalCards() {
                         <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
                         <MilkSales farmId={farmId} refreshKey={reloadKey} />
                         <MilkReport farmId={farmId} refreshKey={reloadKey} />
-                        <ReproPlan farmId={farmId} refreshKey={reloadKey} />
                         {farm?.can_view_finance && <MilkProfit farmId={farmId} refreshKey={reloadKey} />}
 
                         {isOwner && !adding && (
@@ -467,6 +465,12 @@ function AnimalCards() {
                                                         {a.status === 'faol' && a.stage_display && <span className="work-badge">{a.stage_display}</span>}
                                                         {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
                                                         {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
+                                                        {a.reproduction && ['soon', 'now', 'late'].includes(a.reproduction.dry_off_state) && (
+                                                            <span className="work-badge">Quritish vaqti</span>
+                                                        )}
+                                                        {a.reproduction && ['now', 'late', 'critical'].includes(a.reproduction.rebreed_state) && (
+                                                            <span className="work-badge">Urug'lantirish kerak</span>
+                                                        )}
                                                         {a.withdrawal && (
                                                             <span className="work-badge work-badge--shoshilinch">
                                                                 {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}

@@ -8,6 +8,8 @@ Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 4. Tug'ish eslatmasi -- tug'ishi yaqin yoki muddati o'tib ketgan bug'oz hayvonlar
 5. Dori ushlab turish muddati -- davolangan hayvonlarning sutini/go'shtini hali sotib bo'lmaydi
 6. Qarz eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan nasiyalar (mijozlar va yetkazib beruvchilar)
+7. Quritish eslatmasi -- tug'ishdan ~60 kun oldin sog'ishni to'xtatish vaqti (apps/animals/reproduction.py)
+8. Qayta urug'lantirish -- tug'gandan keyin ~60 kundan boshlab; 117 kundan oshsa tug'ishlar orasi 400 kundan oshadi
 
 Har bir funksiya matn qatorlari ro'yxatini qaytaradi (ogohlantirish bo'lmasa -- bo'sh ro'yxat).
 Chegaralarni shu fayl tepasidagi sozlamalardan o'zgartirish mumkin.
@@ -47,6 +49,9 @@ VACCINE_OVERDUE_DAYS = 7   # muddati o'tganlarni necha kungacha eslatamiz
 CALVING_DAYS_AHEAD = 14     # tug'ishga necha kun qolganda eslatma boshlanadi
 CALVING_URGENT_DAYS = 3     # shu kundan kam qolsa, xabar "shoshilinch" belgisi (🚨) bilan chiqadi
 CALVING_OVERDUE_DAYS = 21   # muddati o'tib ketganlarni necha kungacha eslatamiz
+
+# Quritish / qayta urug'lantirish (chegaralar apps/animals/reproduction.py da)
+REBREED_NUDGE_DAYS = 7      # "urug'lantirish vaqti keldi" xabari ochilgan kundan necha kun davomida chiqadi
 
 # Qarz eslatmasi: muddatiga shuncha kun qolganda boshlanadi, to'langunча har kuni eslatiladi
 DEBT_DAYS_AHEAD = 3
@@ -274,30 +279,59 @@ def calving_lines(farm, today):
     return lines
 
 
-# ---------------------------------------------------------------- 4b. Quritish va qayta urug'lantirish
-def repro_lines(farm, today):
-    """Sigirni quritish vaqti va tug'gandan keyin qayta urug'lantirish eslatmalari."""
-    from apps.animals import repro
-    rep = repro.build_report(farm, today)
-    lines = []
-    dry = rep['dry_off']
-    if dry:
-        urgent = any(r['status'] == 'vaqti' for r in dry)
-        lines.append(f"{'🚨' if urgent else '🥛'} Quritish vaqti: {len(dry)} ta (tug'ishdan ~{repro.DRY_DAYS_BEFORE} kun oldin)")
-        for r in dry[:MAX_ITEMS]:
-            who = f"№{r['tag_number']}" + (f" {r['name']}" if r['name'] else '')
-            lines.append(f"  • {who} — {_when(r['dry_date'], today)}, tug'ish {r['due_date']:%d.%m}")
-        lines += _more(len(dry))
-    rb = rep['rebreed']
-    if rb:
-        late = any(r['status'] == 'kechikdi' for r in rb)
-        lines.append(f"{'⚠️' if late else '🐄'} Qayta urug'lantirish vaqti: {len(rb)} ta")
-        for r in rb[:MAX_ITEMS]:
-            who = f"№{r['tag_number']}" + (f" {r['name']}" if r['name'] else '')
-            tail = (f", tug'ishlar orasi ~{r['projected_interval']} kun bo'ladi" if r['status'] == 'kechikdi' else '')
-            lines.append(f"  • {who} — tug'gandan {r['days_since']} kun o'tdi{tail}")
-        lines += _more(len(rb))
-        lines.append("  ℹ️ Urug'lantirilgach, kartochkada bug'ozlik sanasini yozing: eslatma to'xtaydi.")
+def _repro_infos(farm, today):
+    """[(hayvon, tsikl ma'lumoti)] -- faol urg'ochi qoramollar, bitta so'rov to'plami bilan."""
+    from apps.animals import reproduction
+    animals = list(Animal.objects.select_related('group__animal_type').filter(
+        farm=farm, status='faol', sex='urgochi'))
+    shared = reproduction.collect([a.pk for a in animals])
+    out = []
+    for a in animals:
+        data = reproduction.info(a, today, shared['calvings'].get(a.pk, []), shared['milk'].get(a.pk))
+        if data:
+            out.append((a, data))
+    return out
+
+
+def dry_off_lines(farm, today):
+    """Quritish vaqti: tug'ishdan ~60 kun oldin sog'ish to'xtatilishi kerak (keyingi laktatsiya sutini oshiradi)."""
+    rows = [(a, d) for a, d in _repro_infos(farm, today) if d['dry_off_state'] in ('soon', 'now', 'late')]
+    if not rows:
+        return []
+    rows.sort(key=lambda r: (r[1]['dry_off_date'], r[0].pk))
+    late = any(d['dry_off_state'] == 'late' for _, d in rows)
+    lines = [f"{'⚠️' if late else '🥛'} Quritish vaqti: {len(rows)} ta"]
+    for a, d in rows[:MAX_ITEMS]:
+        lines.append(f"  • {a} — {_when(d['dry_off_date'], today)}, tug'ish {a.due_date:%d.%m}")
+    lines += _more(len(rows))
+    lines.append("  ℹ️ Sog'ishni to'xtatgach, kartochkada «Quritildi» ni bosing: eslatma to'xtaydi.")
+    return lines
+
+
+def rebreed_lines(farm, today):
+    """Tug'gan, hali bug'oz bo'lmagan sigirlar: urug'lantirish vaqti va tug'ishlar orasi muddati."""
+    from apps.animals import reproduction as rp
+    rows = []
+    for a, d in _repro_infos(farm, today):
+        state, days = d['rebreed_state'], d['days_since_calving']
+        if state in ('late', 'critical') and days <= rp.REBREED_MAX_DAYS:
+            rows.append((a, d))
+        elif state == 'now' and days < rp.REBREED_FROM_DAYS + REBREED_NUDGE_DAYS:
+            rows.append((a, d))
+    if not rows:
+        return []
+    rows.sort(key=lambda r: (-r[1]['days_since_calving'], r[0].pk))
+    critical = any(d['rebreed_state'] == 'critical' for _, d in rows)
+    lines = [f"{'🚨' if critical else '🐄'} Urug'lantirish vaqti: {len(rows)} ta"]
+    for a, d in rows[:MAX_ITEMS]:
+        text = f"  • {a} — tug'gandan {d['days_since_calving']} kun"
+        if d['rebreed_state'] == 'critical':
+            text += f" (tug'ishlar orasi {rp.CALVING_INTERVAL_TARGET} kundan oshadi)"
+        elif d['rebreed_state'] == 'late':
+            text += f" ({d['conceive_by']:%d.%m} gacha bug'oz bo'lishi kerak)"
+        lines.append(text)
+    lines += _more(len(rows))
+    lines.append("  ℹ️ Urug'lantirilgach, kartochkada bug'ozlik sanasini yozing: eslatma to'xtaydi.")
     return lines
 
 
@@ -360,8 +394,8 @@ def build_alert_lines(farm, today):
     to'xtab qolmasligi uchun xato log'ga yoziladi va qolganlari davom etadi.
     """
     lines = []
-    for builder in (calving_lines, repro_lines, debt_lines, withdrawal_lines, vaccination_lines, feed_forecast_lines,
-                    spending_alert_lines):
+    for builder in (calving_lines, dry_off_lines, rebreed_lines, debt_lines, withdrawal_lines,
+                    vaccination_lines, feed_forecast_lines, spending_alert_lines):
         try:
             lines += builder(farm, today)
         except Exception:
