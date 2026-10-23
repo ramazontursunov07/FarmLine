@@ -7,6 +7,7 @@ import InstallButton from '../components/InstallButton';
 import MilkEntry from '../components/MilkEntry';
 import MilkReport from '../components/MilkReport';
 import MilkSales from '../components/MilkSales';
+import MilkProfit from '../components/MilkProfit';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
@@ -234,6 +235,7 @@ function AnimalCards() {
                         <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
                         <MilkSales farmId={farmId} refreshKey={reloadKey} />
                         <MilkReport farmId={farmId} refreshKey={reloadKey} />
+                        {farm?.can_view_finance && <MilkProfit farmId={farmId} refreshKey={reloadKey} />}
 
                         {isOwner && !adding && (
                             <button type="button" className="btn-primary btn-auto" onClick={() => openAdd()}>

@@ -20,6 +20,7 @@ from apps.users.permissions import IsAppAdmin, is_app_admin
 from .models import (COUNT_EVENT_TYPES, Animal, AnimalGroup, AnimalEvent, AnimalType, MilkRecord, MilkSale,
                      WeightRecord)
 from apps.debts import credit
+from . import profit as profit_report
 from .permissions import IsFarmOwnerOrWorker
 from .withdrawal import active_withdrawals, withheld_liters
 from .serializers import (AnimalTypeSerializer, AnimalGroupSerializer, AnimalEventSerializer,
@@ -532,6 +533,31 @@ class MilkRecordViewSet(_AnimalRecordViewSet):
         self._ensure_can_modify(instance)
         self._ensure_not_sold(instance.animal.farm_id, instance.liters)
         instance.delete()
+
+    @action(detail=False, methods=['get'])
+    def profit(self, request):
+        """
+        1 litr sut tannarxi va har bir sigirning foyda/zarari (faqat moliya huquqi bor foydalanuvchi).
+        ?farm=<id> (shart), ?month=YYYY-MM (bo'lmasa, shu oy), ?price=<so'm> (1 litr narxini qo'lda berish),
+        ?exclude=ozuqa,dori (hisobga olinmaydigan chiqim kategoriyalari).
+        """
+        from apps.finance.views import finance_farms
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        farm = Farm.objects.filter(pk=int(farm_id)).first()
+        if farm is None or not (is_app_admin(request.user) or finance_farms(request.user).filter(pk=farm.pk).exists()):
+            raise PermissionDenied("Tannarx hisoboti faqat ferma egasi yoki moliya huquqi bor ishchi uchun.")
+        today = timezone.localdate()
+        try:
+            start, end = profit_report.month_bounds(request.query_params.get('month'), today)
+        except (ValueError, TypeError):
+            raise ValidationError({'month': "Oy YYYY-MM ko'rinishida bo'lishi kerak (masalan, 2026-10)"})
+        if start > end:
+            raise ValidationError({'month': "Kelajak oyi uchun hisobot yo'q"})
+        exclude = {c for c in request.query_params.get('exclude', '').split(',') if c}
+        price = profit_report.parse_price(request.query_params.get('price'))
+        return Response(profit_report.build_report(farm, start, end, exclude, price))
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
