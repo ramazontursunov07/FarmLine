@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.users.models import User
@@ -7,7 +8,7 @@ from .models import Farm, Worker
 
 
 class FarmSerializer(serializers.ModelSerializer):
-    owner_username = serializers.CharField(source='owner.username', read_only=True) #fermerni usernamemi
+    owner_username = serializers.CharField(source='owner.username', read_only=True)  # fermerni usernamemi
     can_view_finance = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,27 +28,42 @@ class FarmSerializer(serializers.ModelSerializer):
         """Fermer o'z fermasida har doim True; ishchida esa unga berilgan huquq."""
         request = self.context.get('request')
         user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated: #user bo'lmasa yoki Authenticateddan o'tmagan bo'lsa False qaytaradi.Ya'ni ruxsat yo'q.
+        if not user or not user.is_authenticated:  # user bo'lmasa yoki Authenticateddan o'tmagan bo'lsa False qaytaradi.Ya'ni ruxsat yo'q.
             return False
-        if obj.owner_id == user.id:  #Agar ferma egasi bo'lsa unga ruxsat.
+        if obj.owner_id == user.id:  # Agar ferma egasi bo'lsa unga ruxsat.
             return True
-        return obj.workers.filter(user=user, can_view_finance=True).exists() #Agar ruxsat berilgan ishchi bo'lsa.
+        return obj.workers.filter(user=user, can_view_finance=True).exists()  # Agar ruxsat berilgan ishchi bo'lsa.
 
 
 class WorkerSerializer(serializers.ModelSerializer):
-    """Ishchini ko'rsatish va tahrirlash (tahrirlanadigan yagona maydon: can_view_finance)."""
+    """Ishchini ko'rsatish va tahrirlash (tahrirlanadigan maydonlar: can_view_finance, monthly_salary)."""
     user_username = serializers.CharField(source='user.username', read_only=True)
     user_full_name = serializers.SerializerMethodField()
     user_phone = serializers.CharField(source='user.phone_number', read_only=True, default='')
     farm_name = serializers.CharField(source='farm.name', read_only=True)
+    monthly_salary = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False)
+    last_salary_month = serializers.SerializerMethodField()
 
     class Meta:
         model = Worker
         fields = [
             'id', 'user', 'user_username', 'user_full_name', 'user_phone',
-            'farm_name', 'farm', 'can_view_finance', 'joined_at',
+            'farm_name', 'farm', 'can_view_finance', 'monthly_salary', 'salary_from', 'last_salary_month',
+            'joined_at',
         ]
-        read_only_fields = ['user', 'farm']
+        read_only_fields = ['user', 'farm', 'salary_from']
+
+    def get_last_salary_month(self, obj):
+        """Oxirgi marta qaysi oy uchun ish haqi chiqimi yozilgan (YYYY-MM)."""
+        last = obj.salary_payments.first()
+        return f"{last.month:%Y-%m}" if last else None
+
+    def update(self, instance, validated_data):
+        # Oylik 0 dan oshirilganda hisob shu kundan boshlanadi (o'tgan oylar uchun chiqim yozilmaydi)
+        salary = validated_data.get('monthly_salary')
+        if salary is not None and salary > 0 and (instance.monthly_salary or 0) <= 0:
+            validated_data['salary_from'] = timezone.localdate()
+        return super().update(instance, validated_data)
 
     def get_user_full_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
@@ -65,6 +81,7 @@ class WorkerCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
     can_view_finance = serializers.BooleanField(required=False, default=False)
+    monthly_salary = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, default=0)
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -86,4 +103,6 @@ class WorkerCreateSerializer(serializers.Serializer):
             user=user,
             farm=farm,
             can_view_finance=validated_data['can_view_finance'],
+            monthly_salary=validated_data['monthly_salary'],
+            salary_from=timezone.localdate() if validated_data['monthly_salary'] > 0 else None,
         )

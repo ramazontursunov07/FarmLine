@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import { formatMoney } from '../utils/format';
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -10,6 +11,7 @@ const EMPTY_FORM = {
     username: '',
     phone_number: '',
     password: '',
+    monthly_salary: '',
     can_view_finance: false,
 };
 
@@ -49,7 +51,11 @@ function WorkersPanel({ farmId }) {
         setSaving(true);
         setFormError('');
         try {
-            const { data } = await api.post('workers/', { ...formData, farm: farmId });
+            const { data } = await api.post('workers/', {
+                ...formData,
+                monthly_salary: formData.monthly_salary === '' ? 0 : formData.monthly_salary,
+                farm: farmId,
+            });
             setWorkers((prev) => [data, ...prev]);
             setFormData(EMPTY_FORM);
             setShowForm(false);
@@ -65,6 +71,26 @@ function WorkersPanel({ farmId }) {
             const { data } = await api.patch(`workers/${worker.id}/`, {
                 can_view_finance: !worker.can_view_finance,
             });
+            setWorkers((prev) => prev.map((w) => (w.id === data.id ? data : w)));
+        } catch (err) {
+            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+        }
+    };
+
+    const handleSalary = async (worker) => {
+        const value = window.prompt(
+            `${worker.user_full_name}: oylik ish haqi (so'm)?\n` +
+            "Oy oxirida shu summa moliyaga «Ish haqi» chiqimi bo'lib o'zi yoziladi. 0 = o'chirish.",
+            Number(worker.monthly_salary) || ''
+        );
+        if (value === null) return;
+        const n = Number(value.replace(/\s/g, '').replace(',', '.'));
+        if (value.trim() === '' || Number.isNaN(n) || n < 0) {
+            window.alert("Iltimos, 0 yoki undan katta son kiriting");
+            return;
+        }
+        try {
+            const { data } = await api.patch(`workers/${worker.id}/`, { monthly_salary: n });
             setWorkers((prev) => prev.map((w) => (w.id === data.id ? data : w)));
         } catch (err) {
             window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
@@ -122,6 +148,11 @@ function WorkersPanel({ farmId }) {
                             <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange}
                                 placeholder="+998 90 123 45 67" />
                         </div>
+                        <div className="form-field">
+                            <label>Oylik ish haqi (so'm, ixtiyoriy)</label>
+                            <input type="number" name="monthly_salary" min="0" step="1" inputMode="numeric"
+                                value={formData.monthly_salary} onChange={handleChange} placeholder="Masalan: 3000000" />
+                        </div>
                     </div>
                     <label className="check-field">
                         <input type="checkbox" name="can_view_finance" checked={formData.can_view_finance}
@@ -159,6 +190,12 @@ function WorkersPanel({ farmId }) {
                                 <span className="worker-meta">
                                     @{w.user_username}{w.user_phone ? ` · ${w.user_phone}` : ''}
                                 </span>
+                                <span className="worker-meta">
+                                    {Number(w.monthly_salary) > 0
+                                        ? `Oylik: ${formatMoney(w.monthly_salary)} · oy oxirida moliyaga o'zi yoziladi`
+                                        : "Oylik belgilanmagan"}
+                                    {w.last_salary_month ? ` · oxirgi yozilgan: ${w.last_salary_month}` : ''}
+                                </span>
                             </div>
                             <div className="worker-actions">
                                 <label className="check-field">
@@ -166,6 +203,9 @@ function WorkersPanel({ farmId }) {
                                         onChange={() => handleToggleFinance(w)} />
                                     Moliyani ko'radi
                                 </label>
+                                <button type="button" className="farm-item-action" onClick={() => handleSalary(w)}>
+                                    Oylik
+                                </button>
                                 <button type="button" className="farm-item-action farm-item-action--danger"
                                     onClick={() => handleRemove(w)}>
                                     Olib tashlash

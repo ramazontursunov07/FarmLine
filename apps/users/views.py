@@ -1,6 +1,7 @@
 import hmac
 import html
 import ipaddress
+import logging
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -14,6 +15,8 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+
+from apps.farms import payroll
 
 from .digest_runner import run_digest_in_background
 from .models import DigestRun, PasswordResetToken, TelegramLinkToken, User
@@ -29,6 +32,8 @@ from .serializers import (
 )
 from .telegram import build_bot_link, send_message
 
+logger = logging.getLogger(__name__)
+
 # Foydalanuvchi bor-yo'qligidan qat'i nazar har doim shu javob qaytariladi
 FORGOT_PASSWORD_DETAIL = (
     "Agar akkaunt mavjud va Telegram ulangan bo'lsa, parolni tiklash havolasi botga yuborildi."
@@ -37,16 +42,16 @@ FORGOT_PASSWORD_DETAIL = (
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = RegisterSerializer #serializatsiya classi
-    permission_classes = [AllowAny] #hamma uchun
+    serializer_class = RegisterSerializer  # serializatsiya classi
+    permission_classes = [AllowAny]  # hamma uchun
     authentication_classes = []  # eskirgan token ochiq endpointni 401 bilan to'sib qo'ymasin
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data) #ma'lumotni serializatsiya qilamiz.
-        serializer.is_valid(raise_exception=True) #tekshiramiz.
-        user = serializer.save() #saqlaymiz.
+        serializer = self.get_serializer(data=request.data)  # ma'lumotni serializatsiya qilamiz.
+        serializer.is_valid(raise_exception=True)  # tekshiramiz.
+        user = serializer.save()  # saqlaymiz.
 
         refresh = RefreshToken.for_user(user)
 
@@ -64,8 +69,8 @@ class RegisterView(generics.CreateAPIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-    throttle_classes = [ScopedRateThrottle] #ma'lum vaqt ichida nechta so'rov yuborish mumkinligi.
-    throttle_scope = 'login' #bir daqiqada nechta so'rov yuborishi mumkinligi.
+    throttle_classes = [ScopedRateThrottle]  # ma'lum vaqt ichida nechta so'rov yuborish mumkinligi.
+    throttle_scope = 'login'  # bir daqiqada nechta so'rov yuborishi mumkinligi.
 
 
 class ChangePasswordView(generics.UpdateAPIView):
@@ -77,19 +82,19 @@ class ChangePasswordView(generics.UpdateAPIView):
         return self.request.user
 
     def update(self, request, *args, **kwargs):
-        user = self.get_object() #obyektni olamiz
-        serializer = self.get_serializer(data=request.data) #serializatsiya qilamiz.
-        serializer.is_valid(raise_exception=True) #agarda xato bo'lsa xatoni chiqaramiz.
+        user = self.get_object()  # obyektni olamiz
+        serializer = self.get_serializer(data=request.data)  # serializatsiya qilamiz.
+        serializer.is_valid(raise_exception=True)  # agarda xato bo'lsa xatoni chiqaramiz.
 
-        old_password = serializer.validated_data['old_password'] #eski password
-        new_password = serializer.validated_data['new_password'] #yangi password
+        old_password = serializer.validated_data['old_password']  # eski password
+        new_password = serializer.validated_data['new_password']  # yangi password
 
-        if not user.check_password(old_password): #eski parolni tekshiramiz.
+        if not user.check_password(old_password):  # eski parolni tekshiramiz.
             return Response({'old_password': "Eski parol noto'g'ri"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user.set_password(new_password) #agarda eski parol to'g'ri bo'lsa unda yangi parolni kodlaymiz.
-        user.save() #undan keyin saqlaymiz.
-        return Response({'detail': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK) #response
+        user.set_password(new_password)  # agarda eski parol to'g'ri bo'lsa unda yangi parolni kodlaymiz.
+        user.save()  # undan keyin saqlaymiz.
+        return Response({'detail': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK)  # response
 
 
 class UserUpdateView(generics.RetrieveUpdateAPIView):
@@ -107,8 +112,8 @@ class TelegramLinkView(APIView):
     DELETE - Telegram ulanishini olib tashlaydi.
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle] #necha marta so'rov yuborish mumkinligi
-    throttle_scope = 'telegram_link' #bir daqiqada nechta so'rov yuborish mumkinligi.
+    throttle_classes = [ScopedRateThrottle]  # necha marta so'rov yuborish mumkinligi
+    throttle_scope = 'telegram_link'  # bir daqiqada nechta so'rov yuborish mumkinligi.
 
     def post(self, request):
         # Eski ishlatilmagan kodlar bekor qilinadi
@@ -249,9 +254,14 @@ class DailyDigestCronView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         today = timezone.localdate()
+        try:
+            payroll.post_due(today)  # oy oxirida ishchilar ish haqi chiqimi
+        except Exception:
+            logger.exception("Ish haqini yozishda xato")
         run, created = DigestRun.objects.get_or_create(date=today)
         if not created and request.query_params.get('force') != '1':
             return Response({'detail': 'Bugungi hisobot allaqachon yuborilgan'}, status=status.HTTP_200_OK)
 
         run_digest_in_background(today, run.pk)
         return Response({'detail': 'Hisobot yuborilmoqda'}, status=status.HTTP_202_ACCEPTED)
+    

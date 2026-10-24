@@ -4,6 +4,7 @@ import time
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
+from apps.farms.payroll import post_due_once_a_day
 from apps.users.digest_runner import send_due_digest
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,10 @@ class Command(BaseCommand):
             delay = CHECK_EVERY
             try:
                 close_old_connections()
+                try:
+                    post_due_once_a_day()  # oy oxirida ishchilar ish haqi chiqimi
+                except Exception:
+                    logger.exception("Ish haqini yozishda xato")
                 result = send_due_digest()
                 if result is False:
                     delay = RETRY_AFTER_ERROR
