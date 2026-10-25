@@ -94,6 +94,27 @@ class WeatherTests(APITestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['status'], 'unavailable')
 
+    def test_service_down_shows_last_good_forecast(self):
+        self.client.force_authenticate(self.owner)
+        with patch('apps.weather.services.requests.get', side_effect=fake_get):
+            self.assertEqual(self.client.get(URL, {'farm': self.farm.id}).json()['status'], 'ok')
+        # Yangi natija muddati o'tdi, lekin eski nusxa qoldi
+        farm = Farm.objects.get(pk=self.farm.pk)
+        cache.delete(f'weather:{round(farm.latitude, 2)}:{round(farm.longitude, 2)}')
+        with patch('apps.weather.services.requests.get', side_effect=requests.ConnectionError()):
+            r = self.client.get(URL, {'farm': self.farm.id})
+        body = r.json()
+        self.assertEqual((r.status_code, body['status']), (200, 'ok'))
+        self.assertTrue(body['stale'])
+        self.assertTrue(body['updated_at'])
+        self.assertEqual(len(body['days']), 3)
+
+    def test_fresh_forecast_is_not_marked_stale(self):
+        self.client.force_authenticate(self.owner)
+        with patch('apps.weather.services.requests.get', side_effect=fake_get):
+            body = self.client.get(URL, {'farm': self.farm.id}).json()
+        self.assertNotIn('stale', body)
+
     def test_geocode_falls_back_to_parts_and_caches_coords(self):
         calls = []
 

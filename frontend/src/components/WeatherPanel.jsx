@@ -10,6 +10,17 @@ function dayName(iso, i) {
     return WEEKDAYS[d.getDay()];
 }
 
+// "bugun 14:05" yoki "23.10 14:05"
+function updatedText(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    return sameDay ? `bugun ${time}` : `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${time}`;
+}
+
 function deg(v) {
     return v == null ? '—' : `${Math.round(v)}°`;
 }
@@ -95,6 +106,13 @@ function WeatherPanel({ farms }) {
                         </li>
                     ))}
                 </ul>
+
+                {data.stale && (
+                    <p className="db-muted" role="status">
+                        Ob-havo xizmati hozir javob bermayapti: oxirgi olingan ma'lumot
+                        {data.updated_at ? ` (${updatedText(data.updated_at)})` : ''} ko'rsatilyapti.
+                    </p>
+                )}
             </>
         );
     }

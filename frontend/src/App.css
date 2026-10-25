@@ -1664,3 +1664,42 @@ a.farm-tile:hover {
 .form-more[open] > summary {
     margin-bottom: 8px;
 }
+
+/* ===== "Ko'proq" menyusi: kam ishlatiladigan tugmalar yig'ilgan (Ombor) ===== */
+.more-menu {
+    flex: 0 0 auto; /* yopiq: Sarf va Kirim bilan bir qatorda */
+}
+
+.more-menu[open] {
+    flex-basis: 100%; /* ochiq: tugmalar pastga to'liq kenglikda */
+}
+
+.more-menu > summary {
+    display: inline-block;
+    padding: 8px 16px;
+    min-height: 40px;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.more-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.more-menu[open] > summary {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.more-menu-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 0 2px;
+}

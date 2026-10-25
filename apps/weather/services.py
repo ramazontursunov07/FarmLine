@@ -3,13 +3,15 @@ import logging
 
 import requests
 from django.core.cache import cache
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search'
 FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
 TIMEOUT = 8
-CACHE_SECONDS = 30 * 60
+CACHE_SECONDS = 60 * 60       # shuncha vaqt ichida Open-Meteo'dan qayta so'ramaymiz (429 "juda ko'p so'rov" bo'lmasin)
+STALE_SECONDS = 24 * 60 * 60  # xizmat javob bermasa, shuncha vaqt eski natijani ko'rsatamiz
 
 # Ogohlantirish chegaralari
 FROST_C = 0          # min harorat shundan past yoki teng bo'lsa
@@ -75,14 +77,23 @@ def fetch_forecast(lat, lon):
     cached = cache.get(key)
     if cached:
         return cached
-    data = _get_json(FORECAST_URL, {
-        'latitude': lat, 'longitude': lon, 'timezone': 'auto', 'forecast_days': 7,
-        'current': 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
-        'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
-                  'precipitation_sum,precipitation_probability_max,wind_speed_10m_max'),
-    })
+    try:
+        data = _get_json(FORECAST_URL, {
+            'latitude': lat, 'longitude': lon, 'timezone': 'auto', 'forecast_days': 7,
+            'current': 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
+            'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
+                      'precipitation_sum,precipitation_probability_max,wind_speed_10m_max'),
+        })
+    except WeatherError:
+        # Xizmat javob bermadi: bo'sh xato o'rniga oxirgi muvaffaqiyatli natijani "eskirgan" belgisi bilan beramiz
+        stale = cache.get(key + ':stale')
+        if stale:
+            return {**stale, 'stale': True}
+        raise
     result = parse_forecast(data)
+    result['updated_at'] = timezone.now().isoformat()
     cache.set(key, result, CACHE_SECONDS)
+    cache.set(key + ':stale', result, STALE_SECONDS)
     return result
 
 

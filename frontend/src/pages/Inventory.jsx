@@ -313,7 +313,9 @@ function Inventory() {
                                             <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'sarf')}>Sarf</button>
                                             <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'kirim')}>Kirim</button>
                                             {isOwner && (
-                                                <>
+                                                <details className="more-menu">
+                                                    <summary>Ko'proq</summary>
+                                                    <div className="more-menu-body">
                                                     <button type="button" className="farm-item-action" onClick={() => handleThreshold(item)}>
                                                         Chegara
                                                     </button>
@@ -344,7 +346,8 @@ function Inventory() {
                                                     <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteItem(item)}>
                                                         O'chirish
                                                     </button>
-                                                </>
+                                                    </div>
+                                                </details>
                                             )}
                                         </div>
                                     </li>
