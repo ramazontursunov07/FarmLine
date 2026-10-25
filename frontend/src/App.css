@@ -1600,8 +1600,67 @@ a.farm-tile:hover {
         padding: 9px 8px;
     }
 
+    .report-table th {
+        white-space: normal; /* uzun sarlavha ikki qatorga tushsin */
+        line-height: 1.25;
+    }
+
     .report-table th:first-child,
     .report-table td:first-child {
         padding-left: 12px;
     }
+
+    /* Katta pul summalari bor jadval (Moliya): yanada ixcham */
+    .report-table--money {
+        font-size: 12px;
+    }
+
+    .report-table--money th,
+    .report-table--money td {
+        padding: 9px 5px;
+    }
+}
+
+/* ===== Tezkor tanlov tugmalari (chip) va yig'iladigan qo'shimcha maydonlar ===== */
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    min-height: 44px; /* barmoq bilan bosish uchun */
+    padding: 8px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chip:hover {
+    border-color: var(--color-primary);
+}
+
+.chip--active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.form-more {
+    margin: 4px 0 16px;
+}
+
+.form-more > summary {
+    cursor: pointer;
+    padding: 10px 0;
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+.form-more[open] > summary {
+    margin-bottom: 8px;
 }

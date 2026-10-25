@@ -256,6 +256,14 @@ function FarmWork() {
                 return;
             }
         }
+        // Boshqa ishlarda ham sarlavha bo'sh qolsa, o'zimiz yozamiz: "Vaksinatsiya: Qo'y, 40 ta"
+        if (!isBirth && !payload.title.trim()) {
+            const group = activeGroups.find((g) => String(g.id) === selectedGroup);
+            const who = group
+                ? `${group.animal_type_name}${payload.animal_count ? `, ${payload.animal_count} ta` : ''}`
+                : '';
+            payload.title = who ? `${EVENT_TYPES[payload.event_type]}: ${who}` : EVENT_TYPES[payload.event_type];
+        }
         // Tug'ilishda sarlavha bo'sh qolsa, o'zimiz yozamiz
         if (isBirth && !payload.title.trim()) {
             const tags = (payload.calves || []).map((c) => `№${c.tag_number}`).join(', ');
@@ -459,7 +467,22 @@ function FarmWork() {
                                 </p>
                             ) : (
                                 <form onSubmit={handleAddEvent}>
-                                    <div className="form-row">
+                                    <div className="form-field">
+                                        <label id="event-type-label">Nima bo'ldi?</label>
+                                        <div className="chips" role="radiogroup" aria-labelledby="event-type-label">
+                                            {Object.entries(EVENT_TYPES)
+                                                .filter(([v]) => !HIDDEN_IN_FORM.includes(v))
+                                                .map(([v, l]) => (
+                                                    <button key={v} type="button" role="radio"
+                                                        aria-checked={eventForm.event_type === v}
+                                                        className={`chip${eventForm.event_type === v ? ' chip--active' : ''}`}
+                                                        onClick={() => handleEventChange({ target: { name: 'event_type', value: v } })}>
+                                                        {l}
+                                                    </button>
+                                                ))}
+                                        </div>
+                                    </div>
+                                    {activeGroups.length > 1 ? (
                                         <div className="form-field">
                                             <label>Hayvon guruhi</label>
                                             <select name="animal_group" value={selectedGroup} onChange={handleEventChange}>
@@ -470,17 +493,11 @@ function FarmWork() {
                                                 ))}
                                             </select>
                                         </div>
-                                        <div className="form-field">
-                                            <label>Ish turi</label>
-                                            <select name="event_type" value={eventForm.event_type} onChange={handleEventChange}>
-                                                {Object.entries(EVENT_TYPES)
-                                                    .filter(([v]) => !HIDDEN_IN_FORM.includes(v))
-                                                    .map(([v, l]) => (
-                                                        <option key={v} value={v}>{l}</option>
-                                                    ))}
-                                            </select>
-                                        </div>
-                                    </div>
+                                    ) : (
+                                        <p className="work-meta" style={{ marginBottom: 12 }}>
+                                            Guruh: {activeGroups[0].animal_type_name}{activeGroups[0].breed ? ` (${activeGroups[0].breed})` : ''} — {activeGroups[0].count} ta
+                                        </p>
+                                    )}
                                     {needsAnimal && (
                                         <div className="form-field">
                                             <label>{animalRequired ? 'Qaysi hayvon? Quloq raqami' : 'Quloq raqami (ixtiyoriy)'}</label>
@@ -588,12 +605,9 @@ function FarmWork() {
                                         );
                                     })}
                                     <div className="form-field">
-                                        <label>Sarlavha</label>
+                                        <label>Sarlavha (ixtiyoriy)</label>
                                         <input type="text" name="title" value={eventForm.title} onChange={handleEventChange}
-                                            placeholder={isBirth || pickedAnimal
-                                                ? "Bo'sh qoldirsangiz, avtomatik yoziladi"
-                                                : 'Masalan: 10 ta tovuq antibiotik bilan davolanyapti'}
-                                            required={!isBirth && !pickedAnimal} />
+                                            placeholder="Bo'sh qoldirsangiz, avtomatik yoziladi" />
                                     </div>
                                     {eventForm.event_type === 'davolash' && (
                                         <div className="form-row">
@@ -619,6 +633,12 @@ function FarmWork() {
                                             </p>
                                         </div>
                                     )}
+                                    <details className="form-more">
+                                        <summary>
+                                            Sana: {formatDate(eventForm.start_date)}
+                                            {!COUNT_HINTS[eventForm.event_type] ? ` · ${EVENT_STATUSES[eventForm.status]}` : ''}
+                                            {' '}(o'zgartirish yoki izoh qo'shish)
+                                        </summary>
                                     <div className="form-field">
                                         <label>Izoh (ixtiyoriy)</label>
                                         <input type="text" name="description" value={eventForm.description} onChange={handleEventChange} />
@@ -639,6 +659,7 @@ function FarmWork() {
                                             </div>
                                         )}
                                     </div>
+                                    </details>
                                     {eventError && <p className="error-text" role="alert">{eventError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingEvent}>
                                         {savingEvent ? 'Kuting...' : "Qo'shish"}

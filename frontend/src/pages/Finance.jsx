@@ -32,6 +32,12 @@ const EMPTY_FORM = {
 
 const EMPTY_FILTERS = { transaction_type: "", category: "", date_from: "", date_to: "" };
 
+// Telefonda "so'm" yozuvi yashiriladi (jadval ekranga sig'sin); kompyuterda to'liq ko'rinadi
+function Money({ value }) {
+    const text = formatMoney(value);
+    return <>{text.replace(" so'm", '')}<span className="hide-sm"> so'm</span></>;
+}
+
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
 function Finance() {
@@ -263,7 +269,7 @@ function Finance() {
                             <p className="empty-state">Hisobot uchun yozuvlar yo'q</p>
                         ) : (
                             <div className="report-wrap">
-                                <table className="report-table">
+                                <table className="report-table report-table--money">
                                     <thead>
                                         <tr>
                                             <th>Davr</th>
@@ -276,11 +282,11 @@ function Finance() {
                                         {report.map((r) => (
                                             <tr key={r.period}>
                                                 <td>{formatPeriod(r.period, reportPeriod)}</td>
-                                                <td className="amount-in">{formatMoney(r.income)}</td>
-                                                <td className="amount-out">{formatMoney(r.expense)}</td>
+                                                <td className="amount-in"><Money value={r.income} /></td>
+                                                <td className="amount-out"><Money value={r.expense} /></td>
                                                 <td className={Number(r.profit) < 0 ? "amount-out" : "amount-in"}>
                                                     <strong>
-                                                        {Number(r.profit) > 0 ? "+" : ""}{formatMoney(r.profit)}
+                                                        {Number(r.profit) > 0 ? "+" : ""}<Money value={r.profit} />
                                                     </strong>
                                                 </td>
                                             </tr>
