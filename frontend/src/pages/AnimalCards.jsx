@@ -9,6 +9,13 @@ import MilkReport from '../components/MilkReport';
 import MilkSales from '../components/MilkSales';
 import MilkProfit from '../components/MilkProfit';
 
+// Sahifa bo'limlari: tanlangani manzildagi ?tab= da saqlanadi (orqaga tugmasi va havola ishlaydi)
+const TABS = [
+    { key: 'hayvonlar', label: 'Hayvonlar' },
+    { key: 'sut', label: 'Sut sotish' },
+    { key: 'hisobot', label: 'Hisobotlar' },
+];
+
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const STATUSES = { faol: 'Faol', sotilgan: 'Sotilgan', olgan: "O'lgan" };
 
@@ -48,6 +55,14 @@ function AnimalCards() {
     const [statusFilter, setStatusFilter] = useState('faol');
     const [sexFilter, setSexFilter] = useState('');
     const groupFilter = searchParams.get('group') || '';
+    const tabParam = searchParams.get('tab');
+    const tab = TABS.some((t) => t.key === tabParam) ? tabParam : 'hayvonlar';
+    const selectTab = (key) => {
+        const next = new URLSearchParams(searchParams);
+        if (key === 'hayvonlar') next.delete('tab');
+        else next.set('tab', key);
+        setSearchParams(next, { replace: true });
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -233,10 +248,26 @@ function AnimalCards() {
                         </p>
 
                         <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
-                        <MilkSales farmId={farmId} refreshKey={reloadKey} />
-                        <MilkReport farmId={farmId} refreshKey={reloadKey} />
-                        {farm?.can_view_finance && <MilkProfit farmId={farmId} refreshKey={reloadKey} />}
 
+                        <div className="tabs" role="tablist" aria-label="Bo'limlar">
+                            {TABS.map((t) => (
+                                <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
+                                    className={`tab${tab === t.key ? ' tab--active' : ''}`} onClick={() => selectTab(t.key)}>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {tab === 'sut' && <MilkSales farmId={farmId} refreshKey={reloadKey} />}
+                        {tab === 'hisobot' && (
+                            <>
+                                <MilkReport farmId={farmId} refreshKey={reloadKey} />
+                                {farm?.can_view_finance && <MilkProfit farmId={farmId} refreshKey={reloadKey} />}
+                            </>
+                        )}
+
+                        {tab === 'hayvonlar' && (
+                        <>
                         {isOwner && !adding && (
                             <button type="button" className="btn-primary btn-auto" onClick={() => openAdd()}>
                                 + Hayvon qo'shish
@@ -507,6 +538,8 @@ function AnimalCards() {
                                     </ul>
                                 </div>
                             ))
+                        )}
+                        </>
                         )}
                     </>
                 )}

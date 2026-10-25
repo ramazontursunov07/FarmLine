@@ -148,9 +148,9 @@ function MilkProfit({ farmId, refreshKey }) {
                                     <tr>
                                         <th>Sigir</th>
                                         <th>Sut, l</th>
-                                        <th>Kuniga, l</th>
-                                        <th>Xarajat</th>
-                                        <th>Daromad</th>
+                                        <th className="hide-sm">Kuniga, l</th>
+                                        <th className="hide-sm">Xarajat</th>
+                                        <th className="hide-sm">Daromad</th>
                                         <th>Foyda</th>
                                         <th>Holat</th>
                                     </tr>
@@ -167,9 +167,9 @@ function MilkProfit({ farmId, refreshKey }) {
                                                     {!c.active && <span className="work-badge">{c.status}</span>}
                                                 </td>
                                                 <td>{num(c.liters)}</td>
-                                                <td>{num(c.daily_avg)}</td>
-                                                <td>{money(c.cost)}</td>
-                                                <td>{money(c.revenue)}</td>
+                                                <td className="hide-sm">{num(c.daily_avg)}</td>
+                                                <td className="hide-sm">{money(c.cost)}</td>
+                                                <td className="hide-sm">{money(c.revenue)}</td>
                                                 <td className={profitClass(c.profit)}><strong>{money(c.profit)}</strong></td>
                                                 <td><span className={`work-badge ${v.cls}`}>{v.label}</span></td>
                                             </tr>
