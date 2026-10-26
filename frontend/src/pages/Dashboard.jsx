@@ -6,6 +6,7 @@ import FarmForm from '../components/FarmForm';
 import AdminPanel from '../components/AdminPanel';
 import WorkersPanel from '../components/WorkersPanel';
 import FarmerOverview from '../components/FarmerOverview';
+import WorkerHome from '../components/WorkerHome';
 import WeatherPanel from '../components/WeatherPanel';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
@@ -467,7 +468,10 @@ function Dashboard() {
                             </div>
                         </div>
                     </section>
-                    <div className="db-main">{farmsSection}</div>
+                    <div className="db-main">
+                        {!loading && !error && farms.length > 0 && (<WorkerHome farms={farms} onChanged={() => setDataVersion((v) => v + 1)} />)}
+                        {farms.length > 0 ? (<details className="more-menu"><summary className="db-h2">Boshqa bo'limlar</summary>{farmsSection}</details>) : farmsSection}
+                    </div>
                 </>
             )}
             <AssistantChat onActionDone={() => setDataVersion((v) => v + 1)} />
