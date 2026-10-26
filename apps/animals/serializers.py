@@ -212,8 +212,8 @@ def months_between(born, today):
 
 
 # Hayvon davrlari: yoshi va tug'ish/bug'ozlik tarixidan avtomatik aniqlanadi (qo'lda o'zgartirilmaydi)
-BREEDING_AGE_MONTHS = 12   # shu yoshdan keyin urug'lantirish/bug'ozlik yozish mumkin
-ADULT_AGE_MONTHS = 24      # tug'magan bo'lsa ham shu yoshdan keyin "sigir" hisoblanadi
+BREEDING_AGE_MONTHS = 12  # shu yoshdan keyin urug'lantirish/bug'ozlik yozish mumkin
+ADULT_AGE_MONTHS = 24  # tug'magan bo'lsa ham shu yoshdan keyin "sigir" hisoblanadi
 STAGE_LABELS = {
     'buzoq': 'Buzoq', 'gunajin': "G'unajin", 'sigir': 'Sigir', 'buqa': 'Buqa',
 }
@@ -289,7 +289,8 @@ class AnimalSerializer(serializers.ModelSerializer):
         shared = self.context.get('repro')  # ro'yxatda view bir marta yig'adi (N+1 bo'lmasligi uchun)
         if shared is None:
             shared = reproduction.collect([obj.pk]) if obj.pk else {'calvings': {}, 'milk': {}}
-        return reproduction.info(obj, timezone.localdate(), shared['calvings'].get(obj.pk, []), shared['milk'].get(obj.pk))
+        return reproduction.info(obj, timezone.localdate(), shared['calvings'].get(obj.pk, []),
+                                 shared['milk'].get(obj.pk))
 
     def get_stage(self, obj):
         calved = getattr(obj, 'last_calving_date', None) is not None
@@ -331,7 +332,8 @@ class AnimalSerializer(serializers.ModelSerializer):
         instance = self.instance
         group = attrs.get('group', getattr(instance, 'group', None))
         # Tug'ilgan sana majburiy (yoshi bo'yicha sut/bug'ozlik bo'limlari ko'rsatiladi)
-        if (instance is None and not attrs.get('birth_date')) or ('birth_date' in attrs and attrs['birth_date'] is None):
+        if (instance is None and not attrs.get('birth_date')) or (
+                'birth_date' in attrs and attrs['birth_date'] is None):
             raise serializers.ValidationError({'birth_date': "Tug'ilgan sanani kiriting"})
         self._validate_pregnancy(attrs, instance, group)
         if instance is not None and 'group' in attrs and attrs['group'].farm_id != instance.farm_id:
@@ -354,7 +356,6 @@ class AnimalSerializer(serializers.ModelSerializer):
             if instance is not None and mother.pk == instance.pk:
                 raise serializers.ValidationError({'mother': "Hayvon o'zining onasi bo'la olmaydi"})
         return attrs
-
 
     def _validate_pregnancy(self, attrs, instance, group):
         sex = attrs.get('sex', getattr(instance, 'sex', 'urgochi'))
@@ -388,7 +389,8 @@ class AnimalSerializer(serializers.ModelSerializer):
             attrs['due_date'] = since + timedelta(days=days) if days else None
         due = attrs.get('due_date', getattr(instance, 'due_date', None))
         if due is not None and due < since:
-            raise serializers.ValidationError({'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
+            raise serializers.ValidationError(
+                {'due_date': "Tug'ish sanasi bug'ozlik boshlangan sanadan oldin bo'lishi mumkin emas"})
         dried = attrs.get('dried_off_on', getattr(instance, 'dried_off_on', None))
         if dried is not None:
             if dried > timezone.localdate():
@@ -499,13 +501,14 @@ class MilkSaleSerializer(serializers.ModelSerializer):
     on_credit = serializers.SerializerMethodField()
     party_name = serializers.SerializerMethodField()
     debt_remaining = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source='customer.name', read_only=True, default=None)
 
     class Meta:
         model = MilkSale
         fields = ['id', 'farm', 'date', 'liters', 'price_per_liter', 'amount', 'note',
-                  'on_credit', 'party_name', 'debt_remaining',
+                  'on_credit', 'party_name', 'debt_remaining', 'customer', 'customer_name',
                   'recorded_by', 'recorded_by_name', 'created_at']
-        read_only_fields = ['amount', 'recorded_by', 'created_at']
+        read_only_fields = ['amount', 'recorded_by', 'created_at', 'customer']
 
     def get_on_credit(self, obj):
         return obj.debt_id is not None

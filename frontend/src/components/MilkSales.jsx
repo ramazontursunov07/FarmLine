@@ -17,8 +17,9 @@ function formatDate(iso) {
 function MilkSales({ farmId, refreshKey }) {
     const [stock, setStock] = useState(null);
     const [sales, setSales] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [error, setError] = useState('');
-    const [form, setForm] = useState({ liters: '', price_per_liter: '', date: today(), note: '' });
+    const [form, setForm] = useState({ liters: '', price_per_liter: '', date: today(), note: '', customer_name: '' });
     const [credit, setCredit] = useState(EMPTY_CREDIT);
     const [formError, setFormError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -31,6 +32,8 @@ function MilkSales({ farmId, refreshKey }) {
             if (data.can_sell) {
                 const res = await api.get('animals-milk-sale/', { params: { farm: farmId } });
                 setSales(asList(res.data).slice(0, 10));
+                const cust = await api.get('animals-milk-sale/customers/', { params: { farm: farmId } });
+                setCustomers(asList(cust.data));
             }
             setError('');
         } catch (err) {
@@ -56,10 +59,11 @@ function MilkSales({ farmId, refreshKey }) {
                 liters: form.liters,
                 price_per_liter: form.price_per_liter,
                 note: form.note.trim(),
+                ...(!credit.on_credit && form.customer_name.trim() ? { customer_name: form.customer_name.trim() } : {}),
                 ...creditPayload(credit),
                 ...(confirmWithheld ? { confirm_withheld: true } : {}),
             });
-            setForm({ ...form, liters: '', note: '' });
+            setForm({ ...form, liters: '', note: '', customer_name: '' });
             setCredit(EMPTY_CREDIT());
             setVersion((v) => v + 1);
         } catch (err) {
@@ -176,11 +180,22 @@ function MilkSales({ farmId, refreshKey }) {
                                     onChange={handleChange} required />
                             </div>
                             <div className="form-field">
-                                <label>Kimga sotildi (ixtiyoriy)</label>
+                                <label>Izoh (ixtiyoriy)</label>
                                 <input type="text" name="note" value={form.note} maxLength={200}
                                     onChange={handleChange} />
                             </div>
                         </div>
+                        {!credit.on_credit && (
+                            <div className="form-field">
+                                <label>Mijoz (ixtiyoriy)</label>
+                                <input type="text" name="customer_name" value={form.customer_name} maxLength={120}
+                                    list="milk-customers" placeholder="Ismini yozing yoki ro'yxatdan tanlang"
+                                    onChange={handleChange} />
+                                <datalist id="milk-customers">
+                                    {customers.map((c) => <option key={c.id} value={c.name} />)}
+                                </datalist>
+                            </div>
+                        )}
                         <CreditFields farmId={farmId} kind="mijoz" total={total} value={credit} onChange={setCredit} />
                         {!credit.on_credit && (
                             <p className="workers-hint">
@@ -195,6 +210,33 @@ function MilkSales({ farmId, refreshKey }) {
                         </button>
                     </form>
 
+                    {customers.some((c) => c.sales > 0 || Number(c.debt) > 0) && (
+                        <details className="more-menu">
+                            <summary className="section-title">👥 Mijozlar ({customers.length})</summary>
+                            <ul className="work-list">
+                                {customers.map((c) => (
+                                    <li key={c.id} className="work-item">
+                                        <div className="work-main">
+                                            <span className="work-title">
+                                                {c.name}
+                                                {Number(c.debt) > 0 && (
+                                                    <span className={`work-badge${c.debt_overdue ? ' work-badge--shoshilinch' : ' work-badge--credit'}`}>
+                                                        Qarz: {formatMoney(c.debt)}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="work-meta">
+                                                {num(c.liters)} l · {formatMoney(c.revenue)} · {c.sales} marta
+                                                {c.last_date ? ` · oxirgi: ${formatDate(c.last_date)}` : ''}
+                                            </span>
+                                            {c.phone && <a className="work-meta" href={`tel:${c.phone}`}>📞 {c.phone}</a>}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </details>
+                    )}
+
                     {sales.length > 0 && (
                         <ul className="work-list">
                             {sales.map((s) => (
@@ -207,6 +249,7 @@ function MilkSales({ farmId, refreshKey }) {
                                         <span className="work-meta">
                                             {formatDate(s.date)} · jami {formatMoney(s.amount)}
                                             {s.on_credit ? ` · ${s.party_name}, qolgan qarz: ${formatMoney(s.debt_remaining)}` : ''}
+                                            {!s.on_credit && s.customer_name ? ` · ${s.customer_name}` : ''}
                                             {s.note ? ` · ${s.note}` : ''}
                                         </span>
                                     </div>

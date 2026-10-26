@@ -717,6 +717,12 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         price = serializer.validated_data['price_per_liter']
         amount = (liters * price).quantize(Decimal('0.01'))
         credit_info = credit.parse_credit(self.request.data, farm, amount, serializer.validated_data['date'])
+        customer = None
+        if not credit_info:  # naqd sotuvda mijoz ixtiyoriy: ro'yxatdan tanlanadi yoki yangi ism yoziladi
+            cid = self.request.data.get('customer')
+            cname = str(self.request.data.get('customer_name') or '').strip()
+            if cid or cname:
+                customer = credit.get_party(farm, 'mijoz', cid, cname)
         with transaction.atomic():
             Farm.objects.select_for_update().get(pk=farm.pk)  # bir vaqtda ikki marta sotib yubormaslik uchun
             produced, sold = milk_balance(farm.pk)
@@ -742,18 +748,57 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
                 debt = credit.open_credit(
                     farm=farm, kind='mijoz', credit=credit_info, total=amount, date=serializer.validated_data['date'],
                     description=f"{one_decimal(liters)} l sut", user=user, category='sotuv')
-                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=None, debt=debt)
+                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=None, debt=debt,
+                                       customer=debt.party)
             else:
                 tx = FinanceTransaction.objects.create(
                     farm=farm, transaction_type='kirim', category='sotuv', amount=amount,
                     description=description, date=serializer.validated_data['date'], recorded_by=user)
-                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=tx)
+                sale = serializer.save(recorded_by=user, amount=amount, finance_transaction=tx, customer=customer)
         if user.id != farm.owner_id:
             how = f"\nNasiyaga: {sale.debt.party.name}" if sale.debt_id else ''
             notify_users([farm.owner], (
                 f"🥛 Sut sotildi ({farm.name}):\n"
                 f"{one_decimal(sale.liters)} l × {money(sale.price_per_liter)} so'm = {money(sale.amount)} so'm{how}\n"
                 f"Kim: {display_name(user)}"))
+
+    @action(detail=False, methods=['get'])
+    def customers(self, request):
+        """
+        Mijozlar: kimga qancha sut sotilgan va qancha qarzi bor (?farm=<id>). Ro'yxatdan o'chirilgan sotuvlar ham
+        hisobga kiradi (sut haqiqatda sotilgan). Faqat ferma egasi yoki moliya huquqi bor ishchi.
+        """
+        from django.db.models import Max
+        from apps.debts import stats
+        from apps.debts.models import Party
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        farm = Farm.objects.filter(pk=int(farm_id)).first()
+        if farm is None:
+            raise PermissionDenied("Siz bu fermani ko'ra olmaysiz.")
+        self._ensure_can_sell(farm)
+        parties = list(Party.objects.filter(farm=farm, kind='mijoz').annotate(
+            liters=Sum('milk_sales__liters'), revenue=Sum('milk_sales__amount'),
+            sales=Count('milk_sales'), last_date=Max('milk_sales__date')))
+        owed = {}
+        today = timezone.localdate()
+        for d in stats.debts_with_paid(farm_ids=[farm.pk], party__kind='mijoz'):
+            row = owed.setdefault(d.party_id, {'left': Decimal('0'), 'overdue': False})
+            left = stats.remaining(d)
+            row['left'] += left
+            row['overdue'] = row['overdue'] or stats.is_overdue(d, today)
+        rows = []
+        for p in parties:
+            debt = owed.get(p.pk, {'left': Decimal('0'), 'overdue': False})
+            rows.append({
+                'id': p.pk, 'name': p.name, 'phone': p.phone,
+                'liters': one_decimal(p.liters or Decimal('0')), 'revenue': str(p.revenue or Decimal('0')),
+                'sales': p.sales, 'last_date': p.last_date,
+                'debt': str(debt['left']), 'debt_overdue': debt['overdue'],
+            })
+        rows.sort(key=lambda r: (-Decimal(r['liters']), r['name'].lower()))
+        return Response(rows)
 
     def perform_destroy(self, instance):
         """Faqat yozuvni ro'yxatdan o'chiradi: sotilgan sut hisobi va moliyadagi kirim (balans) o'zgarmaydi."""
@@ -775,3 +820,4 @@ class MilkSaleViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             if debt is not None:
                 credit.delete_debt(debt)  # nasiya qarzi va u bo'yicha olingan pullar ham qaytariladi
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
