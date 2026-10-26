@@ -8,8 +8,8 @@ from apps.core.mixins import IdempotentCreateMixin
 from apps.users.models import User
 from apps.users.notify import display_name, notify_users
 
-from .models import Task
-from .serializers import TaskSerializer
+from .models import RecurringTask, Task
+from .serializers import RecurringTaskSerializer, TaskSerializer
 
 # Ishchi faqat shu maydonlarni o'zgartira oladi
 WORKER_EDITABLE = {'status', 'result_note'}
@@ -88,11 +88,33 @@ class TaskViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             self._notify_assignee(task)  # vazifa boshqa ishchiga o'tkazildi
         if new_status == 'bajarildi' and old_status != 'bajarildi' and not self._is_owner(task.farm):
             notify_users([task.farm.owner], (
-                f"✅ {display_name(user)} vazifani bajardi ({task.farm.name}):\n{task.title}"
-                + (f"\nIzoh: {task.result_note}" if task.result_note else "")
+                    f"✅ {display_name(user)} vazifani bajardi ({task.farm.name}):\n{task.title}"
+                    + (f"\nIzoh: {task.result_note}" if task.result_note else "")
             ))
 
     def perform_destroy(self, instance):
         if not self._is_owner(instance.farm):
             raise PermissionDenied("Vazifani faqat ferma egasi o'chira oladi.")
         instance.delete()
+
+
+class RecurringTaskViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
+    """
+    Takrorlanuvchi vazifalar (masalan, har yili vaksinatsiya). Faqat ferma egasi ko'radi va boshqaradi.
+    Filtr: ?farm=
+    """
+    queryset = RecurringTask.objects.all()
+    serializer_class = RecurringTaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = RecurringTask.objects.select_related('farm', 'assigned_to').filter(farm__owner=self.request.user)
+        farm = self.request.query_params.get('farm', '')
+        if farm.isdigit():
+            qs = qs.filter(farm_id=int(farm))
+        return qs
+
+    def perform_create(self, serializer):
+        if serializer.validated_data['farm'].owner_id != self.request.user.id:
+            raise PermissionDenied("Takrorlanuvchi vazifani faqat ferma egasi qo'sha oladi.")
+        serializer.save(created_by=self.request.user)

@@ -17,6 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.farms import payroll
+from apps.tasks import recurring
 
 from .digest_runner import run_digest_in_background
 from .models import DigestRun, PasswordResetToken, TelegramLinkToken, User
@@ -258,10 +259,13 @@ class DailyDigestCronView(APIView):
             payroll.post_due(today)  # oy oxirida ishchilar ish haqi chiqimi
         except Exception:
             logger.exception("Ish haqini yozishda xato")
+        try:
+            recurring.create_due(today)  # takrorlanuvchi vazifalar
+        except Exception:
+            logger.exception("Takrorlanuvchi vazifalarni yaratishda xato")
         run, created = DigestRun.objects.get_or_create(date=today)
         if not created and request.query_params.get('force') != '1':
             return Response({'detail': 'Bugungi hisobot allaqachon yuborilgan'}, status=status.HTTP_200_OK)
 
         run_digest_in_background(today, run.pk)
         return Response({'detail': 'Hisobot yuborilmoqda'}, status=status.HTTP_202_ACCEPTED)
-    

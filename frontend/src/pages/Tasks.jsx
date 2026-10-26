@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import RecurringTasks from '../components/RecurringTasks';
 
 const PRIORITIES = { oddiy: 'Oddiy', muhim: 'Muhim', shoshilinch: 'Shoshilinch' };
 
@@ -256,6 +257,8 @@ function Tasks() {
                                         </button>
                                     </form>
                                 </div>
+
+                                <RecurringTasks farmId={farmId} workers={workers} onCreated={reload} />
 
                                 <div className="filter-bar">
                                     <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}>

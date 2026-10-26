@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
 from apps.farms.payroll import post_due_once_a_day
+from apps.tasks.recurring import create_due_once_a_day
 from apps.users.digest_runner import send_due_digest
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,10 @@ class Command(BaseCommand):
                     post_due_once_a_day()  # oy oxirida ishchilar ish haqi chiqimi
                 except Exception:
                     logger.exception("Ish haqini yozishda xato")
+                try:
+                    create_due_once_a_day()  # takrorlanuvchi vazifalar
+                except Exception:
+                    logger.exception("Takrorlanuvchi vazifalarni yaratishda xato")
                 result = send_due_digest()
                 if result is False:
                     delay = RETRY_AFTER_ERROR
