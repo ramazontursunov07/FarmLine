@@ -42,6 +42,12 @@ class Worker(models.Model):  # ishchi
         on_delete=models.CASCADE,
         related_name='workers'
     )
+    KIND_CHOICES = (
+        ('ishchi', 'Ishchi'),
+        ('veterinar', 'Veterinar'),
+    )
+    # Veterinar faqat davolash va vaksinatsiya yozuvlarini ko'radi va yozadi; moliya, sut, ombor unga yopiq.
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='ishchi')
     can_view_finance = models.BooleanField(default=False)  # kirim-chiqimlarni ko'rishga ruxsat bormi yokida yo'qmi.
     # Oylik (so'm). 0 bo'lsa, oy oxirida avtomatik chiqim yozilmaydi.
     monthly_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -111,3 +117,4 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.worker} {self.date}: {self.status}"
+    

@@ -94,6 +94,7 @@ def collect(farm, year, month, generated_by=None):
         'prev_label': month_label(prev_start.year, prev_start.month),
         'prev_totals': _totals(farm, prev_start, prev_end),
         'categories': categories,
+        'milk': _milk_summary(farm, start, end),
         'transactions': [
             {
                 'date': t.date,
@@ -117,6 +118,49 @@ def collect(farm, year, month, generated_by=None):
         ],
         'animals': [(a['animal_type__name'], a['total']) for a in animals],
     }
+
+
+def _milk_summary(farm, start, end):
+    """Oy bo'yicha sut: sog'ilgan, sotilgan, narx, tannarx, yemga ketgan xarajat va zararli sigirlar soni."""
+    from apps.animals import profit as milk_profit
+    from apps.animals.models import MilkSale
+
+    today = timezone.localdate()
+    if start > today:
+        return None
+    rep = milk_profit.build_report(farm, start, min(end, today))
+    t = rep['totals']
+    if Decimal(t['liters']) == 0 and not MilkSale.objects.filter(farm=farm, date__range=(start, end)).exists():
+        return None
+    sold = MilkSale.objects.filter(farm=farm, date__range=(start, end)).aggregate(l=Sum('liters'), a=Sum('amount'))
+    return {
+        'liters': Decimal(t['liters']),
+        'sold_liters': sold['l'] or Decimal('0'),
+        'sold_amount': sold['a'] or Decimal('0'),
+        'price': Decimal(t['price_per_liter']) if t['price_per_liter'] else None,
+        'cost_per_liter': Decimal(t['cost_per_liter']) if t['cost_per_liter'] else None,
+        'feed_cost': Decimal(t['feed_cost']),
+        'feed_per_liter': Decimal(t['feed_cost_per_liter']) if t['feed_cost_per_liter'] else None,
+        'profit': Decimal(t['profit']) if t['profit'] is not None else None,
+        'cows': t['cows'],
+        'losing_cows': t['losing_cows'],
+    }
+
+
+def _milk_rows(m):
+    """Sut bo'limi qatorlari (PDF va Excel uchun bir xil)."""
+    def som(v):
+        return f"{money(v)} so'm" if v is not None else '—'
+    return [
+        ("Sog'ilgan sut", f"{qty(m['liters'])} l"),
+        ('Sotilgan sut', f"{qty(m['sold_liters'])} l ({som(m['sold_amount'])})"),
+        ('1 litr sotuv narxi', som(m['price'])),
+        ('1 litr sut tannarxi (hamma xarajat)', som(m['cost_per_liter'])),
+        ('Shundan yemga (1 litr)', som(m['feed_per_liter'])),
+        ('Yem xarajati (oy)', som(m['feed_cost'])),
+        ('Sutdan foyda / zarar', som(m['profit'])),
+        ('Zarar keltirayotgan sigirlar', f"{m['losing_cows']} / {m['cows']}"),
+    ]
 
 
 def result_word(profit):
@@ -181,6 +225,15 @@ def build_xlsx(data):
         for name, total in data['categories'][kind]:
             ws.cell(row=r, column=1, value=name)
             ws.cell(row=r, column=2, value=float(total)).number_format = money_fmt
+            r += 1
+        r += 1
+
+    if data.get('milk'):
+        header(ws, r, ['Sut', 'Qiymat'])
+        r += 1
+        for name, value in _milk_rows(data['milk']):
+            ws.cell(row=r, column=1, value=name)
+            ws.cell(row=r, column=2, value=value)
             r += 1
         r += 1
 
@@ -297,6 +350,11 @@ def build_pdf(data):
     st = table(summary, [70 * mm, 55 * mm, 55 * mm], right_cols=(1, 2), bold_last=True)
     st.setStyle(TableStyle([('TEXTCOLOR', (1, 3), (1, 3), ok if t['profit'] >= 0 else red)]))
     story.append(st)
+
+    if data.get('milk'):
+        story.append(Paragraph('Sut', h2))
+        story.append(table([['Ko\'rsatkich', 'Qiymat']] + [list(r) for r in _milk_rows(data['milk'])],
+                           [110 * mm, 70 * mm], right_cols=(1,)))
 
     for kind, title in (('kirim', 'Kirim kategoriyalari'), ('chiqim', 'Chiqim kategoriyalari')):
         story.append(Paragraph(title, h2))

@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.core.mixins import IdempotentCreateMixin
 from apps.debts import credit
 from apps.farms.models import Farm, Worker
+from apps.farms.roles import is_vet
 from apps.users.permissions import is_app_admin
 from . import feed_need
 from apps.finance.models import Transaction as FinanceTransaction
@@ -157,6 +158,8 @@ class InventoryTransactionViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         item = serializer.validated_data['inventory_item']
         if not is_farm_member(user, item.farm):
             raise PermissionDenied("Siz bu fermaning omboriga yozuv qo'sha olmaysiz.")
+        if is_vet(user, item.farm) and serializer.validated_data['transaction_type'] != 'sarf':
+            raise PermissionDenied("Veterinar ombordan faqat dori sarflay oladi (sarf), qo'sha olmaydi.")
 
         qty = serializer.validated_data['quantity']
         kind = serializer.validated_data['transaction_type']

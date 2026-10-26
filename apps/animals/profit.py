@@ -85,6 +85,8 @@ def build_report(farm, start, end, exclude=(), price_override=None):
     ]
     cost = sum((v for k, v in spent.items() if k not in exclude), ZERO)
 
+    feed_cost = spent.get('ozuqa', ZERO)
+
     # --- sut
     liters_by_animal = {
         r['animal_id']: r for r in MilkRecord.objects.filter(
@@ -156,6 +158,9 @@ def build_report(farm, start, end, exclude=(), price_override=None):
             'liters': _liters(total_liters),
             'cost': _money(cost),
             'cost_per_liter': _money(cost / total_liters) if total_liters else None,
+            # Faqat yem (ozuqa) xarajati: 1 litr sutga yemga qancha ketadi
+            'feed_cost': _money(feed_cost),
+            'feed_cost_per_liter': _money(feed_cost / total_liters) if total_liters else None,
             'price_per_liter': _money(price) if price is not None else None,
             'price_source': price_source,
             'revenue': _money(revenue_total) if revenue_total is not None else None,

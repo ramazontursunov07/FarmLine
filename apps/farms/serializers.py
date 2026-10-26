@@ -10,11 +10,12 @@ from .models import Attendance, Farm, Worker
 class FarmSerializer(serializers.ModelSerializer):
     owner_username = serializers.CharField(source='owner.username', read_only=True)  # fermerni usernamemi
     can_view_finance = serializers.SerializerMethodField()
+    my_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Farm
         fields = ['id', 'owner', 'owner_username', 'name', 'location', 'farm_type',
-                  'can_view_finance', 'created_at', 'updated_at']
+                  'can_view_finance', 'my_role', 'created_at', 'updated_at']
         read_only_fields = ['owner']
 
     def update(self, instance, validated_data):
@@ -23,6 +24,17 @@ class FarmSerializer(serializers.ModelSerializer):
             instance.latitude = None
             instance.longitude = None
         return super().update(instance, validated_data)
+
+    def get_my_role(self, obj):
+        """Foydalanuvchining shu fermadagi roli: owner, ishchi, veterinar (admin va boshqalarga None)."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return None
+        if obj.owner_id == user.id:
+            return 'owner'
+        worker = obj.workers.filter(user=user).first()
+        return worker.kind if worker else None
 
     def get_can_view_finance(self, obj):
         """Fermer o'z fermasida har doim True; ishchida esa unga berilgan huquq."""
@@ -48,7 +60,7 @@ class WorkerSerializer(serializers.ModelSerializer):
         model = Worker
         fields = [
             'id', 'user', 'user_username', 'user_full_name', 'user_phone',
-            'farm_name', 'farm', 'can_view_finance', 'monthly_salary', 'salary_from', 'last_salary_month',
+            'farm_name', 'farm', 'kind', 'can_view_finance', 'monthly_salary', 'salary_from', 'last_salary_month',
             'joined_at',
         ]
         read_only_fields = ['user', 'farm', 'salary_from']
@@ -57,6 +69,16 @@ class WorkerSerializer(serializers.ModelSerializer):
         """Oxirgi marta qaysi oy uchun ish haqi chiqimi yozilgan (YYYY-MM)."""
         last = obj.salary_payments.first()
         return f"{last.month:%Y-%m}" if last else None
+
+    def validate(self, attrs):
+        # Veterinarga moliya ochilmaydi
+        kind = attrs.get('kind', getattr(self.instance, 'kind', 'ishchi'))
+        if kind == 'veterinar' and attrs.get('can_view_finance'):
+            raise serializers.ValidationError(
+                {'can_view_finance': "Veterinarga moliyani ko'rish huquqi berib bo'lmaydi"})
+        if kind == 'veterinar' and self.instance is not None:
+            attrs['can_view_finance'] = False
+        return attrs
 
     def update(self, instance, validated_data):
         # Oylik 0 dan oshirilganda hisob shu kundan boshlanadi (o'tgan oylar uchun chiqim yozilmaydi)
@@ -80,6 +102,7 @@ class WorkerCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    kind = serializers.ChoiceField(choices=['ishchi', 'veterinar'], required=False, default='ishchi')
     can_view_finance = serializers.BooleanField(required=False, default=False)
     monthly_salary = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, default=0)
 
@@ -102,7 +125,8 @@ class WorkerCreateSerializer(serializers.Serializer):
         return Worker.objects.create(
             user=user,
             farm=farm,
-            can_view_finance=validated_data['can_view_finance'],
+            kind=validated_data['kind'],
+            can_view_finance=validated_data['can_view_finance'] and validated_data['kind'] != 'veterinar',
             monthly_salary=validated_data['monthly_salary'],
             salary_from=timezone.localdate() if validated_data['monthly_salary'] > 0 else None,
         )

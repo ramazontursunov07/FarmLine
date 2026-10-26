@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { Icon } from './dashboardKit';
+import TreatmentPdfButton from './TreatmentPdfButton';
 import './WorkerHome.css';
 
 const asList = (d) => (Array.isArray(d) ? d : d?.results ?? []);
@@ -60,6 +61,23 @@ function WorkerHome({ farms, onChanged }) {
             {farms.map((farm) => (
                 <div key={farm.id} className="wh-farm">
                     {multi && <h3 className="wh-farm-name">{farm.name}</h3>}
+                    {farm.my_role === 'veterinar' ? (
+                        <div className="wh-actions">
+                            <Link className="wh-btn wh-btn--main" to={`/farms/${farm.id}/work`}>
+                                <span className="wh-btn-emoji" aria-hidden="true">💉</span>
+                                <span>Davolash va vaksinatsiya</span>
+                            </Link>
+                            <Link className="wh-btn" to={`/farms/${farm.id}/animals`}>
+                                <span className="wh-btn-emoji" aria-hidden="true">🐄</span>
+                                <span>Hayvonlar</span>
+                            </Link>
+                            <Link className="wh-btn" to={`/farms/${farm.id}/inventory`}>
+                                <span className="wh-btn-emoji" aria-hidden="true">💊</span>
+                                <span>Dorilar (ombor)</span>
+                            </Link>
+                            <p className="wh-pdf"><TreatmentPdfButton farmId={farm.id} /></p>
+                        </div>
+                    ) : (
                     <div className="wh-actions">
                         <Link className="wh-btn wh-btn--main" to={`/farms/${farm.id}/animals`}>
                             <span className="wh-btn-emoji" aria-hidden="true">🥛</span>
@@ -78,6 +96,7 @@ function WorkerHome({ farms, onChanged }) {
                             <span>Ombor</span>
                         </Link>
                     </div>
+                    )}
                 </div>
             ))}
 
@@ -106,9 +125,11 @@ function WorkerHome({ farms, onChanged }) {
             )}
             {sorted.length > 6 && <p className="db-muted">Yana {sorted.length - 6} ta vazifa «Vazifalar» bo'limida.</p>}
 
-            <p className="wh-attendance">
-                📅 Shu oyda kelmagan kunlaringiz: <strong>{absent}</strong>
-            </p>
+            {!farms.every((f) => f.my_role === 'veterinar') && (
+                <p className="wh-attendance">
+                    📅 Shu oyda kelmagan kunlaringiz: <strong>{absent}</strong>
+                </p>
+            )}
         </section>
     );
 }

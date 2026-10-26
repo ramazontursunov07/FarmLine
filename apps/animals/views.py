@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from apps.core.mixins import IdempotentCreateMixin
 from apps.finance.models import Transaction as FinanceTransaction
 from apps.farms.models import Farm, Worker
+from apps.farms.roles import VET_EVENT_TYPES, is_vet
 from apps.users.digest import money
 from apps.users.notify import display_name, notify_users
 from apps.users.permissions import IsAppAdmin, is_app_admin
@@ -131,6 +132,46 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
             qs = qs.exclude(status='yakunlangan')
         return qs
 
+    @action(detail=False, methods=['get'], url_path='history-pdf')
+    def history_pdf(self, request):
+        """
+        Davolash va vaksinatsiya tarixi PDF: ?farm=<id> [&animal=<id>] [&date_from=] [&date_to=].
+        Ferma egasi, ishchi va veterinar yuklab oladi.
+        """
+        from django.http import HttpResponse
+        from . import treatment_pdf
+        farm_id = request.query_params.get('farm', '')
+        if not farm_id.isdigit():
+            raise ValidationError({'farm': "Ferma raqami kerak"})
+        farm = Farm.objects.filter(pk=int(farm_id)).first()
+        if farm is None or not is_farm_member(request.user, farm):
+            raise PermissionDenied("Siz bu fermani ko'ra olmaysiz.")
+        qs = AnimalEvent.objects.filter(animal_group__farm=farm, event_type__in=treatment_pdf.TREATMENT_TYPES
+                                        ).select_related('animal', 'animal_group__animal_type', 'medicine',
+                                                         'recorded_by').order_by('start_date', 'id')
+        p = request.query_params
+        title = "Davolash va vaksinatsiya tarixi"
+        if p.get('animal', '').isdigit():
+            animal = Animal.objects.filter(pk=int(p['animal']), farm=farm).first()
+            if animal is None:
+                raise ValidationError({'animal': "Hayvon topilmadi"})
+            qs = qs.filter(animal=animal)
+            title += f": №{animal.tag_number}" + (f" {animal.name}" if animal.name else '')
+        bounds = []
+        for param, lookup in (('date_from', 'start_date__gte'), ('date_to', 'start_date__lte')):
+            if p.get(param):
+                value = parse_date(p[param])
+                if value is None:
+                    raise ValidationError({param: "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak"})
+                qs = qs.filter(**{lookup: value})
+                bounds.append(f"{value:%d.%m.%Y}")
+        period = ' – '.join(bounds) if len(bounds) == 2 else (f"{bounds[0]} dan" if p.get('date_from') and bounds
+                                                              else (f"{bounds[0]} gacha" if bounds else ''))
+        content = treatment_pdf.build_pdf(farm, list(qs[:2000]), title, period, request.user)
+        response = HttpResponse(content, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="davolash-tarixi-{farm.pk}.pdf"'
+        return response
+
     def _ensure_can_modify(self, event):
         user = self.request.user
         if event.animal_group.farm.owner_id == user.id or event.recorded_by_id == user.id:
@@ -142,6 +183,9 @@ class AnimalEventViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         group = serializer.validated_data['animal_group']
         if not is_farm_member(user, group.farm):
             raise PermissionDenied("Siz bu fermaga yozuv qo'sha olmaysiz.")
+
+        if is_vet(user, group.farm) and serializer.validated_data['event_type'] not in VET_EVENT_TYPES:
+            raise PermissionDenied("Veterinar faqat kasallik, davolash va vaksinatsiya yozuvlarini yoza oladi.")
 
         # Tug'ilish bilan birga buzoq kartochkalarini ochish (ferma egasi ham, ishchi ham: buzoq kartasiz qolmasin)
         calves = serializer.validated_data.get('calves') or []
@@ -493,6 +537,8 @@ class _AnimalRecordViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):
         animal = serializer.validated_data['animal']
         if not is_farm_member(user, animal.farm):
             raise PermissionDenied("Siz bu fermaga yozuv qo'sha olmaysiz.")
+        if is_vet(user, animal.farm):
+            raise PermissionDenied("Veterinar sut va vazn yoza olmaydi.")
         serializer.save(recorded_by=user)
 
     def perform_update(self, serializer):

@@ -46,6 +46,11 @@ class MilkProfitTests(AnimalCardBase):
         self.assertEqual((t['price_per_liter'], t['price_source']), ('5000', 'sotuv'))
         self.assertEqual(t['profit'], str(160000 - 360000))  # 32 l * 5000 - xarajat
 
+    def test_feed_cost_per_liter(self):
+        t = self.report().json()['totals']
+        self.assertEqual(t['feed_cost'], '300000')  # faqat "ozuqa" chiqimi
+        self.assertEqual(t['feed_cost_per_liter'], '9375')  # 300000 / 32
+
     def test_only_adult_females_are_counted(self):
         ids = {c['id'] for c in self.report().json()['cows']}
         self.assertEqual(ids, {self.good.pk, self.bad.pk, self.dry.pk})  # buzoq va buqa yo'q

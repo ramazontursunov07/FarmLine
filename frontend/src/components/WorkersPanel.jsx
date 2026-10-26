@@ -13,6 +13,7 @@ const EMPTY_FORM = {
     phone_number: '',
     password: '',
     monthly_salary: '',
+    kind: 'ishchi',
     can_view_finance: false,
 };
 
@@ -155,11 +156,21 @@ function WorkersPanel({ farmId }) {
                                 value={formData.monthly_salary} onChange={handleChange} placeholder="Masalan: 3000000" />
                         </div>
                     </div>
-                    <label className="check-field">
-                        <input type="checkbox" name="can_view_finance" checked={formData.can_view_finance}
-                            onChange={handleChange} />
-                        Kirim-chiqimni ko'ra olsin
-                    </label>
+                    <div className="form-field">
+                        <label>Kim</label>
+                        <select name="kind" value={formData.kind}
+                            onChange={(e) => setFormData({ ...formData, kind: e.target.value, can_view_finance: false })}>
+                            <option value="ishchi">Ishchi</option>
+                            <option value="veterinar">Veterinar (faqat davolash va vaksina)</option>
+                        </select>
+                    </div>
+                    {formData.kind === 'ishchi' && (
+                        <label className="check-field">
+                            <input type="checkbox" name="can_view_finance" checked={formData.can_view_finance}
+                                onChange={handleChange} />
+                            Kirim-chiqimni ko'ra olsin
+                        </label>
+                    )}
                     <p className="workers-hint">
                         Username va parolni ishchiga o'zingiz bering, u shular bilan tizimga kiradi.
                     </p>
@@ -187,7 +198,10 @@ function WorkersPanel({ farmId }) {
                     {workers.map((w) => (
                         <li key={w.id} className="worker-item">
                             <div className="worker-info">
-                                <span className="worker-name">{w.user_full_name}</span>
+                                <span className="worker-name">
+                                    {w.user_full_name}
+                                    {w.kind === 'veterinar' && <span className="work-badge">Veterinar</span>}
+                                </span>
                                 <span className="worker-meta">
                                     @{w.user_username}{w.user_phone ? ` · ${w.user_phone}` : ''}
                                 </span>
@@ -199,11 +213,13 @@ function WorkersPanel({ farmId }) {
                                 </span>
                             </div>
                             <div className="worker-actions">
-                                <label className="check-field">
-                                    <input type="checkbox" checked={w.can_view_finance}
-                                        onChange={() => handleToggleFinance(w)} />
-                                    Moliyani ko'radi
-                                </label>
+                                {w.kind !== 'veterinar' && (
+                                    <label className="check-field">
+                                        <input type="checkbox" checked={w.can_view_finance}
+                                            onChange={() => handleToggleFinance(w)} />
+                                        Moliyani ko'radi
+                                    </label>
+                                )}
                                 <button type="button" className="farm-item-action" onClick={() => handleSalary(w)}>
                                     Oylik
                                 </button>

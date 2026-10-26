@@ -6,6 +6,7 @@ import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
 import InstallButton from '../components/InstallButton';
 import QrImage from '../components/QrImage';
+import TreatmentPdfButton from '../components/TreatmentPdfButton';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const EVENT_STATUSES = { boshlangan: 'Boshlangan', davom_etmoqda: 'Davom etmoqda', yakunlangan: 'Yakunlangan' };
@@ -577,6 +578,7 @@ function AnimalCard() {
                             {animal.mother_tag ? ` · onasi: №${animal.mother_tag}` : ''}
                         </p>
                         {animal.notes && <p className="work-desc">{animal.notes}</p>}
+                        <p><TreatmentPdfButton farmId={farmId} animalId={animalId} label="📄 Shu hayvon davolash tarixi (PDF)" /></p>
                         <details className="more-menu">
                             <summary className="section-title">📱 QR kod</summary>
                             <div className="work-card animal-qr">

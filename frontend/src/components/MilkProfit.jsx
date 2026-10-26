@@ -79,6 +79,15 @@ function MilkProfit({ farmId, refreshKey }) {
                             <span className="stat-sub">{formatPeriod(`${data.month}-01`, 'month')}: {num(t.liters)} l, xarajat {money(t.cost)}</span>
                         </div>
                         <div className="stat-card">
+                            <span className="stat-value">{t.feed_cost_per_liter ? money(t.feed_cost_per_liter) : '—'}</span>
+                            <span className="stat-label">Shundan yemga (1 litr)</span>
+                            <span className="stat-sub">
+                                yem xarajati {money(t.feed_cost)}
+                                {t.cost_per_liter && t.feed_cost_per_liter
+                                    ? ` · tannarxning ${Math.round((Number(t.feed_cost) / Number(t.cost)) * 100) || 0}%` : ''}
+                            </span>
+                        </div>
+                        <div className="stat-card">
                             <span className="stat-value">{t.price_per_liter ? money(t.price_per_liter) : '—'}</span>
                             <span className="stat-label">1 litr sotuv narxi</span>
                             <span className="stat-sub">

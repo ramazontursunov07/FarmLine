@@ -60,7 +60,7 @@ function ReportDownload({ farmId }) {
         <>
             <h3 className="section-title">Hisobotni yuklab olish</h3>
             <p className="workers-hint">
-                Tanlangan oy bo'yicha kirim, chiqim, foyda/zarar va ombor holati. Bank yoki shirkatga ko'rsatish uchun qulay.
+                Tanlangan oy bo'yicha kirim, chiqim, foyda/zarar, sut (sog'ilgan, sotilgan, tannarx) va ombor holati. Bank yoki shirkatga ko'rsatish uchun qulay.
             </p>
             <div className="filter-bar">
                 <input

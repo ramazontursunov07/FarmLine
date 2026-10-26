@@ -1,3 +1,4 @@
+import TreatmentPdfButton from '../components/TreatmentPdfButton';
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -442,6 +443,8 @@ function FarmWork() {
                             {farm.location}
                             {isOwner ? ' · Ishchilar yozgan ishlar ham shu yerda ko\'rinadi' : ''}
                         </p>
+
+                        <p><TreatmentPdfButton farmId={farmId} /></p>
 
                         <Link to={`/farms/${farmId}/animals`} className="back-link">
                             Hayvon kartochkalari (vazn, sut, tug'ish) →

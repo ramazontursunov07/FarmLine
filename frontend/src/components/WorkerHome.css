@@ -25,3 +25,4 @@
     background: var(--color-primary); color: #fff;
 }
 .wh-attendance { margin: 0; font-size: .95rem; color: var(--color-text-muted); }
+.wh-pdf { grid-column: 1 / -1; margin: 0; text-align: center; }
