@@ -1,8 +1,8 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db.models import F, Q, Sum
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -17,8 +17,11 @@ from apps.inventory.serializers import InventoryItemSerializer
 from apps.tasks.models import Task
 from apps.tasks.serializers import TaskSerializer
 from apps.users.permissions import is_app_admin
-from .models import Farm, Worker
-from .serializers import FarmSerializer, WorkerCreateSerializer, WorkerSerializer
+from .models import Attendance, Farm, SalaryPayment, Worker
+from .payroll import month_end
+from .serializers import (
+    AttendanceMarkSerializer, AttendanceSerializer, FarmSerializer, WorkerCreateSerializer, WorkerSerializer,
+)
 
 
 class WorkerViewSet(viewsets.ModelViewSet):
@@ -69,6 +72,53 @@ class WorkerViewSet(viewsets.ModelViewSet):
         if user.role == 'ishchi' and not user.worker_profiles.exists():
             user.is_active = False
             user.save(update_fields=['is_active'])
+
+
+class AttendanceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    Ishchilar davomati. Faqat kelmagan / ruxsatli kunlar saqlanadi (yozuvsiz kun — "keldi").
+    GET  ?farm=<id>&month=YYYY-MM — ro'yxat (ferma egasi hammasini, ishchi o'zinikini ko'radi).
+    POST {worker, date, status: keldi|kelmadi|ruxsat, note} — belgilash (faqat ferma egasi).
+    Ish haqi chiqimi yozilib bo'lgan oyni o'zgartirib bo'lmaydi.
+    """
+    serializer_class = AttendanceSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Attendance.objects.select_related('worker__user').filter(
+            Q(worker__farm__owner=user) | Q(worker__user=user))
+        p = self.request.query_params
+        if p.get('farm', '').isdigit():
+            qs = qs.filter(worker__farm_id=int(p['farm']))
+        month = p.get('month', '')
+        try:
+            year, mon = (int(x) for x in month.split('-'))
+            first = date(year, mon, 1)
+        except ValueError:
+            first = None
+        if first:
+            qs = qs.filter(date__gte=first, date__lte=month_end(first))
+        return qs
+
+    def create(self, request):
+        ser = AttendanceMarkSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        worker = d['worker']
+        if worker.farm.owner_id != request.user.id:
+            raise PermissionDenied("Davomatni faqat ferma egasi belgilay oladi.")
+        if SalaryPayment.objects.filter(worker=worker, month=d['date'].replace(day=1)).exists():
+            return Response({'date': "Bu oy uchun ish haqi allaqachon yozilgan, davomatni o'zgartirib bo'lmaydi"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if d['status'] == 'keldi':
+            Attendance.objects.filter(worker=worker, date=d['date']).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        obj, _ = Attendance.objects.update_or_create(
+            worker=worker, date=d['date'],
+            defaults={'status': d['status'], 'note': d['note'], 'marked_by': request.user})
+        return Response(AttendanceSerializer(obj).data, status=status.HTTP_200_OK)
 
 
 class FarmViewSet(IdempotentCreateMixin, viewsets.ModelViewSet):

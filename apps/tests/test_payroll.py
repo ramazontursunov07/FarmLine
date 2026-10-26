@@ -36,10 +36,11 @@ class PayrollBase(APITestCase):
 
 @override_settings(TELEGRAM_ASYNC=False)
 class PostDueTests(PayrollBase):
-    def test_full_month_posted_on_last_day_only(self):
+    def test_full_month_posted_day_after_month_end(self):
         self.set_salary(3_000_000, date(2026, 9, 1))
         self.assertEqual(payroll.post_due(date(2026, 9, 29)), [])  # oy hali tugamagan
-        posted = payroll.post_due(date(2026, 9, 30))
+        self.assertEqual(payroll.post_due(date(2026, 9, 30)), [])  # oxirgi kun: davomat tugallanishini kutamiz
+        posted = payroll.post_due(date(2026, 10, 1))
         self.assertEqual(len(posted), 1)
         t = Transaction.objects.get()
         self.assertEqual((t.transaction_type, t.category, t.amount), ('chiqim', 'ish_haqi', Decimal('3000000')))
@@ -48,8 +49,8 @@ class PostDueTests(PayrollBase):
 
     def test_idempotent(self):
         self.set_salary(3_000_000, date(2026, 9, 1))
-        payroll.post_due(date(2026, 9, 30))
-        payroll.post_due(date(2026, 9, 30))
+        payroll.post_due(date(2026, 10, 1))
+        payroll.post_due(date(2026, 10, 1))
         payroll.post_due(date(2026, 10, 5))
         self.assertEqual(Transaction.objects.count(), 1)
         self.assertEqual(SalaryPayment.objects.count(), 1)
@@ -67,12 +68,12 @@ class PostDueTests(PayrollBase):
 
     def test_first_partial_month_is_prorated(self):
         self.set_salary(3_000_000, date(2026, 9, 16))  # 16..30 sentabr = 15 kun / 30
-        payroll.post_due(date(2026, 9, 30))
+        payroll.post_due(date(2026, 10, 1))
         self.assertEqual(Transaction.objects.get().amount, Decimal('1500000'))
 
     def test_joined_later_than_salary_from_uses_joined_date(self):
         self.set_salary(3_100_000, date(2026, 9, 1), joined=date(2026, 10, 16))  # 16..31 okt = 16 kun / 31
-        payroll.post_due(date(2026, 10, 31))
+        payroll.post_due(date(2026, 11, 1))
         self.assertEqual(Transaction.objects.get().amount, Decimal('1600000'))
 
     def test_zero_salary_is_skipped(self):
@@ -81,7 +82,7 @@ class PostDueTests(PayrollBase):
 
     def test_deleted_expense_is_not_reposted(self):
         self.set_salary(3_000_000, date(2026, 9, 1))
-        payroll.post_due(date(2026, 9, 30))
+        payroll.post_due(date(2026, 10, 1))
         Transaction.objects.all().delete()
         payroll.post_due(date(2026, 10, 3))
         self.assertEqual(Transaction.objects.count(), 0)
@@ -89,7 +90,7 @@ class PostDueTests(PayrollBase):
 
     def test_year_end_rollover(self):
         self.set_salary(1_000_000, date(2026, 12, 1))
-        posted = payroll.post_due(date(2027, 1, 31))
+        posted = payroll.post_due(date(2027, 2, 1))
         self.assertEqual([p.month for p in posted], [date(2026, 12, 1), date(2027, 1, 1)])
 
     def test_owner_gets_telegram_message(self):
@@ -97,14 +98,14 @@ class PostDueTests(PayrollBase):
         self.owner.save()
         self.set_salary(3_000_000, date(2026, 9, 1))
         with mock.patch('apps.users.notify.send_message') as send, self.captureOnCommitCallbacks(execute=True):
-            payroll.post_due(date(2026, 9, 30))
+            payroll.post_due(date(2026, 10, 1))
         self.assertEqual(send.call_count, 1)
         self.assertIn('3 000 000', send.call_args[0][1])
 
     def test_command(self):
         from django.core.management import call_command
         self.set_salary(3_000_000, date(2026, 9, 1))
-        with mock.patch('apps.farms.payroll.timezone.localdate', return_value=date(2026, 9, 30)):
+        with mock.patch('apps.farms.payroll.timezone.localdate', return_value=date(2026, 10, 1)):
             call_command('post_salaries')
         self.assertEqual(Transaction.objects.count(), 1)
 
@@ -145,13 +146,14 @@ class WorkerSalaryApiTests(PayrollBase):
 
     def test_last_salary_month_shown(self):
         self.set_salary(1_000_000, date(2026, 9, 1))
-        payroll.post_due(date(2026, 9, 30))
+        payroll.post_due(date(2026, 10, 1))
         r = self.client.get(f'{WORKERS}?farm={self.farm.pk}')
         rows = r.json()['results'] if isinstance(r.json(), dict) else r.json()
         self.assertEqual(rows[0]['last_salary_month'], '2026-09')
 
     def test_deleting_worker_keeps_expenses(self):
         self.set_salary(1_000_000, date(2026, 9, 1))
-        payroll.post_due(date(2026, 9, 30))
+        payroll.post_due(date(2026, 10, 1))
         self.client.delete(f'{WORKERS}{self.worker.pk}/')
         self.assertEqual(Transaction.objects.count(), 1)
+        

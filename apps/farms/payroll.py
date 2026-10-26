@@ -5,6 +5,8 @@ Qoidalar:
   * `Worker.monthly_salary` > 0 bo'lsa, har oyning oxirgi kuni (yoki undan keyin, server o'chiq bo'lgan bo'lsa) chiqim yoziladi;
   * hisob `salary_from` (oylik kiritilgan sana) va ishchi qo'shilgan sanadan boshlanadi: o'tgan oylar uchun chiqim yozilmaydi;
   * birinchi to'liq bo'lmagan oy kunlariga qarab hisoblanadi (masalan, oyning yarmidan boshlagan bo'lsa, yarim oylik);
+  * chiqim oy tugagandan keyingi kuni yoziladi (oxirgi kun davomati ham hisobga olinishi uchun);
+  * davomatda 'kelmadi' deb belgilangan kunlar uchun oylikdan (oylik / oydagi kunlar) ushlab qolinadi;
   * (ishchi, oy) bo'yicha faqat bir marta yoziladi (`SalaryPayment`). Chiqimni o'chirsangiz, qayta yozilmaydi.
 """
 import calendar
@@ -15,7 +17,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import SalaryPayment, Worker
+from .models import Attendance, SalaryPayment, Worker
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +37,14 @@ def start_date(worker):
     return max(candidates) if candidates else None
 
 
+def absent_days(worker, first, start):
+    """Shu oyda (hisob boshlangan kundan keyin) 'kelmadi' deb belgilangan kunlar soni."""
+    return Attendance.objects.filter(
+        worker=worker, status='kelmadi', date__gte=max(start, first), date__lte=month_end(first)).count()
+
+
 def month_amount(worker, first, start):
-    """Shu oy uchun summa: to'liq oy bo'lsa — oylik, boshlangan oy bo'lsa — kunlariga qarab."""
+    """Shu oy uchun summa (ushlab qolishsiz): to'liq oy bo'lsa — oylik, boshlangan oy bo'lsa — kunlariga qarab."""
     end = month_end(first)
     period_start = max(start, first)
     days = (end - period_start).days + 1
@@ -53,7 +61,7 @@ def due_months(worker, today):
     if start is None or Decimal(worker.monthly_salary or 0) <= 0:
         return []
     months, first = [], start.replace(day=1)
-    while month_end(first) <= today:
+    while month_end(first) < today:
         months.append(first)
         first = _next_month(first)
     return months
@@ -62,20 +70,25 @@ def due_months(worker, today):
 def _post_one(worker, first, start):
     """Bitta oy uchun chiqim yozadi. Allaqachon yozilgan bo'lsa, None qaytaradi."""
     from apps.finance.models import Transaction
-    amount = month_amount(worker, first, start)
-    if amount <= 0:
+    gross = month_amount(worker, first, start)
+    absent = absent_days(worker, first, start)
+    total_days = calendar.monthrange(first.year, first.month)[1]
+    deduction = min((Decimal(worker.monthly_salary) * absent / total_days).quantize(Decimal('1'), ROUND_HALF_UP), gross)
+    amount = gross - deduction
+    if gross <= 0:
         return None
     try:
         with transaction.atomic():
             payment, created = SalaryPayment.objects.get_or_create(
-                worker=worker, month=first, defaults={'amount': amount})
+                worker=worker, month=first, defaults={'amount': amount, 'absent_days': absent, 'deduction': deduction})
             if not created:
                 return None
             name = worker.user.get_full_name() or worker.user.username
+            extra = f", {absent} kun kelmagani uchun {deduction:,.0f} so'm ushlandi".replace(',', ' ') if absent else ''
             payment.transaction = Transaction.objects.create(
                 farm=worker.farm, transaction_type='chiqim', category='ish_haqi', amount=amount,
                 date=month_end(first), recorded_by=worker.farm.owner,
-                description=f"Ish haqi: {name} ({first:%Y-%m}), avtomatik",
+                description=f"Ish haqi: {name} ({first:%Y-%m}), avtomatik{extra}",
             )
             payment.save(update_fields=['transaction'])
             return payment
@@ -114,7 +127,8 @@ def _notify(payments):
         lines = ["💰 Ish haqi moliyaga chiqim qilib yozildi:"]
         for p in items[:10]:
             name = p.worker.user.get_full_name() or p.worker.user.username
-            lines.append(f"  • {name} ({p.worker.farm.name}, {p.month:%m.%Y}) — {money(p.amount)} so'm")
+            tail = f" (kelmagan: {p.absent_days} kun)" if p.absent_days else ""
+            lines.append(f"  • {name} ({p.worker.farm.name}, {p.month:%m.%Y}) — {money(p.amount)} so'm{tail}")
         if len(items) > 10:
             lines.append(f"  ... va yana {len(items) - 10} ta")
         lines.append(f"Jami: {money(sum(p.amount for p in items))} so'm")

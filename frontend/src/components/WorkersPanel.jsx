@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney } from '../utils/format';
+import AttendanceSheet from './AttendanceSheet';
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -192,7 +193,7 @@ function WorkersPanel({ farmId }) {
                                 </span>
                                 <span className="worker-meta">
                                     {Number(w.monthly_salary) > 0
-                                        ? `Oylik: ${formatMoney(w.monthly_salary)} · oy oxirida moliyaga o'zi yoziladi`
+                                        ? `Oylik: ${formatMoney(w.monthly_salary)} · oy tugagach moliyaga o'zi yoziladi`
                                         : "Oylik belgilanmagan"}
                                     {w.last_salary_month ? ` · oxirgi yozilgan: ${w.last_salary_month}` : ''}
                                 </span>
@@ -215,6 +216,8 @@ function WorkersPanel({ farmId }) {
                     ))}
                 </ul>
             )}
+
+            {!loading && !error && <AttendanceSheet workers={workers} />}
         </div>
     );
 }

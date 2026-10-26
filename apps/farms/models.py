@@ -67,6 +67,9 @@ class SalaryPayment(models.Model):
     # Chiqim o'chirilsa ham yozuv qoladi: o'sha oy uchun qayta yozilmaydi
     transaction = models.ForeignKey('finance.Transaction', on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='salary_payments')
+    # Kelmagan kunlar va ushlab qolingan summa (amount — ushlab qolingandan keyingi, ya'ni to'lanadigan summa)
+    absent_days = models.PositiveSmallIntegerField(default=0)
+    deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -79,3 +82,32 @@ class SalaryPayment(models.Model):
 
     def __str__(self):
         return f"{self.worker} {self.month:%Y-%m}: {self.amount}"
+
+
+class Attendance(models.Model):
+    """
+    Ishchi davomati. Faqat kelmagan / ruxsatli kunlar yoziladi: yozuv bo'lmagan kun "keldi" hisoblanadi.
+    'kelmadi' kunlari oylikdan ushlab qolinadi, 'ruxsat' (kasallik, ta'til) — ushlanmaydi.
+    """
+    STATUS_CHOICES = (
+        ('kelmadi', 'Kelmadi'),
+        ('ruxsat', 'Ruxsat bilan'),
+    )
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name='attendance')
+    date = models.DateField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    note = models.CharField(max_length=200, blank=True)
+    marked_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+        verbose_name = "Davomat"
+        verbose_name_plural = "Davomat"
+        constraints = [
+            models.UniqueConstraint(fields=['worker', 'date'], name='unique_attendance_per_worker_day'),
+        ]
+
+    def __str__(self):
+        return f"{self.worker} {self.date}: {self.status}"

@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.users.models import User
-from .models import Farm, Worker
+from .models import Attendance, Farm, Worker
 
 
 class FarmSerializer(serializers.ModelSerializer):
@@ -106,3 +106,28 @@ class WorkerCreateSerializer(serializers.Serializer):
             monthly_salary=validated_data['monthly_salary'],
             salary_from=timezone.localdate() if validated_data['monthly_salary'] > 0 else None,
         )
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    worker_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = ['id', 'worker', 'worker_name', 'date', 'status', 'status_display', 'note']
+
+    def get_worker_name(self, obj):
+        return obj.worker.user.get_full_name() or obj.worker.user.username
+
+
+class AttendanceMarkSerializer(serializers.Serializer):
+    """Bir kunni belgilash: 'keldi' yozuvni olib tashlaydi, 'kelmadi' / 'ruxsat' yozadi."""
+    worker = serializers.PrimaryKeyRelatedField(queryset=Worker.objects.all())
+    date = serializers.DateField()
+    status = serializers.ChoiceField(choices=['keldi', 'kelmadi', 'ruxsat'])
+    note = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
+
+    def validate_date(self, value):
+        if value > timezone.localdate():
+            raise serializers.ValidationError("Kelajak kunini belgilab bo'lmaydi")
+        return value
