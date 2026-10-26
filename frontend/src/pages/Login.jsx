@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import InstallButton from '../components/InstallButton';
@@ -31,6 +31,7 @@ function Login() {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -45,7 +46,8 @@ function Login() {
 
             const { user, access, refresh } = response.data;
             login(user, { access, refresh });
-            navigate('/dashboard');
+            const back = location.state?.from;
+            navigate(typeof back === 'string' && back.startsWith('/') && !back.startsWith('//') ? back : '/dashboard');
         } catch (err) {
             setError('Login yoki parol noto\'g\'ri');
         } finally {

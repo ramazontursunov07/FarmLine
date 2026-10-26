@@ -12,6 +12,7 @@ import AnimalCard from './pages/AnimalCard';
 import Tasks from './pages/Tasks';
 import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
+import AnimalQrSheet from './pages/AnimalQrSheet';
 import PrivateRoute from './components/PrivateRoute';
 import PublicRoute from './components/PublicRoute';
 import OfflineBanner from './components/OfflineBanner';
@@ -53,6 +54,15 @@ function App() {
                 element={
                     <PrivateRoute>
                         <AnimalCards />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/farms/:farmId/animals/qr"
+                element={
+                    <PrivateRoute>
+                        <AnimalQrSheet />
                     </PrivateRoute>
                 }
             />

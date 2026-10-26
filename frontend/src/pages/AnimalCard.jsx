@@ -5,6 +5,7 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
 import InstallButton from '../components/InstallButton';
+import QrImage from '../components/QrImage';
 
 const SEXES = { urgochi: "Urg'ochi", erkak: 'Erkak' };
 const EVENT_STATUSES = { boshlangan: 'Boshlangan', davom_etmoqda: 'Davom etmoqda', yakunlangan: 'Yakunlangan' };
@@ -576,6 +577,17 @@ function AnimalCard() {
                             {animal.mother_tag ? ` · onasi: №${animal.mother_tag}` : ''}
                         </p>
                         {animal.notes && <p className="work-desc">{animal.notes}</p>}
+                        <details className="more-menu">
+                            <summary className="section-title">📱 QR kod</summary>
+                            <div className="work-card animal-qr">
+                                <QrImage value={`${window.location.origin}/farms/${farmId}/animals/${animalId}`} size={180}
+                                    alt={`№${animal.tag_number} QR kodi`} />
+                                <p className="workers-hint">
+                                    Telefon kamerasi bilan skanerlasangiz, shu kartochka ochiladi.{' '}
+                                    <Link to={`/farms/${farmId}/animals/qr`}>Hamma hayvonlar QR bilkalarini chop etish</Link>
+                                </p>
+                            </div>
+                        </details>
                         {isOwner && !editingCard && (
                             <button type="button" className="btn-ghost btn-auto" onClick={startEditCard}>
                                 Kartochkani tahrirlash

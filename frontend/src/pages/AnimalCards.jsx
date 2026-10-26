@@ -247,6 +247,12 @@ function AnimalCards() {
                             Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
                         </p>
 
+                        {animals.length > 0 && (
+                            <p className="panel-subtitle">
+                                <Link to={`/farms/${farmId}/animals/qr`}>🏷 QR bilkalarni chop etish</Link>
+                            </p>
+                        )}
+
                         <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
 
                         <div className="tabs" role="tablist" aria-label="Bo'limlar">
