@@ -1,24 +1,36 @@
 """Bilimlar bazasi (RAG): knowledge/ papkasidagi .md hujjatlardan savolga mos bo'laklarni topadi.
 
-Qidiruv -- oddiy BM25 (qo'shimcha kutubxona va tashqi API kerak emas). O'zbek tilida qo'shimchalar ko'p
-(qoramol, qoramolni, qoramolning), shuning uchun so'zlar boshidagi STEM_LEN harfga qisqartirib solishtiriladi,
-apostroflar olib tashlanadi (qo'y = qoy = qo`y).
+Qidiruv ikki xil va ular birlashtiriladi (hybrid):
+  1) BM25 -- kalit so'zlar bo'yicha (qo'shimcha kutubxona va tashqi API kerak emas). O'zbek tilida qo'shimchalar
+     ko'p (qoramol, qoramolni, qoramolning), shuning uchun so'zlar boshidagi STEM_LEN harfga qisqartirib solishtiriladi,
+     apostroflar olib tashlanadi (qo'y = qoy = qo`y).
+  2) Vektor qidiruv (pgvector + Gemini embedding) -- ma'no bo'yicha: savol va matn boshqa so'zlar bilan yozilgan
+     bo'lsa ham topadi. Faqat PostgreSQL da, GEMINI_API_KEY bo'lganda ishlaydi; xato bersa BM25 yolg'iz davom etadi.
+Ikkala ro'yxat Reciprocal Rank Fusion (RRF) bilan birlashtiriladi.
 """
+import hashlib
+import logging
 import math
 import re
 from functools import lru_cache
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 KNOWLEDGE_DIR = Path(__file__).resolve().parents[2] / 'knowledge'
 
 STEM_LEN = 6
 TOP_K = 4
 MAX_CHARS = 4500  # AI ga beriladigan bilim hajmi (token tejash uchun)
-MAX_CHUNK_CHARS = 1500
+MAX_CHUNK_CHARS = 1500  # bo'lak shundan uzun bo'lsa, bir nechta bo'lakka bo'linadi (kesilmaydi)
+CHUNK_OVERLAP = 150
 MIN_SCORE = 2.0  # eng yaxshi bo'lak shu balldan past bo'lsa, savol bazaga aloqasiz deb olinadi
 REL_SCORE = 0.4  # qolgan bo'laklar eng yaxshisining kamida shu ulushini olishi kerak
 
 K1, B = 1.5, 0.75
+
+POOL = 8  # har bir qidiruvdan olinadigan nomzodlar soni (keyin TOP_K gacha qisqartiriladi)
+RRF_K = 60  # RRF doimiysi (standart qiymat)
 
 STOPWORDS = {
     'va', 'bu', 'bilan', 'uchun', 'ham', 'yoki', 'nima', 'qanday', 'qachon', 'kerak', 'bo', 'bor', 'yoq',
@@ -77,16 +89,43 @@ def split_markdown(text, source):
     return chunks
 
 
-@lru_cache(maxsize=1)
-def _index():
-    chunks = []
+def _split_long(chunk):
+    """Uzun bo'lakni LangChain splitter bilan abzats/gap chegarasida bo'ladi (avval 1500 belgidan keyingisi tashlab yuborilardi)."""
+    if len(chunk['text']) <= MAX_CHUNK_CHARS:
+        return [chunk]
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=MAX_CHUNK_CHARS, chunk_overlap=CHUNK_OVERLAP, separators=['\n\n', '\n', '. ', ' ', ''])
+    return [{**chunk, 'text': part} for part in splitter.split_text(chunk['text']) if part.strip()]
+
+
+def chunk_key(chunk):
+    """Bo'lak kaliti: fayl, sarlavha yoki matn o'zgarsa, kalit ham o'zgaradi (vektor qayta hisoblanadi)."""
+    raw = f"{chunk['source']}\n{chunk['title']}\n{chunk['text']}"
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+
+def load_chunks():
+    """knowledge/ dagi barcha bo'laklar (har birida 'key'). BM25 va vektor indeks aynan shu ro'yxatdan quriladi."""
+    chunks, seen = [], set()
     if KNOWLEDGE_DIR.is_dir():
         for path in sorted(KNOWLEDGE_DIR.rglob('*.md')):
             rel = path.relative_to(KNOWLEDGE_DIR).as_posix()
-            chunks.extend(split_markdown(path.read_text(encoding='utf-8'), rel))
+            for block in split_markdown(path.read_text(encoding='utf-8'), rel):
+                for chunk in _split_long(block):
+                    chunk['key'] = chunk_key(chunk)
+                    if chunk['key'] not in seen:
+                        seen.add(chunk['key'])
+                        chunks.append(chunk)
+    return chunks
+
+
+@lru_cache(maxsize=1)
+def _index():
     docs = []
     df = {}
-    for c in chunks:
+    for c in load_chunks():
         # sarlavha va hujjat nomi ikki marta: sarlavhadagi moslik muhimroq
         tokens = tokenize(c['doc']) + tokenize(c['title']) * 2 + tokenize(c['text'])
         tf = {}
@@ -99,7 +138,8 @@ def _index():
     return docs, df, avg
 
 
-def search(query, k=TOP_K):
+def bm25_scored(query):
+    """[(ball, bo'lak)] -- ball bo'yicha kamayish tartibida, hech qanday chegarasiz."""
     docs, df, avg = _index()
     q = set(tokenize(query))
     if not docs or not q:
@@ -117,10 +157,52 @@ def search(query, k=TOP_K):
         if score > 0:
             scored.append((score, chunk))
     scored.sort(key=lambda x: -x[0])
+    return scored
+
+
+def bm25_search(query, k=TOP_K):
+    """Kalit so'z bo'yicha eng mos bo'laklar (aloqasiz savolda bo'sh ro'yxat)."""
+    scored = bm25_scored(query)
     if not scored or scored[0][0] < MIN_SCORE:
         return []
     top = scored[0][0]
     return [c for sc, c in scored[:k] if sc >= top * REL_SCORE]
+
+
+def fuse(keyword, semantic, k=TOP_K):
+    """Ikki ro'yxatni Reciprocal Rank Fusion bilan birlashtiradi: ikkalasida ham yuqori turgan bo'lak oldinga chiqadi."""
+    scores, chunks = {}, {}
+    for ranking in (keyword, semantic):
+        for rank, chunk in enumerate(ranking):
+            scores[chunk['key']] = scores.get(chunk['key'], 0.0) + 1.0 / (RRF_K + rank + 1)
+            chunks[chunk['key']] = chunk
+    ordered = sorted(scores, key=lambda key: -scores[key])
+    return [chunks[key] for key in ordered[:k]]
+
+
+def _semantic_search(query, k):
+    """Ma'no bo'yicha topilgan bo'laklar. O'chiq yoki xato bo'lsa bo'sh ro'yxat (BM25 yolg'iz davom etadi)."""
+    if not query.strip():
+        return []
+    try:
+        from . import vector_store
+
+        if not vector_store.vector_enabled():
+            return []
+        hits = vector_store.search(query, k)
+    except Exception:  # noqa: BLE001 - qo'shimcha qidiruv ishlamasa ham AI yordamchi javob berishi kerak
+        logger.warning("Vektor qidiruv ishlamadi, oddiy qidiruvga qaytildi", exc_info=True)
+        return []
+    by_key = {c['key']: c for c, _, _ in _index()[0]}  # matn har doim fayllardagi joriy holatdan olinadi
+    return [by_key[key] for key, _similarity in hits if key in by_key]
+
+
+def search(query, k=TOP_K):
+    keyword = bm25_search(query, POOL)
+    semantic = _semantic_search(query, POOL)
+    if not semantic:
+        return keyword[:k]
+    return fuse(keyword, semantic, k)
 
 
 def build_knowledge_prompt(queries):

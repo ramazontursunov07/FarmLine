@@ -426,7 +426,7 @@ class _AnimalRecordSerializer(serializers.ModelSerializer):
         return animal, date
 
 
-class WeightRecordSerializer(_AnimalRecordSerializer):
+class WeightRecordSerializer(_AnimalRecordSerializer): #vaznlarni yozish uchun
     class Meta:
         model = WeightRecord
         fields = ['id', 'farm', 'animal', 'animal_tag', 'date', 'weight_kg',
@@ -450,7 +450,7 @@ class WeightRecordSerializer(_AnimalRecordSerializer):
         return attrs
 
 
-class MilkRecordSerializer(_AnimalRecordSerializer):
+class MilkRecordSerializer(_AnimalRecordSerializer): #sutni yozish
     session_display = serializers.CharField(source='get_session_display', read_only=True)
 
     class Meta:
@@ -496,7 +496,7 @@ class MilkRecordSerializer(_AnimalRecordSerializer):
         return attrs
 
 
-class MilkSaleSerializer(serializers.ModelSerializer):
+class MilkSaleSerializer(serializers.ModelSerializer): #sut sotish
     recorded_by_name = serializers.SerializerMethodField()
     on_credit = serializers.SerializerMethodField()
     party_name = serializers.SerializerMethodField()

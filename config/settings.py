@@ -32,6 +32,8 @@ TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'FarmLineBot')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
 AI_MODEL = os.getenv('AI_MODEL')  # bo'sh bo'lsa, provayderning standart modeli olinadi
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+RAG_VECTOR_SEARCH = os.getenv('RAG_VECTOR_SEARCH', '1') == '1'
+RAG_MIN_SIMILARITY = float(os.getenv('RAG_MIN_SIMILARITY', '0.60'))
 AI_API_KEY = os.getenv('AI_API_KEY')
 # Telegram botdagi ovozli xabarlar uchun: bo'sh bo'lsa AI_PROVIDER ishlatiladi (gemini yoki openai/Groq whisper)
 STT_PROVIDER = os.getenv('STT_PROVIDER')

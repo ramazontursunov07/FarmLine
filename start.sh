@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 python manage.py migrate --noinput
+  python manage.py build_knowledge_index || echo "build_knowledge_index bajarilmadi: qidiruv oddiy rejimda ishlaydi"
 # RUN_BOT=1 bo'lsa, Telegram bot ham shu serverda fon rejimida ishga tushadi
 if [ "$RUN_BOT" = "1" ]; then
     python bot/main.py &

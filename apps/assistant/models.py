@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .fields import VectorField
+
 # AI taklif qilgan amal shu vaqt ichida tasdiqlanmasa, kuchini yo'qotadi
 PENDING_TTL = timedelta(minutes=30)
 
@@ -47,4 +49,27 @@ class PendingAction(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+
+class KnowledgeChunk(models.Model):
+    """Bilimlar bazasi (knowledge/*.md) bo'lagining vektori (pgvector).
+
+    Matnning o'zi bu yerda saqlanmaydi: u har doim fayllardan o'qiladi, shuning uchun eskirib qolmaydi.
+    `key` -- bo'lakning (fayl, sarlavha, matn) hash'i: matn o'zgarsa, kalit ham o'zgaradi va bo'lak qayta hisoblanadi.
+    `embedding` o'lchami embeddings.DIMENSIONS bilan bir xil bo'lishi shart (testda tekshiriladi).
+    """
+    key = models.CharField(max_length=64, unique=True)
+    source = models.CharField(max_length=200)
+    title = models.CharField(max_length=500)
+    embedding = VectorField(dimensions=768)
+    embed_model = models.CharField(max_length=80)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['source', 'title', 'id']
+        verbose_name = "Bilim bo'lagi vektori"
+        verbose_name_plural = "Bilim bo'laklari vektorlari"
+
+    def __str__(self):
+        return f"{self.source} / {self.title}"
     
