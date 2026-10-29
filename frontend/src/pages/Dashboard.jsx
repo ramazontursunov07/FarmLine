@@ -11,6 +11,7 @@ import WeatherPanel from '../components/WeatherPanel';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import NotificationBell from '../components/NotificationBell';
 import AssistantChat from '../components/AssistantChat';
 import { Icon } from '../components/dashboardKit';
 import { greeting, longDate } from '../utils/dashboardDates';
@@ -429,6 +430,7 @@ function Dashboard() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <NotificationBell />
                     <Link to="/profile" className="user-link">Profil</Link>
                     <InstallButton />
                     <button className="btn-ghost" onClick={handleLogout}>Chiqish</button>

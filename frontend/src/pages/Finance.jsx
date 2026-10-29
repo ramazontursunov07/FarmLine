@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../utils/errors";
 import { formatMoney, formatPeriod, today } from "../utils/format";
 import InstallButton from '../components/InstallButton';
+import NotificationBell from '../components/NotificationBell';
 import ReportDownload from '../components/ReportDownload';
 import CreditFields from '../components/CreditFields';
 import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
@@ -218,6 +219,7 @@ function Finance() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <NotificationBell />
                     <Link to="/profile" className="user-link">Profil</Link>
                     <InstallButton />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>

@@ -7,6 +7,7 @@ Telegram orqali ogohlantirishlar.
   shuning uchun bekor bo'lgan amal haqida xabar ketib qolmaydi.
 - Telegram ulanmagan foydalanuvchilar jimgina o'tkazib yuboriladi.
 """
+import logging
 import threading
 
 from django.conf import settings
@@ -14,13 +15,24 @@ from django.db import transaction
 
 from .telegram import send_message
 
+logger = logging.getLogger(__name__)
+
 
 def display_name(user):
     return (user.get_full_name() or user.username) if user else "Noma'lum"
 
 
-def notify_users(users, text):
-    """Telegrami ulangan foydalanuvchilarga xabar yuboradi (takrorlanuvchilar bir marta)."""
+def notify_users(users, text, link=''):
+    """
+    Foydalanuvchilarga xabar: sayt ichidagi bildirishnoma (hamma uchun) va Telegram (ulanganlar uchun).
+    Takrorlanuvchilar bir marta olinadi.
+    """
+    try:
+        from apps.notifications.services import from_text
+        with transaction.atomic():  # xato bo'lsa, tashqi tranzaksiya buzilmasin
+            from_text([u for u in users if u is not None], text, link=link)
+    except Exception:
+        logger.exception("Sayt ichidagi bildirishnomani yozib bo'lmadi")
     chat_ids = {u.telegram_chat_id for u in users if u is not None and u.telegram_chat_id}
     if not chat_ids:
         return

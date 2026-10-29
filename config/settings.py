@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.tasks',
     'apps.users',
+    'apps.notifications',
     'apps.assistant',
     'apps.weather',
 ]
@@ -212,4 +213,3 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # proxy orqali kelgan so'rov HTTPS ekanini biladi
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    

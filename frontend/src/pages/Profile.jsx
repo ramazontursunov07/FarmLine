@@ -1,3 +1,4 @@
+import NotificationBell from '../components/NotificationBell';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -79,6 +80,7 @@ function Profile() {
                 <h1>FarmLine</h1>
                 <div className="user-bar">
                     <span>Salom, {user.first_name || user.username}!</span>
+                    <NotificationBell />
                     <button className="btn-ghost" onClick={logout}>Chiqish</button>
                 </div>
             </header>
