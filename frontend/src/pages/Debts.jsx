@@ -424,7 +424,7 @@ function Debts() {
                                             const t = p.totals || {};
                                             const isOpen = openParty === p.id;
                                             return (
-                                                <PartyRows key={p.id} p={p} t={t} isOpen={isOpen}
+                                                <PartyRows key={p.id} p={p} t={t} isOpen={isOpen} kind={kind}
                                                     debts={debtsByParty[p.id] || []}
                                                     onToggle={() => setOpenParty(isOpen ? null : p.id)}
                                                     onDeleteParty={() => handleDeleteParty(p)}
@@ -445,7 +445,7 @@ function Debts() {
     );
 }
 
-function PartyRows({ p, t, isOpen, debts, onToggle, onDeleteParty, onDeleteDebt, onDeletePayment,
+function PartyRows({ p, t, isOpen, kind, debts, onToggle, onDeleteParty, onDeleteDebt, onDeletePayment,
     payForm, setPayForm, payError, startPay, onPay, busy }) {
     const hasOverdue = (t.overdue_count || 0) > 0;
     return (
