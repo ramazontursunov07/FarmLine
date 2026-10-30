@@ -7,7 +7,7 @@ const POLL_MS = 60000;
 
 const ICONS = {
     calving: '🐄', dry_off: '🥛', rebreed: '🐄', debt: '💸', withdrawal: '⛔',
-    vaccination: '💉', feed: '🌾', spending: '📈', event: '🔔',
+    vaccination: '💉', feed: '🌾', spending: '📈', event: '🔔', milk_drop: '📉',
 };
 
 function BellIcon() {

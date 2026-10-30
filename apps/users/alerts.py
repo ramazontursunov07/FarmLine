@@ -10,6 +10,7 @@ Aqlli ogohlantirishlar: kunlik hisobotga qo'shiladigan bashorat va eslatmalar.
 6. Qarz eslatmasi -- muddati yaqinlashgan yoki o'tib ketgan nasiyalar (mijozlar va yetkazib beruvchilar)
 7. Quritish eslatmasi -- tug'ishdan ~60 kun oldin sog'ishni to'xtatish vaqti (apps/animals/reproduction.py)
 8. Qayta urug'lantirish -- tug'gandan keyin ~60 kundan boshlab; 117 kundan oshsa tug'ishlar orasi 400 kundan oshadi
+9. Sut kamayishi -- sigir sutining oxirgi kunlarda keskin kamayishi (mastit yoki boshqa kasallikning birinchi belgisi bo'lishi mumkin)
 
 Har bir funksiya matn qatorlari ro'yxatini qaytaradi (ogohlantirish bo'lmasa -- bo'sh ro'yxat).
 Chegaralarni shu fayl tepasidagi sozlamalardan o'zgartirish mumkin.
@@ -22,7 +23,7 @@ from decimal import Decimal
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from apps.animals.models import Animal, AnimalEvent
+from apps.animals.models import Animal, AnimalEvent, MilkRecord
 from apps.finance.models import Transaction
 from apps.inventory.models import InventoryItem, InventoryTransaction
 
@@ -52,6 +53,16 @@ CALVING_OVERDUE_DAYS = 21   # muddati o'tib ketganlarni necha kungacha eslatamiz
 
 # Quritish / qayta urug'lantirish (chegaralar apps/animals/reproduction.py da)
 REBREED_NUDGE_DAYS = 7      # "urug'lantirish vaqti keldi" xabari ochilgan kundan necha kun davomida chiqadi
+
+# Sut kamayishi: oxirgi kunlardagi o'rtacha sut oldingi o'rtachadan keskin kam bo'lsa ogohlantiriladi
+MILK_DROP_PERCENT = 25                # necha foiz va undan ko'p kamaysa
+MILK_DROP_MIN_LITERS = Decimal('2')   # kuniga kamida necha litr kamaysa (kam sutli sigirda foiz aldamasin)
+MILK_RECENT_DAYS = 3                  # "oxirgi kunlar": kecha va undan oldingi 2 kun (bugun hali to'liq emas)
+MILK_BASE_DAYS = 14                   # taqqoslash uchun oldingi necha kun
+MILK_RECENT_MIN_RECORDS = 2           # oxirgi kunlarning kamida nechtasida sut yozilgan bo'lishi kerak
+MILK_BASE_MIN_RECORDS = 5             # oldingi davrda kamida nechta kunlik yozuv bo'lishi kerak
+MILK_BASE_MIN_LITERS = Decimal('5')   # kuniga shundan kam sut beradigan sigirlar kuzatilmaydi
+MILK_NEAR_DRY_OFF_DAYS = 70           # tug'ishga shuncha kun qolgan bug'oz sigirda sut tabiiy kamayadi
 
 # Qarz eslatmasi: muddatiga shuncha kun qolganda boshlanadi, to'langunча har kuni eslatiladi
 DEBT_DAYS_AHEAD = 3
@@ -388,13 +399,80 @@ def debt_lines(farm, today):
     return lines
 
 
+# ---------------------------------------------------------------- 9. Sut kamayishi
+def milk_drop(totals, today):
+    """
+    totals -- {sana: shu kundagi jami litr}. Oxirgi kunlar o'rtachasi oldingi 14 kun o'rtachasidan keskin kam bo'lsa,
+    (oldingi o'rtacha, oxirgi o'rtacha, kamayish foizi) qaytaradi, aks holda None. Bugun hisobga olinmaydi.
+    """
+    recent_days = [today - timedelta(days=i) for i in range(1, MILK_RECENT_DAYS + 1)]
+    base_days = [today - timedelta(days=i) for i in range(MILK_RECENT_DAYS + 1, MILK_RECENT_DAYS + MILK_BASE_DAYS + 1)]
+    recent = [totals[d] for d in recent_days if d in totals]
+    base = [totals[d] for d in base_days if d in totals]
+    if len(recent) < MILK_RECENT_MIN_RECORDS or len(base) < MILK_BASE_MIN_RECORDS:
+        return None
+    base_avg = sum(base, Decimal('0')) / len(base)
+    recent_avg = sum(recent, Decimal('0')) / len(recent)
+    if base_avg < MILK_BASE_MIN_LITERS:
+        return None
+    diff = base_avg - recent_avg
+    percent = diff * 100 / base_avg
+    if percent < MILK_DROP_PERCENT or diff < MILK_DROP_MIN_LITERS:
+        return None
+    return base_avg, recent_avg, percent
+
+
+def milk_drop_lines(farm, today):
+    """
+    Sutini keskin kamaytirgan sigirlar. Kasallikni aniqlamaydi: faqat "tekshiring" deydi, sababi mastit,
+    boshqa kasallik, yem yoki issiqlik bo'lishi mumkin. Quritilgan va tug'ishiga ~70 kun qolgan sigirlar
+    hisobga olinmaydi (ularda sut tabiiy kamayadi).
+    """
+    since = today - timedelta(days=MILK_RECENT_DAYS + MILK_BASE_DAYS)
+    rows = (
+        MilkRecord.objects
+        .filter(animal__farm=farm, animal__status='faol', animal__sex='urgochi', date__gte=since, date__lt=today)
+        .order_by()
+        .values('animal_id', 'date')
+        .annotate(total=Sum('liters'))
+    )
+    by_animal = {}
+    for r in rows:
+        by_animal.setdefault(r['animal_id'], {})[r['date']] = r['total']
+    if not by_animal:
+        return []
+
+    animals = {a.pk: a for a in Animal.objects.filter(pk__in=list(by_animal))}
+    found = []
+    for pk, totals in by_animal.items():
+        a = animals.get(pk)
+        if a is None or a.dried_off_on:
+            continue
+        if a.pregnant_since and a.due_date and (a.due_date - today).days <= MILK_NEAR_DRY_OFF_DAYS:
+            continue
+        result = milk_drop(totals, today)
+        if result:
+            found.append((a, *result))
+    if not found:
+        return []
+
+    found.sort(key=lambda r: (-r[3], r[0].pk))
+    lines = [f"📉 Sut kamaydi: {len(found)} ta"]
+    for a, base, recent, percent in found[:MAX_ITEMS]:
+        lines.append(f"  • {a} — kuniga {base:.1f} → {recent:.1f} l (−{percent:.0f}%)")
+    lines += _more(len(found))
+    lines.append("  ℹ️ Sababi turlicha bo'lishi mumkin (mastit, kasallik, yem, issiqlik): sigirni ko'zdan kechiring, "
+                 "tuxum yoki yiringli sut, shish yoki isitma bo'lsa veterinarga ko'rsating.")
+    return lines
+
+
 def build_alert_lines(farm, today):
     """
     Fermaning barcha aqlli ogohlantirishlari. Birortasida xato chiqsa ham, kunlik hisobot
     to'xtab qolmasligi uchun xato log'ga yoziladi va qolganlari davom etadi.
     """
     lines = []
-    for builder in (calving_lines, dry_off_lines, rebreed_lines, debt_lines, withdrawal_lines,
+    for builder in (calving_lines, dry_off_lines, rebreed_lines, milk_drop_lines, debt_lines, withdrawal_lines,
                     vaccination_lines, feed_forecast_lines, spending_alert_lines):
         try:
             lines += builder(farm, today)

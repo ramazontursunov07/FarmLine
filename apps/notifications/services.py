@@ -59,6 +59,7 @@ def _alert_builders():
         ('calving', alerts.calving_lines, 'animals', True),
         ('dry_off', alerts.dry_off_lines, 'animals', True),
         ('rebreed', alerts.rebreed_lines, 'animals', False),
+        ('milk_drop', alerts.milk_drop_lines, 'animals', False),
         ('debt', alerts.debt_lines, 'debts', False),
         ('withdrawal', alerts.withdrawal_lines, 'animals', False),
         ('vaccination', alerts.vaccination_lines, 'animals', False),

@@ -10,6 +10,7 @@ class Notification(models.Model):
         ('calving', "Tug'ish"),
         ('dry_off', 'Quritish'),
         ('rebreed', "Urug'lantirish"),
+        ('milk_drop', 'Sut kamayishi'),
         ('debt', 'Qarz'),
         ('withdrawal', 'Ushlab turish muddati'),
         ('vaccination', 'Vaksinatsiya'),
@@ -36,4 +37,3 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user_id}: {self.title}"
-    
