@@ -7,6 +7,7 @@ from django.db import close_old_connections
 from apps.farms.payroll import post_due_once_a_day
 from apps.tasks.recurring import create_due_once_a_day
 from apps.users.digest_runner import send_due_digest
+from apps.users.work_report import send_due_work_report
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,11 @@ class Command(BaseCommand):
                     create_due_once_a_day()  # takrorlanuvchi vazifalar
                 except Exception:
                     logger.exception("Takrorlanuvchi vazifalarni yaratishda xato")
+                try:
+                    if send_due_work_report():  # kechki ish hisoboti
+                        self.stdout.write("Kechki ish hisoboti yuborildi.")
+                except Exception:
+                    logger.exception("Kechki ish hisobotida xato")
                 result = send_due_digest()
                 if result is False:
                     delay = RETRY_AFTER_ERROR

@@ -20,7 +20,8 @@ from apps.farms import payroll
 from apps.tasks import recurring
 
 from .digest_runner import run_digest_in_background
-from .models import DigestRun, PasswordResetToken, TelegramLinkToken, User
+from .work_report import send_work_reports
+from .models import DigestRun, PasswordResetToken, TelegramLinkToken, User, WorkReportRun
 from .permissions import IsAppAdmin
 from .serializers import (
     AdminUserListSerializer,
@@ -269,3 +270,32 @@ class DailyDigestCronView(APIView):
 
         run_digest_in_background(today, run.pk)
         return Response({'detail': 'Hisobot yuborilmoqda'}, status=status.HTTP_202_ACCEPTED)
+
+
+class WorkReportCronView(APIView):
+    """
+    Kechki ish hisoboti uchun tashqi chaqiruv (kuniga bir marta, kechqurun). Himoya va qoidalar DailyDigestCronView
+    bilan bir xil: X-Cron-Secret, bir kunda bir marta, qayta yuborish uchun ?force=1.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'cron'
+
+    def post(self, request):
+        secret = settings.CRON_SECRET
+        given = request.headers.get('X-Cron-Secret', '')
+        if not secret or not hmac.compare_digest(given.encode('utf-8'), secret.encode('utf-8')):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        today = timezone.localdate()
+        run, created = WorkReportRun.objects.get_or_create(date=today)
+        if not created and request.query_params.get('force') != '1':
+            return Response({'detail': 'Bugungi ish hisoboti allaqachon yuborilgan'}, status=status.HTTP_200_OK)
+        try:
+            sent, skipped = send_work_reports(today)
+        except Exception:
+            logger.exception("Kechki ish hisobotini yuborib bo'lmadi")
+            WorkReportRun.objects.filter(pk=run.pk).delete()
+            return Response({'detail': 'Xato'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'sent': sent, 'skipped': skipped}, status=status.HTTP_200_OK)

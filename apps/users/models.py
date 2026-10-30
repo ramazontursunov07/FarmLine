@@ -104,3 +104,17 @@ class DigestRun(models.Model):
 
 
 """O'rganildi."""
+
+
+class WorkReportRun(models.Model):
+    """Kechki ish hisoboti qaysi kunga yuborilgani (bir kunda bir marta)."""
+    date = models.DateField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+        verbose_name = "Kechki ish hisoboti yuborilishi"
+        verbose_name_plural = "Kechki ish hisobotlari yuborilishi"
+
+    def __str__(self):
+        return f"Kechki ish hisoboti: {self.date}"
