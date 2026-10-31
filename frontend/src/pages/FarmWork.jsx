@@ -109,7 +109,7 @@ function FarmWork() {
         Promise.all([
             api.get(`farms/${farmId}/`),
             api.get('animals-group/', { params: { farm: farmId } }),
-            api.get('animals-event/', { params: { farm: farmId } }),
+            api.get('animals-event/', { params: { farm: farmId, limit: 500 } }),  // eng yangi 500 ta (ro'yxat yil sayin o'sadi)
             api.get('animals-type/'),
             api.get('animals-card/', { params: { farm: farmId } }).catch(() => ({ data: [] })),
             api.get('inventory-item/', { params: { farm: farmId } }).catch(() => ({ data: [] })),

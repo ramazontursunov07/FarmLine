@@ -43,7 +43,7 @@ function Tasks() {
             try {
                 const farmRes = await api.get(`farms/${farmId}/`);
                 const owner = farmRes.data.owner_username === user.username;
-                const requests = [api.get('tasks/', { params: { farm: farmId } })];
+                const requests = [api.get('tasks/', { params: { farm: farmId, limit: 300 } })];
                 if (owner) requests.push(api.get('workers/', { params: { farm: farmId } }));
                 const [tasksRes, workersRes] = await Promise.all(requests);
                 if (cancelled) return;

@@ -13,6 +13,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -270,6 +271,25 @@ class DailyDigestCronView(APIView):
 
         run_digest_in_background(today, run.pk)
         return Response({'detail': 'Hisobot yuborilmoqda'}, status=status.HTTP_202_ACCEPTED)
+
+
+class LogoutView(APIView):
+    """
+    POST /api/users/logout/ {"refresh": "..."} -- refresh tokenni bekor qiladi (qora ro'yxatga qo'shadi).
+    Access token muddati o'tgan bo'lishi mumkin, shuning uchun kirish talab qilinmaydi: refreshning o'zi yetarli.
+    Token yaroqsiz yoki allaqachon bekor qilingan bo'lsa ham javob 200: foydalanuvchi baribir chiqib ketadi.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        token = request.data.get('refresh')
+        if isinstance(token, str) and token:
+            try:
+                RefreshToken(token).blacklist()
+            except TokenError:
+                pass
+        return Response({'detail': 'Chiqildi'}, status=status.HTTP_200_OK)
 
 
 class WorkReportCronView(APIView):

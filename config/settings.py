@@ -68,6 +68,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # chiqilgan/aylantirilgan refresh tokenlarni bekor qiladi
     'drf_yasg',
     'corsheaders',
 
@@ -178,6 +179,8 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 REST_FRAMEWORK = {
+    # ?limit= berilgandagina sahifalaydi; berilmasa avvalgidek to'liq ro'yxat (apps/core/pagination.py)
+    'DEFAULT_PAGINATION_CLASS': 'apps.core.pagination.OptionalLimitOffsetPagination',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -199,7 +202,20 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_DAYS', '60'))),
     'ROTATE_REFRESH_TOKENS': True,
+    # Aylantirilgan eski refresh token qayta ishlamaydi (o'g'irlangan token 60 kun ishlab qolmasin)
+    'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# Kesh: so'rov cheklovlari (throttle) barcha gunicorn jarayonlari uchun umumiy bo'lishi kerak.
+# Hostingda (DATABASE_URL bor) baza keshi ishlatiladi: jadval `python manage.py createcachetable` bilan yaratiladi
+# (start.sh buni o'zi bajaradi). Kompyuterda (SQLite) oddiy xotira keshi yetarli.
+if os.getenv('DATABASE_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'django_cache',
+        }
+    }
 
 # Takroriy yuborishdan himoya sarlavhasi (offline navbatdan keladi); aks holda brauzer uni to'sib qo'yadi
 CORS_ALLOW_HEADERS = (*default_headers, 'idempotency-key')
@@ -215,4 +231,3 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # proxy orqali kelgan so'rov HTTPS ekanini biladi
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    

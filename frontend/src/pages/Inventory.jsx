@@ -59,7 +59,7 @@ function Inventory() {
         Promise.all([
             api.get(`farms/${farmId}/`),
             api.get('inventory-item/', { params: { farm: farmId } }),
-            api.get('inventory-transaction/', { params: { farm: farmId } }),
+            api.get('inventory-transaction/', { params: { farm: farmId, limit: 300 } }),  // eng yangi 300 ta harakat
         ])
             .then(([farmRes, itemsRes, txRes]) => {
                 if (cancelled) return;
