@@ -39,6 +39,26 @@ export function t(text, vars) {
     return out;
 }
 
+/**
+ * Server yozgan qisqa faoliyat matnlari ("Ombor, kirim: 50 tonna Kepak", "Vazifa bajarildi: ...")
+ * ni ruschaga o'giradi. Foydalanuvchi o'zi kiritgan nom va sarlavhalar o'zgarishsiz qoladi.
+ */
+export function tServer(text) {
+    if (typeof text !== 'string' || current !== 'ru') return text;
+    const direct = t(text);
+    if (direct !== text) return direct;
+    let m = text.match(/^Ombor, (kirim|sarf): (\S+) (\S+) ([\s\S]*)$/);
+    if (m) return `${t('Ombor')}, ${t(m[1])}: ${m[2]} ${t(m[3])} ${m[4]}`;
+    m = text.match(/^([^:\n]{2,40}): ([\s\S]*)$/);
+    if (m) {
+        const title = m[2].replace(/(\S+) (o'ldi|kasallandi|davolanyapti)$/, (_, a, w) => `${a} ${t(w)}`);
+        return `${t(m[1])}: ${title}`;
+    }
+    m = text.match(/^([^:]+): (-?[\d.,]+)(°|\s\S+)\. ([\s\S]*)$/);
+    if (m) return `${t(m[1])}: ${m[2]}${m[3] === '°' ? '°' : ' ' + t(m[3].trim())}. ${t(m[4])}`;
+    return text;
+}
+
 /** Sana/raqam formatlari uchun brauzer tili kodi */
 export const intlLocale = () => (current === 'ru' ? 'ru-RU' : 'uz-UZ');
 

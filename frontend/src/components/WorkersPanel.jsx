@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney } from '../utils/format';
 import AttendanceSheet from './AttendanceSheet';
+import { t } from '../i18n';
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -33,7 +34,7 @@ function WorkersPanel({ farmId }) {
             setWorkers(asList(data));
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, "Ishchilarni yuklab bo'lmadi"));
+            setError(getErrorMessage(err, t('Ishchilarni yuklab bo\'lmadi')));
         } finally {
             setLoading(false);
         }
@@ -62,7 +63,7 @@ function WorkersPanel({ farmId }) {
             setFormData(EMPTY_FORM);
             setShowForm(false);
         } catch (err) {
-            setFormError(getErrorMessage(err, "Ishchini qo'shib bo'lmadi"));
+            setFormError(getErrorMessage(err, t('Ishchini qo\'shib bo\'lmadi')));
         } finally {
             setSaving(false);
         }
@@ -75,51 +76,51 @@ function WorkersPanel({ farmId }) {
             });
             setWorkers((prev) => prev.map((w) => (w.id === data.id ? data : w)));
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleSalary = async (worker) => {
         const value = window.prompt(
-            `${worker.user_full_name}: oylik ish haqi (so'm)?\n` +
-            "Oy oxirida shu summa moliyaga «Ish haqi» chiqimi bo'lib o'zi yoziladi. 0 = o'chirish.",
+            t('{user_full_name}: oylik ish haqi (so\'m)?\n', { user_full_name: worker.user_full_name }) +
+            t('Oy oxirida shu summa moliyaga «Ish haqi» chiqimi bo\'lib o\'zi yoziladi. 0 = o\'chirish.'),
             Number(worker.monthly_salary) || ''
         );
         if (value === null) return;
         const n = Number(value.replace(/\s/g, '').replace(',', '.'));
         if (value.trim() === '' || Number.isNaN(n) || n < 0) {
-            window.alert("Iltimos, 0 yoki undan katta son kiriting");
+            window.alert(t('Iltimos, 0 yoki undan katta son kiriting'));
             return;
         }
         try {
             const { data } = await api.patch(`workers/${worker.id}/`, { monthly_salary: n });
             setWorkers((prev) => prev.map((w) => (w.id === data.id ? data : w)));
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleRemove = async (worker) => {
         const ok = window.confirm(
-            `${worker.user_full_name} (@${worker.user_username}) ni fermadan olib tashlaysizmi?\n\n` +
-            "Agar u boshqa hech qaysi fermada ishlamasa, uning akkaunti bloklanadi."
+            t('{user_full_name} (@{user_username}) ni fermadan olib tashlaysizmi?\n\n', { user_full_name: worker.user_full_name, user_username: worker.user_username }) +
+            t('Agar u boshqa hech qaysi fermada ishlamasa, uning akkaunti bloklanadi.')
         );
         if (!ok) return;
         try {
             await api.delete(`workers/${worker.id}/`);
             setWorkers((prev) => prev.filter((w) => w.id !== worker.id));
         } catch (err) {
-            window.alert(getErrorMessage(err, "Ishchini olib tashlab bo'lmadi"));
+            window.alert(getErrorMessage(err, t('Ishchini olib tashlab bo\'lmadi')));
         }
     };
 
     return (
         <div className="workers-panel">
             <div className="workers-head">
-                <h4>Ishchilar</h4>
+                <h4>{t('Ishchilar')}</h4>
                 {!showForm && (
                     <button type="button" className="btn-ghost" onClick={() => setShowForm(true)}>
-                        + Ishchi qo'shish
+                        {t('+ Ishchi qo\'shish')}
                     </button>
                 )}
             </div>
@@ -128,71 +129,71 @@ function WorkersPanel({ farmId }) {
                 <form className="worker-form" onSubmit={handleAdd}>
                     <div className="worker-form-grid">
                         <div className="form-field">
-                            <label>Ism</label>
+                            <label>{t('Ism')}</label>
                             <input type="text" name="first_name" value={formData.first_name} onChange={handleChange} required />
                         </div>
                         <div className="form-field">
-                            <label>Familiya</label>
+                            <label>{t('Familiya')}</label>
                             <input type="text" name="last_name" value={formData.last_name} onChange={handleChange} />
                         </div>
                         <div className="form-field">
-                            <label>Username (kirish uchun)</label>
+                            <label>{t('Username (kirish uchun)')}</label>
                             <input type="text" name="username" value={formData.username} onChange={handleChange}
                                 autoComplete="off" required />
                         </div>
                         <div className="form-field">
-                            <label>Parol</label>
+                            <label>{t('Parol')}</label>
                             <input type="text" name="password" value={formData.password} onChange={handleChange}
                                 autoComplete="off" minLength={8} required />
                         </div>
                         <div className="form-field">
-                            <label>Telefon raqam</label>
+                            <label>{t('Telefon raqam')}</label>
                             <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange}
                                 placeholder="+998 90 123 45 67" />
                         </div>
                         <div className="form-field">
-                            <label>Oylik ish haqi (so'm, ixtiyoriy)</label>
+                            <label>{t('Oylik ish haqi (so\'m, ixtiyoriy)')}</label>
                             <input type="number" name="monthly_salary" min="0" step="1" inputMode="numeric"
-                                value={formData.monthly_salary} onChange={handleChange} placeholder="Masalan: 3000000" />
+                                value={formData.monthly_salary} onChange={handleChange} placeholder={t('Masalan: 3000000')} />
                         </div>
                     </div>
                     <div className="form-field">
-                        <label>Kim</label>
+                        <label>{t('Kim')}</label>
                         <select name="kind" value={formData.kind}
                             onChange={(e) => setFormData({ ...formData, kind: e.target.value, can_view_finance: false })}>
-                            <option value="ishchi">Ishchi</option>
-                            <option value="veterinar">Veterinar (faqat davolash va vaksina)</option>
+                            <option value="ishchi">{t('Ishchi')}</option>
+                            <option value="veterinar">{t('Veterinar (faqat davolash va vaksina)')}</option>
                         </select>
                     </div>
                     {formData.kind === 'ishchi' && (
                         <label className="check-field">
                             <input type="checkbox" name="can_view_finance" checked={formData.can_view_finance}
                                 onChange={handleChange} />
-                            Kirim-chiqimni ko'ra olsin
+                            {t('Kirim-chiqimni ko\'ra olsin')}
                         </label>
                     )}
                     <p className="workers-hint">
-                        Username va parolni ishchiga o'zingiz bering, u shular bilan tizimga kiradi.
+                        {t('Username va parolni ishchiga o\'zingiz bering, u shular bilan tizimga kiradi.')}
                     </p>
                     {formError && <p className="error-text">{formError}</p>}
                     <div className="farm-edit-actions">
                         <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? 'Kuting...' : "Qo'shish"}
+                            {saving ? t('Kuting...') : t('Qo\'shish')}
                         </button>
                         <button type="button" className="btn-ghost" disabled={saving}
                             onClick={() => { setShowForm(false); setFormError(''); setFormData(EMPTY_FORM); }}>
-                            Bekor qilish
+                            {t('Bekor qilish')}
                         </button>
                     </div>
                 </form>
             )}
 
             {loading ? (
-                <p className="workers-empty">Yuklanmoqda...</p>
+                <p className="workers-empty">{t('Yuklanmoqda...')}</p>
             ) : error ? (
                 <p className="error-text">{error}</p>
             ) : workers.length === 0 ? (
-                <p className="workers-empty">Bu fermada hozircha ishchi yo'q</p>
+                <p className="workers-empty">{t('Bu fermada hozircha ishchi yo\'q')}</p>
             ) : (
                 <ul className="worker-list">
                     {workers.map((w) => (
@@ -200,16 +201,16 @@ function WorkersPanel({ farmId }) {
                             <div className="worker-info">
                                 <span className="worker-name">
                                     {w.user_full_name}
-                                    {w.kind === 'veterinar' && <span className="work-badge">Veterinar</span>}
+                                    {w.kind === 'veterinar' && <span className="work-badge">{t('Veterinar')}</span>}
                                 </span>
                                 <span className="worker-meta">
-                                    @{w.user_username}{w.user_phone ? ` · ${w.user_phone}` : ''}
+                                    @{w.user_username}{w.user_phone ? t(' · {user_phone}', { user_phone: w.user_phone }) : ''}
                                 </span>
                                 <span className="worker-meta">
                                     {Number(w.monthly_salary) > 0
-                                        ? `Oylik: ${formatMoney(w.monthly_salary)} · oy tugagach moliyaga o'zi yoziladi`
-                                        : "Oylik belgilanmagan"}
-                                    {w.last_salary_month ? ` · oxirgi yozilgan: ${w.last_salary_month}` : ''}
+                                        ? t('Oylik: {v1} · oy tugagach moliyaga o\'zi yoziladi', { v1: formatMoney(w.monthly_salary) })
+                                        : t('Oylik belgilanmagan')}
+                                    {w.last_salary_month ? t(' · oxirgi yozilgan: {last_salary_month}', { last_salary_month: w.last_salary_month }) : ''}
                                 </span>
                             </div>
                             <div className="worker-actions">
@@ -217,15 +218,15 @@ function WorkersPanel({ farmId }) {
                                     <label className="check-field">
                                         <input type="checkbox" checked={w.can_view_finance}
                                             onChange={() => handleToggleFinance(w)} />
-                                        Moliyani ko'radi
+                                        {t('Moliyani ko\'radi')}
                                     </label>
                                 )}
                                 <button type="button" className="farm-item-action" onClick={() => handleSalary(w)}>
-                                    Oylik
+                                    {t('Oylik')}
                                 </button>
                                 <button type="button" className="farm-item-action farm-item-action--danger"
                                     onClick={() => handleRemove(w)}>
-                                    Olib tashlash
+                                    {t('Olib tashlash')}
                                 </button>
                             </div>
                         </li>

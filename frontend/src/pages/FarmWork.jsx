@@ -669,7 +669,7 @@ function FarmWork() {
                                     </details>
                                     {eventError && <p className="error-text" role="alert">{eventError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingEvent}>
-                                        {savingEvent ? 'Kuting...' : t('Qo\'shish')}
+                                        {savingEvent ? t('Kuting...') : t('Qo\'shish')}
                                     </button>
                                 </form>
                             )}
@@ -739,7 +739,7 @@ function FarmWork() {
                                     </div>
                                     {groupError && <p className="error-text" role="alert">{groupError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingGroup}>
-                                        {savingGroup ? 'Kuting...' : t('Guruh qo\'shish')}
+                                        {savingGroup ? t('Kuting...') : t('Guruh qo\'shish')}
                                     </button>
                                 </form>
                             </div>

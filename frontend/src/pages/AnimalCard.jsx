@@ -577,8 +577,8 @@ function AnimalCard() {
                     <>
                         <h2 className="panel-title">
                             №{animal.tag_number}{animal.name ? t(' · {name}', { name: animal.name }) : ''}
-                            {isActive && animal.stage_display && <span className="work-badge">{animal.stage_display}</span>}
-                            {!isActive && <span className="work-badge">{animal.status_display}</span>}
+                            {isActive && animal.stage_display && <span className="work-badge">{t(animal.stage_display)}</span>}
+                            {!isActive && <span className="work-badge">{t(animal.status_display)}</span>}
                         </h2>
                         <p className="panel-subtitle">
                             {animal.group_label} · {t(SEXES[animal.sex]) || animal.sex}
@@ -671,7 +671,7 @@ function AnimalCard() {
                                 <span className="animal-stat-value">{ws.last ? t('{last} kg', { last: ws.last }) : '—'}</span>
                                 <span className="animal-stat-sub">
                                     {ws.last_date ? formatDate(ws.last_date) : "yozilmagan"}
-                                    {change != null && ` · ${change > 0 ? '+' : ''}${change} kg`}
+                                    {change != null && ` · ${change > 0 ? '+' : ''}${change} ${t('kg')}`}
                                     {ws.daily_gain_g != null && t(' · {daily_gain_g} g/kun', { daily_gain_g: ws.daily_gain_g })}
                                 </span>
                             </div>
@@ -689,7 +689,7 @@ function AnimalCard() {
                             {canBreed && (
                                 <div className="animal-stat">
                                     <span className="animal-stat-label">{t('Bug\'ozlik')}</span>
-                                    <span className="animal-stat-value">{animal.is_pregnant ? t('Bug\'oz') : "Yo'q"}</span>
+                                    <span className="animal-stat-value">{animal.is_pregnant ? t('Bug\'oz') : t("Yo'q")}</span>
                                     <span className="animal-stat-sub">
                                         {animal.is_pregnant
                                             ? (animal.due_date
@@ -913,7 +913,7 @@ function AnimalCard() {
                                             {animal.reproduction && (() => {
                                                 const r = animal.reproduction;
                                                 const dryText = {
-                                                    done: `Quritilgan${r.dried_off_on ? ` (${formatDate(r.dried_off_on)})` : ''}`,
+                                                    done: `${t('Quritilgan')}${r.dried_off_on ? ` (${formatDate(r.dried_off_on)})` : ''}`,
                                                     soon: t('Quritish vaqti yaqin: {v1}', { v1: formatDate(r.dry_off_date) }),
                                                     now: t('Bugun quritish vaqti'),
                                                     late: t('Quritish kechikdi ({v1})', { v1: formatDate(r.dry_off_date) }),
@@ -1131,10 +1131,10 @@ function AnimalCard() {
                                         <div className="work-main">
                                             <span className="work-title">
                                                 {ev.title}
-                                                <span className="work-badge">{ev.event_type_display}</span>
+                                                <span className="work-badge">{t(ev.event_type_display)}</span>
                                             </span>
                                             <span className="work-meta">
-                                                {formatDate(ev.start_date)}{ev.end_date && ev.end_date !== ev.start_date ? ` – ${formatDate(ev.end_date)}` : ''} · {ev.status_display}
+                                                {formatDate(ev.start_date)}{ev.end_date && ev.end_date !== ev.start_date ? ` – ${formatDate(ev.end_date)}` : ''} · {t(ev.status_display)}
                                             </span>
                                             {ev.description && <span className="work-desc">{ev.description}</span>}
                                         </div>

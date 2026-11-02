@@ -2,15 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import './AssistantChat.css';
-import { t } from '../i18n';
+import { t, intlLocale } from '../i18n';
 
-const GREETING =
-    "Salom! Men FarmLine yordamchisiman. Savol bering yoki ayting, men yozib qo'yaman: " +
-    "«ombordan 50 kg yem chiqar», «bugun 200 000 so'm yem uchun chiqim yoz». Yozishdan oldin sizdan tasdiq so'rayman.";
+const GREETING_A = "Salom! Men FarmLine yordamchisiman. Savol bering yoki ayting, men yozib qo'yaman: ";
+const GREETING_B = "«ombordan 50 kg yem chiqar», «bugun 200 000 so'm yem uchun chiqim yoz». Yozishdan oldin sizdan tasdiq so'rayman.";
 const MAX_LEN = 1000; // backend ham shu chegarani tekshiradi
 const HISTORY_LIMIT = 10; // AI ga oxirgi nechta xabar yuboriladi
 const AI_TIMEOUT_MS = 60000; // AI javobi oddiy so'rovdan sekinroq bo'lishi mumkin
-const VOICE_LANG = 'uz-UZ';
 
 // Brauzer ovozni matnga o'girishni qo'llab-quvvatlasa (Chrome, Edge, Android), mikrofon tugmasi chiqadi
 const SpeechRecognition =
@@ -61,7 +59,7 @@ function AssistantChat({ onActionDone }) {
         }
         setVoiceError('');
         const rec = new SpeechRecognition();
-        rec.lang = VOICE_LANG;
+        rec.lang = intlLocale();
         rec.interimResults = true;
         rec.continuous = false;
         const base = text.trim() ? `${text.trim()} ` : '';
@@ -203,7 +201,7 @@ function AssistantChat({ onActionDone }) {
                     </header>
 
                     <div className="ai-messages" aria-live="polite">
-                        <div className="ai-msg ai-msg--assistant">{GREETING}</div>
+                        <div className="ai-msg ai-msg--assistant">{t(GREETING_A) + t(GREETING_B)}</div>
                         {messages.map((m, i) => (
                             <div
                                 key={i}
@@ -230,7 +228,7 @@ function AssistantChat({ onActionDone }) {
                                 <div className="ai-action-buttons">
                                     <button type="button" className="ai-confirm" onClick={confirmAction}
                                         disabled={confirming}>
-                                        {confirming ? 'Yozilmoqda...' : t('Tasdiqlash')}
+                                        {confirming ? t('Yozilmoqda...') : t('Tasdiqlash')}
                                     </button>
                                     <button type="button" className="ai-cancel" onClick={cancelAction}
                                         disabled={confirming}>

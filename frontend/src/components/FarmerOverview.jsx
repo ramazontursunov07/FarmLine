@@ -7,7 +7,7 @@ import { formatMoney } from '../utils/format';
 import FinanceCharts from './FinanceCharts';
 import { Icon } from './dashboardKit';
 import { greeting, longDate, monthName, daysSince } from '../utils/dashboardDates';
-import { t } from '../i18n';
+import { t, tServer } from '../i18n';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 const SHOWN = 5; // dastlab ko'rsatiladigan "e'tibor kerak" qatorlari soni
@@ -28,7 +28,7 @@ function formatDateTime(iso) {
 
 function lateText(dueDate) {
     const d = daysSince(dueDate);
-    return d === 0 ? 'bugun muddati' : t('{d} kun kechikdi', { d });
+    return d === 0 ? t('bugun muddati') : t('{d} kun kechikdi', { d });
 }
 
 function AttentionList({ rows, total }) {
@@ -55,11 +55,11 @@ function AttentionList({ rows, total }) {
                 {visible.map((r) => (
                     <li key={r.key}>
                         <Link to={r.to} className={`db-attn db-attn--${r.kind}`}>
-                            <span className="db-attn-icon"><Icon name={t(KIND[r.kind]).icon} size={18} /></span>
+                            <span className="db-attn-icon"><Icon name={KIND[r.kind].icon} size={18} /></span>
                             <span className="db-attn-body">
                                 <span className="db-attn-name">{r.title}</span>
                                 <span className="db-attn-meta">
-                                    <span className="db-attn-kind">{t(KIND[r.kind]).label}</span>
+                                    <span className="db-attn-kind">{t(KIND[r.kind].label)}</span>
                                     {r.meta.map((m) => <span key={m}>{m}</span>)}
                                 </span>
                             </span>
@@ -99,7 +99,7 @@ function MoneyPanel({ finance }) {
                         <span className={`db-money-num${loss ? ' is-loss' : ''}`}>
                             {loss ? '−' : profit > 0 ? '+' : ''}{formatMoney(Math.abs(profit))}
                         </span>
-                        <span className="db-money-word">{loss ? 'zarar' : 'foyda'}</span>
+                        <span className="db-money-word">{loss ? t('zarar') : t('foyda')}</span>
                     </p>
                     <div className="db-bars">
                         <div className="db-bar-row">
@@ -116,7 +116,7 @@ function MoneyPanel({ finance }) {
                 </>
             )}
             <p className="db-money-prev">
-                {t('O\'tgan oy:')} {prev < 0 ? 'zarar ' : prev > 0 ? 'foyda ' : ''}
+                {t('O\'tgan oy:')} {prev < 0 ? t('zarar') + ' ' : prev > 0 ? t('foyda') + ' ' : ''}
                 <strong>{formatMoney(Math.abs(prev))}</strong>
             </p>
         </aside>
@@ -161,8 +161,8 @@ function FarmerOverview({ refreshKey, children }) {
             })),
             ...inventory.items.map((i) => ({
                 key: `i${i.id}`, kind: 'stock', to: `/farms/${i.farm}/inventory`,
-                title: `${i.item_name}: ${num(i.quantity)} ${i.unit} qoldi`,
-                meta: [i.farm_name, `kamida ${num(i.low_stock_threshold)} ${i.unit} kerak`],
+                title: t('{name}: {qty} {unit} qoldi', { name: i.item_name, qty: num(i.quantity), unit: t(i.unit) }),
+                meta: [i.farm_name, t('kamida {qty} {unit} kerak', { qty: num(i.low_stock_threshold), unit: t(i.unit) })],
             })),
             ...treatments.items.map((e) => ({
                 key: `e${e.id}`, kind: 'care', to: `/farms/${e.farm}/work`, title: e.title,
@@ -229,7 +229,7 @@ function FarmerOverview({ refreshKey, children }) {
                                     {data.activity.map((a, idx) => (
                                         <li key={idx}>
                                             <span className="db-activity-time">{formatDateTime(a.at)}</span>
-                                            <span><strong>{a.who}</strong> {a.text}</span>
+                                            <span><strong>{a.who}</strong> {tServer(a.text)}</span>
                                             <span className="db-muted">{data.farms.find((f) => f.id === a.farm)?.name ?? ''}</span>
                                         </li>
                                     ))}

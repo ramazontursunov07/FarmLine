@@ -92,9 +92,9 @@ function MilkProfit({ farmId, refreshKey }) {
                             <span className="stat-value">{tk.price_per_liter ? money(tk.price_per_liter) : '—'}</span>
                             <span className="stat-label">{t('1 litr sotuv narxi')}</span>
                             <span className="stat-sub">
-                                {tk.price_source === 'sotuv' && "shu oydagi sotuvlardan"}
-                                {tk.price_source === 'sotuv_90' && "oxirgi 90 kundagi sotuvlardan"}
-                                {tk.price_source === 'qolda' && "siz kiritgan narx"}
+                                {tk.price_source === 'sotuv' && t("shu oydagi sotuvlardan")}
+                                {tk.price_source === 'sotuv_90' && t("oxirgi 90 kundagi sotuvlardan")}
+                                {tk.price_source === 'qolda' && t("siz kiritgan narx")}
                                 {!tk.price_source && t('sotuv yo\'q')}
                             </span>
                         </div>
@@ -125,7 +125,7 @@ function MilkProfit({ farmId, refreshKey }) {
                                     <label key={c.category} className="profit-cat">
                                         <input type="checkbox" checked={!excluded.includes(c.category)}
                                             onChange={() => toggleCategory(c.category)} />
-                                        {c.label}: {money(c.amount)}
+                                        {t(c.label)}: {money(c.amount)}
                                     </label>
                                 ))}
                             </div>
@@ -140,7 +140,7 @@ function MilkProfit({ farmId, refreshKey }) {
                                     <li key={c.id}>
                                         №{c.tag_number}{c.name ? ` ${c.name}` : ''} —{' '}
                                         {c.verdict === 'sut_yoq'
-                                            ? "bu oy sut bermagan"
+                                            ? t("bu oy sut bermagan")
                                             : t('kuniga {v1} l, zarar {v2}', { v1: num(c.daily_avg), v2: money(Math.abs(Number(c.profit))) })}
                                         {c.break_even_daily && t(' (zararsiz bo\'lishi uchun kuniga ~{v1} l kerak)', { v1: num(c.break_even_daily) })}
                                     </li>
@@ -167,7 +167,7 @@ function MilkProfit({ farmId, refreshKey }) {
                                 </thead>
                                 <tbody>
                                     {data.cows.map((c) => {
-                                        const v = t(VERDICTS[c.verdict]);
+                                        const v = VERDICTS[c.verdict];
                                         return (
                                             <tr key={c.id}>
                                                 <td>
@@ -181,7 +181,7 @@ function MilkProfit({ farmId, refreshKey }) {
                                                 <td className="hide-sm">{money(c.cost)}</td>
                                                 <td className="hide-sm">{money(c.revenue)}</td>
                                                 <td className={profitClass(c.profit)}><strong>{money(c.profit)}</strong></td>
-                                                <td><span className={`work-badge ${v.cls}`}>{v.label}</span></td>
+                                                <td><span className={`work-badge ${v.cls}`}>{t(v.label)}</span></td>
                                             </tr>
                                         );
                                     })}

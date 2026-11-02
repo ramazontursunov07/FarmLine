@@ -71,7 +71,7 @@ function Debts() {
     const [busy, setBusy] = useState(false);
 
     const reload = () => setReloadKey((k) => k + 1);
-    const L = t(KINDS[kind]);
+    const L = Object.fromEntries(Object.entries(KINDS[kind]).map(([k, v]) => [k, t(v)]));
 
     useEffect(() => {
         let cancelled = false;
@@ -296,11 +296,11 @@ function Debts() {
                         </div>
 
                         <div className="filter-bar">
-                            {Object.entries(KINDS).map(([k, v]) => [k, t(v)]).map(([k, v]) => (
+                            {Object.entries(KINDS).map(([k, v]) => (
                                 <button key={k} type="button"
                                     className={k === kind ? 'btn-primary btn-auto' : 'btn-ghost'}
                                     onClick={() => { setKind(k); setOpenParty(null); setShowDebtForm(false); setShowPartyForm(false); }}>
-                                    {v.tab}
+                                    {t(v.tab)}
                                 </button>
                             ))}
                         </div>

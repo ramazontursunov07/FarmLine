@@ -144,7 +144,7 @@ function Tasks() {
                 <span className="work-title">
                     {tk.title}
                     {tk.priority !== 'oddiy' && (
-                        <span className={`work-badge work-badge--${tk.priority}`}>{tk.priority_display}</span>
+                        <span className={`work-badge work-badge--${tk.priority}`}>{t(tk.priority_display)}</span>
                     )}
                     {tk.status === 'jarayonda' && <span className="work-badge">{t('Jarayonda')}</span>}
                 </span>
@@ -258,7 +258,7 @@ function Tasks() {
                                         )}
                                         {formError && <p className="error-text" role="alert">{formError}</p>}
                                         <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                                            {saving ? 'Kuting...' : t('Vazifa berish')}
+                                            {saving ? t('Kuting...') : t('Vazifa berish')}
                                         </button>
                                     </form>
                                 </div>

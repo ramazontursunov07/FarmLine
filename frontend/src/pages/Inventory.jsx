@@ -424,7 +424,7 @@ function Inventory() {
                                     )}
                                     {txError && <p className="error-text" role="alert">{txError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingTx}>
-                                        {savingTx ? 'Kuting...' : t('Yozish')}
+                                        {savingTx ? t('Kuting...') : t('Yozish')}
                                     </button>
                                 </form>
                             )}
@@ -489,7 +489,7 @@ function Inventory() {
                                         )}
                                         {itemError && <p className="error-text" role="alert">{itemError}</p>}
                                         <button type="submit" className="btn-primary btn-auto" disabled={savingItem}>
-                                            {savingItem ? 'Kuting...' : t('Mahsulot qo\'shish')}
+                                            {savingItem ? t('Kuting...') : t('Mahsulot qo\'shish')}
                                         </button>
                                     </form>
                                 </div>

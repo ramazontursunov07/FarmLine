@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
+import { t, tServer } from '../i18n';
 
 const WEEKDAYS = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
 
 function dayName(iso, i) {
-    if (i === 0) return 'Bugun';
-    if (i === 1) return 'Ertaga';
+    if (i === 0) return t('Bugun');
+    if (i === 1) return t('Ertaga');
     const d = new Date(`${iso}T12:00:00`);
-    return WEEKDAYS[d.getDay()];
+    return t(WEEKDAYS[d.getDay()]);
 }
 
 // "bugun 14:05" yoki "23.10 14:05"
@@ -18,7 +19,7 @@ function updatedText(iso) {
     const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     const now = new Date();
     const sameDay = d.toDateString() === now.toDateString();
-    return sameDay ? `bugun ${time}` : `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${time}`;
+    return sameDay ? t('bugun {time}', { time }) : `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${time}`;
 }
 
 function deg(v) {
@@ -57,18 +58,17 @@ function WeatherPanel({ farms }) {
 
     let body;
     if (loading) {
-        body = <p className="db-muted">Ob-havo yuklanmoqda...</p>;
+        body = <p className="db-muted">{t('Ob-havo yuklanmoqda...')}</p>;
     } else if (failed || !data) {
-        body = <p className="db-muted">Ob-havoni hozir olib bo'lmadi. Internetni tekshirib, keyinroq qarang.</p>;
+        body = <p className="db-muted">{t('Ob-havoni hozir olib bo\'lmadi. Internetni tekshirib, keyinroq qarang.')}</p>;
     } else if (data.status === 'no_location') {
         body = (
             <p className="db-muted">
-                «{data.location}» manzili bo'yicha joy topilmadi. Fermani tahrirlab, manzilni aniqroq yozing
-                (masalan: «Qarshi, Qashqadaryo»).
+                «{data.location}{t('» manzili bo\'yicha joy topilmadi. Fermani tahrirlab, manzilni aniqroq yozing (masalan: «Qarshi, Qashqadaryo»).')}
             </p>
         );
     } else if (data.status === 'unavailable') {
-        body = <p className="db-muted">Ob-havo xizmati hozir javob bermayapti. Birozdan keyin qayta urinib ko'ring.</p>;
+        body = <p className="db-muted">{t('Ob-havo xizmati hozir javob bermayapti. Birozdan keyin qayta urinib ko\'ring.')}</p>;
     } else {
         const today = data.days[0];
         body = (
@@ -76,10 +76,10 @@ function WeatherPanel({ farms }) {
                 <div className="db-wx-now">
                     <span className="db-wx-temp">{deg(data.current.temp)}</span>
                     <div className="db-wx-meta">
-                        <strong>{data.current.text || 'Ob-havo'}</strong>
+                        <strong>{t(data.current.text) || t('Ob-havo')}</strong>
                         <span>
-                            Bugun {deg(today?.temp_min)} … {deg(today?.temp_max)} · Shamol {Math.round(data.current.wind_kmh ?? 0)} km/soat
-                            {data.current.humidity != null ? ` · Namlik ${data.current.humidity}%` : ''}
+                            {t('Bugun')} {deg(today?.temp_min)} … {deg(today?.temp_max)} {t('· Shamol')} {Math.round(data.current.wind_kmh ?? 0)} {t('km/soat')}
+                            {data.current.humidity != null ? t(' · Namlik {humidity}%', { humidity: data.current.humidity }) : ''}
                         </span>
                     </div>
                 </div>
@@ -88,7 +88,7 @@ function WeatherPanel({ farms }) {
                     <ul className="db-wx-alerts">
                         {data.alerts.map((a) => (
                             <li key={`${a.type}-${a.date}`} className={`db-wx-alert db-wx-alert--${a.level}`}>
-                                <b>{dayName(a.date, data.days.findIndex((d) => d.date === a.date))}:</b> {a.text}
+                                <b>{dayName(a.date, data.days.findIndex((d) => d.date === a.date))}:</b> {tServer(a.text)}
                             </li>
                         ))}
                     </ul>
@@ -98,10 +98,10 @@ function WeatherPanel({ farms }) {
                     {data.days.map((d, i) => (
                         <li key={d.date} className="db-wx-day">
                             <span className="db-wx-dname">{dayName(d.date, i)}</span>
-                            <span className="db-wx-dtext">{d.text}</span>
+                            <span className="db-wx-dtext">{t(d.text)}</span>
                             <span className="db-wx-dtemp">{deg(d.temp_max)} <i>{deg(d.temp_min)}</i></span>
                             <span className="db-wx-drain">
-                                {d.rain_chance != null && d.rain_chance >= 30 ? `Yog'in ${d.rain_chance}%` : ' '}
+                                {d.rain_chance != null && d.rain_chance >= 30 ? t('Yog\'in {rain_chance}%', { rain_chance: d.rain_chance }) : ' '}
                             </span>
                         </li>
                     ))}
@@ -109,8 +109,8 @@ function WeatherPanel({ farms }) {
 
                 {data.stale && (
                     <p className="db-muted" role="status">
-                        Ob-havo xizmati hozir javob bermayapti: oxirgi olingan ma'lumot
-                        {data.updated_at ? ` (${updatedText(data.updated_at)})` : ''} ko'rsatilyapti.
+                        {t('Ob-havo xizmati hozir javob bermayapti: oxirgi olingan ma\'lumot')}
+                        {data.updated_at ? ` (${updatedText(data.updated_at)})` : ''} {t('ko\'rsatilyapti.')}
                     </p>
                 )}
             </>
@@ -120,10 +120,10 @@ function WeatherPanel({ farms }) {
     return (
         <section className="db-section db-wx">
             <div className="db-wx-head">
-                <h2 className="db-h2">Ob-havo</h2>
+                <h2 className="db-h2">{t('Ob-havo')}</h2>
                 {farms.length > 1 ? (
                     <select className="db-wx-select" value={activeId} onChange={(e) => setFarmId(Number(e.target.value))}
-                        aria-label="Ferma tanlang">
+                        aria-label={t('Ferma tanlang')}>
                         {farms.map((f) => (
                             <option key={f.id} value={f.id}>{f.name}</option>
                         ))}

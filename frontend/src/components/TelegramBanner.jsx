@@ -99,7 +99,7 @@ function TelegramBanner() {
             </div>
 
             <button type="button" className="tg-banner-button" onClick={handleLink} disabled={busy}>
-                {busy ? 'Kuting...' : link ? t('Qayta ochish') : t('Telegramga ulash')}
+                {busy ? t('Kuting...') : link ? t('Qayta ochish') : t('Telegramga ulash')}
             </button>
         </div>
     );

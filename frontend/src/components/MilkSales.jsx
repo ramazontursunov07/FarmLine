@@ -152,7 +152,7 @@ function MilkSales({ farmId, refreshKey }) {
                         {stock.withdrawals.map((w) => (
                             <li key={w.animal}>
                                 №{w.tag_number}{w.name ? ` ${w.name}` : ''} — {w.medicine}:{' '}
-                                {w.until ? t('{v1} gacha ({days_left} kun qoldi)', { v1: formatDate(w.until), days_left: w.days_left }) : 'davolash davom etmoqda'}
+                                {w.until ? t('{v1} gacha ({days_left} kun qoldi)', { v1: formatDate(w.until), days_left: w.days_left }) : t('davolash davom etmoqda')}
                             </li>
                         ))}
                     </ul>
@@ -207,7 +207,7 @@ function MilkSales({ farmId, refreshKey }) {
                         )}
                         {formError && <p className="error-text" role="alert">{formError}</p>}
                         <button type="submit" className="btn-primary btn-auto" disabled={saving || Number(stock.available) <= 0}>
-                            {saving ? 'Kuting...' : t('Sutni sotish')}
+                            {saving ? t('Kuting...') : t('Sutni sotish')}
                         </button>
                     </form>
 
