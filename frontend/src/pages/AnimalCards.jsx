@@ -4,11 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import MilkEntry from '../components/MilkEntry';
 import MilkReport from '../components/MilkReport';
 import MilkSales from '../components/MilkSales';
 import MilkProfit from '../components/MilkProfit';
+import { t } from '../i18n';
 
 // Sahifa bo'limlari: tanlangani manzildagi ?tab= da saqlanadi (orqaga tugmasi va havola ishlaydi)
 const TABS = [
@@ -57,7 +59,7 @@ function AnimalCards() {
     const [sexFilter, setSexFilter] = useState('');
     const groupFilter = searchParams.get('group') || '';
     const tabParam = searchParams.get('tab');
-    const tab = TABS.some((t) => t.key === tabParam) ? tabParam : 'hayvonlar';
+    const tab = TABS.some((tb) => tb.key === tabParam) ? tabParam : 'hayvonlar';
     const selectTab = (key) => {
         const next = new URLSearchParams(searchParams);
         if (key === 'hayvonlar') next.delete('tab');
@@ -81,7 +83,7 @@ function AnimalCards() {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setError(err.response?.status === 404 ? 'Ferma topilmadi' : getErrorMessage(err, "Ma'lumotlarni yuklab bo'lmadi"));
+                    setError(err.response?.status === 404 ? t('Ferma topilmadi') : getErrorMessage(err, t("Ma'lumotlarni yuklab bo'lmadi")));
                 }
             })
             .finally(() => !cancelled && setLoading(false));
@@ -139,7 +141,7 @@ function AnimalCards() {
             setAdding(false);
             reload();
         } catch (err) {
-            setAddError(getErrorMessage(err, "Hayvonni qo'shib bo'lmadi"));
+            setAddError(getErrorMessage(err, t("Hayvonni qo'shib bo'lmadi")));
         } finally {
             setAddSaving(false);
         }
@@ -166,7 +168,7 @@ function AnimalCards() {
             setEditingId(null);
             reload();
         } catch (err) {
-            setEditError(getErrorMessage(err, "Kartochkani saqlab bo'lmadi"));
+            setEditError(getErrorMessage(err, t("Kartochkani saqlab bo'lmadi")));
         } finally {
             setSaving(false);
         }
@@ -174,10 +176,10 @@ function AnimalCards() {
 
     const handleDelete = async (a) => {
         const ok = window.confirm(
-            `№${a.tag_number}${a.name ? ` (${a.name})` : ''} kartochkasini o'chirasizmi?\n\n` +
-            "Uning vazn va sut tarixi ham o'chadi. " +
-            (a.status === 'faol' ? "Guruhdagi hayvonlar soni 1 taga kamayadi. " : "Guruh soni o'zgarmaydi. ") +
-            "Buni qaytarib bo'lmaydi."
+            t("№{tag}{name} kartochkasini o'chirasizmi?", { tag: a.tag_number, name: a.name ? ` (${a.name})` : '' }) + '\n\n' +
+            t("Uning vazn va sut tarixi ham o'chadi.") + ' ' +
+            (a.status === 'faol' ? t('Guruhdagi hayvonlar soni 1 taga kamayadi.') : t("Guruh soni o'zgarmaydi.")) + ' ' +
+            t("Buni qaytarib bo'lmaydi.")
         );
         if (!ok) return;
         try {
@@ -185,7 +187,7 @@ function AnimalCards() {
             if (editingId === a.id) setEditingId(null);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t("O'chirib bo'lmadi")));
         }
     };
 
@@ -217,51 +219,52 @@ function AnimalCards() {
     const sections = sexFilter
         ? [{ key: sexFilter, title: '', items: visible }]
         : [
-            { key: 'urgochi', title: "Urg'ochi hayvonlar", items: females },
-            { key: 'erkak', title: 'Erkak hayvonlar', items: males },
+            { key: 'urgochi', title: t("Urg'ochi hayvonlar"), items: females },
+            { key: 'erkak', title: t('Erkak hayvonlar'), items: males },
         ].filter((s) => s.items.length > 0);
 
     return (
         <div className="app-shell">
             <header className="app-header">
-                <h1>FarmLine</h1>
+                <h1>{t('FarmLine')}</h1>
                 <div className="user-bar">
-                    <span>Salom, {user.first_name || user.username}!</span>
+                    <span>{t('Salom, {name}!', { name: user.first_name || user.username })}</span>
+                    <LanguageSwitcher />
                     <NotificationBell />
-                    <Link to="/profile" className="user-link">Profil</Link>
+                    <Link to="/profile" className="user-link">{t('Profil')}</Link>
                     <InstallButton />
-                    <button className="btn-ghost" onClick={logout}>Chiqish</button>
+                    <button className="btn-ghost" onClick={logout}>{t('Chiqish')}</button>
                 </div>
             </header>
 
             <main className="app-main">
-                <Link to={`/farms/${farmId}/work`} className="back-link">← Ferma ishlariga qaytish</Link>
+                <Link to={`/farms/${farmId}/work`} className="back-link">{t('← Ferma ishlariga qaytish')}</Link>
 
                 {loading ? (
-                    <p className="empty-state">Yuklanmoqda...</p>
+                    <p className="empty-state">{t('Yuklanmoqda...')}</p>
                 ) : error ? (
                     <p className="error-text">{error}</p>
                 ) : (
                     <>
-                        <h2 className="panel-title">{farm.name}: hayvon kartochkalari</h2>
+                        <h2 className="panel-title">{t('{name}: hayvon kartochkalari', { name: farm.name })}</h2>
                         <p className="panel-subtitle">
-                            Har bir hayvon uchun alohida hisob: vazn, sut, tug'ish va davolash tarixi.
-                            Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.
+                            {t("Har bir hayvon uchun alohida hisob: vazn, sut, tug'ish va davolash tarixi.")}{' '}
+                            {t('Kartochka ochish ixtiyoriy, guruh soni avvalgidek guruhda saqlanadi.')}
                         </p>
 
                         {animals.length > 0 && (
                             <p className="panel-subtitle">
-                                <Link to={`/farms/${farmId}/animals/qr`}>🏷 QR bilkalarni chop etish</Link>
+                                <Link to={`/farms/${farmId}/animals/qr`}>{t('🏷 QR bilkalarni chop etish')}</Link>
                             </p>
                         )}
 
                         <MilkEntry farmId={farmId} animals={animals} onSaved={reload} />
 
-                        <div className="tabs" role="tablist" aria-label="Bo'limlar">
-                            {TABS.map((t) => (
-                                <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
-                                    className={`tab${tab === t.key ? ' tab--active' : ''}`} onClick={() => selectTab(t.key)}>
-                                    {t.label}
+                        <div className="tabs" role="tablist" aria-label={t("Bo'limlar")}>
+                            {TABS.map((tb) => (
+                                <button key={tb.key} type="button" role="tab" aria-selected={tab === tb.key}
+                                    className={`tab${tab === tb.key ? ' tab--active' : ''}`} onClick={() => selectTab(tb.key)}>
+                                    {t(tb.label)}
                                 </button>
                             ))}
                         </div>
@@ -278,7 +281,7 @@ function AnimalCards() {
                         <>
                         {isOwner && !adding && (
                             <button type="button" className="btn-primary btn-auto" onClick={() => openAdd()}>
-                                + Hayvon qo'shish
+                                {t("+ Hayvon qo'shish")}
                             </button>
                         )}
                         {isOwner && adding && (
@@ -286,16 +289,16 @@ function AnimalCards() {
                                 {activeGroups.length === 0 ? (
                                     <>
                                         <p className="work-meta">
-                                            Avval hayvon guruhini oching: «Ferma ishlari» sahifasida «Hayvon guruhlari» bo'limida.
+                                            {t("Avval hayvon guruhini oching: «Ferma ishlari» sahifasida «Hayvon guruhlari» bo'limida.")}
                                         </p>
-                                        <button type="button" className="btn-ghost" onClick={() => setAdding(false)}>Yopish</button>
+                                        <button type="button" className="btn-ghost" onClick={() => setAdding(false)}>{t('Yopish')}</button>
                                     </>
                                 ) : (
                                     <form className="animal-inline-form" onSubmit={handleAdd}>
-                                        {calfMode && <h4 className="section-title">Buzoq kartochkasi</h4>}
+                                        {calfMode && <h4 className="section-title">{t('Buzoq kartochkasi')}</h4>}
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>Guruhi</label>
+                                                <label>{t('Guruhi')}</label>
                                                 <select name="group" value={addForm.group} onChange={handleAddChange}>
                                                     {activeGroups.map((g) => (
                                                         <option key={g.id} value={g.id}>
@@ -305,50 +308,50 @@ function AnimalCards() {
                                                 </select>
                                             </div>
                                             <div className="form-field">
-                                                <label>Quloq raqami</label>
+                                                <label>{t('Quloq raqami')}</label>
                                                 <input type="text" name="tag_number" value={addForm.tag_number}
                                                     onChange={handleAddChange} maxLength={30} required />
                                             </div>
                                         </div>
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>Laqabi (ixtiyoriy)</label>
+                                                <label>{t('Laqabi (ixtiyoriy)')}</label>
                                                 <input type="text" name="name" value={addForm.name}
                                                     onChange={handleAddChange} maxLength={100} />
                                             </div>
                                             <div className="form-field">
-                                                <label>Jinsi</label>
+                                                <label>{t('Jinsi')}</label>
                                                 <select name="sex" value={addForm.sex} onChange={handleAddChange}>
-                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>Tug'ilgan sana</label>
+                                                <label>{t("Tug'ilgan sana")}</label>
                                                 <input type="date" name="birth_date" value={addForm.birth_date}
                                                     max={new Date().toLocaleDateString('en-CA')} onChange={handleAddChange} required />
                                             </div>
                                             <div className="form-field">
-                                                <label>Onasi (ixtiyoriy)</label>
+                                                <label>{t('Onasi (ixtiyoriy)')}</label>
                                                 <select name="mother" value={addForm.mother} onChange={handleAddChange}>
                                                     <option value="">—</option>
                                                     {mothers.map((m) => (
                                                         <option key={m.id} value={m.id}>
-                                                            №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                            №{m.tag_number}{m.name ? t(' · {name}', { name: m.name }) : ''}
                                                         </option>
                                                     ))}
                                                 </select>
                                             </div>
                                         </div>
-                                        <p className="workers-hint">Guruhdagi hayvonlar soni 1 taga ko'payadi.</p>
+                                        <p className="workers-hint">{t("Guruhdagi hayvonlar soni 1 taga ko'payadi.")}</p>
                                         {addError && <p className="error-text" role="alert">{addError}</p>}
                                         <div className="farm-edit-actions">
                                             <button type="submit" className="btn-primary btn-auto" disabled={addSaving}>
-                                                {addSaving ? 'Kuting...' : "Qo'shish"}
+                                                {addSaving ? t('Kuting...') : t("Qo'shish")}
                                             </button>
                                             <button type="button" className="btn-ghost" disabled={addSaving} onClick={() => setAdding(false)}>
-                                                Bekor qilish
+                                                {t('Bekor qilish')}
                                             </button>
                                         </div>
                                     </form>
@@ -357,11 +360,11 @@ function AnimalCards() {
                         )}
 
                         <div className="filter-bar">
-                            <input type="search" placeholder="Quloq raqami yoki laqab" value={search}
+                            <input type="search" placeholder={t('Quloq raqami yoki laqab')} value={search}
                                 onChange={(e) => setSearch(e.target.value)} />
                             <select value={groupFilter}
                                 onChange={(e) => setSearchParams(e.target.value ? { group: e.target.value } : {})}>
-                                <option value="">Barcha guruhlar</option>
+                                <option value="">{t('Barcha guruhlar')}</option>
                                 {groups.map((g) => (
                                     <option key={g.id} value={g.id}>
                                         {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
@@ -369,19 +372,19 @@ function AnimalCards() {
                                 ))}
                             </select>
                             <select value={sexFilter} onChange={(e) => setSexFilter(e.target.value)}>
-                                <option value="">Urg'ochi va erkak ({matched.length})</option>
-                                <option value="urgochi">Faqat urg'ochi ({females.length})</option>
-                                <option value="erkak">Faqat erkak ({males.length})</option>
+                                <option value="">{t("Urg'ochi va erkak ({n})", { n: matched.length })}</option>
+                                <option value="urgochi">{t("Faqat urg'ochi ({n})", { n: females.length })}</option>
+                                <option value="erkak">{t('Faqat erkak ({n})', { n: males.length })}</option>
                             </select>
                             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                                <option value="">Barcha holatlar</option>
-                                {Object.entries(STATUSES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                <option value="">{t('Barcha holatlar')}</option>
+                                {Object.entries(STATUSES).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                             </select>
                         </div>
 
                         {(statusFilter === '' || statusFilter === 'faol') && !search.trim() && uncarded.length > 0 && (
                             <>
-                                <h3 className="section-title">Kartochkasiz hayvonlar: {uncardedTotal} ta</h3>
+                                <h3 className="section-title">{t('Kartochkasiz hayvonlar: {n}', { n: uncardedTotal })}</h3>
                                 <ul className="work-list">
                                     {uncarded.map(({ group: g, rest }) => (
                                         <li key={g.id} className="work-item">
@@ -390,13 +393,13 @@ function AnimalCards() {
                                                     {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
                                                 </span>
                                                 <span className="work-meta">
-                                                    {rest} ta hayvon, kartochkasi ochilmagan (guruhda jami {g.count} ta)
+                                                    {t('{rest} ta hayvon, kartochkasi ochilmagan (guruhda jami {total})', { rest, total: g.count })}
                                                 </span>
                                             </div>
                                             {isOwner && (
                                                 <div className="work-side animal-actions">
                                                     <button type="button" className="btn-ghost" onClick={() => openAdd(String(g.id), true)}>
-                                                        Kartochka ochish
+                                                        {t('Kartochka ochish')}
                                                     </button>
                                                 </div>
                                             )}
@@ -408,13 +411,13 @@ function AnimalCards() {
 
                         {visible.length === 0 ? (
                             <p className="empty-state">
-                                {animals.length === 0 ? "Hozircha hayvon kartochkasi yo'q" : 'Bunday kartochka topilmadi'}
+                                {animals.length === 0 ? t("Hozircha hayvon kartochkasi yo'q") : t('Bunday kartochka topilmadi')}
                             </p>
                         ) : (
                             sections.map((sec) => (
                                 <div key={sec.key}>
                                     {sec.title && (
-                                        <h3 className="section-title">{sec.title}: {sec.items.length} ta</h3>
+                                        <h3 className="section-title">{t('{title}: {n}', { title: sec.title, n: sec.items.length })}</h3>
                                     )}
                                     <ul className="work-list">
                                         {sec.items.map((a) => (
@@ -423,32 +426,32 @@ function AnimalCards() {
                                                     <form className="animal-edit-form" onSubmit={(e) => handleSave(e, a)}>
                                                         <div className="form-row">
                                                             <div className="form-field">
-                                                                <label>Quloq raqami</label>
+                                                                <label>{t('Quloq raqami')}</label>
                                                                 <input type="text" name="tag_number" value={editForm.tag_number}
                                                                     onChange={handleEditChange} maxLength={30} required />
                                                             </div>
                                                             <div className="form-field">
-                                                                <label>Laqabi (ixtiyoriy)</label>
+                                                                <label>{t('Laqabi (ixtiyoriy)')}</label>
                                                                 <input type="text" name="name" value={editForm.name}
                                                                     onChange={handleEditChange} maxLength={100} />
                                                             </div>
                                                         </div>
                                                         <div className="form-row">
                                                             <div className="form-field">
-                                                                <label>Jinsi</label>
+                                                                <label>{t('Jinsi')}</label>
                                                                 <select name="sex" value={editForm.sex} onChange={handleEditChange}>
-                                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                                    {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                                                                 </select>
                                                             </div>
                                                             <div className="form-field">
-                                                                <label>Tug'ilgan sana</label>
+                                                                <label>{t("Tug'ilgan sana")}</label>
                                                                 <input type="date" name="birth_date" value={editForm.birth_date}
                                                                     max={new Date().toLocaleDateString('en-CA')} onChange={handleEditChange} required />
                                                             </div>
                                                         </div>
                                                         <div className="form-row">
                                                             <div className="form-field">
-                                                                <label>Guruhi</label>
+                                                                <label>{t('Guruhi')}</label>
                                                                 <select name="group" value={editForm.group} onChange={handleEditChange}>
                                                                     {groups
                                                                         .filter((g) => g.status === 'faol' || String(g.id) === editForm.group)
@@ -460,14 +463,14 @@ function AnimalCards() {
                                                                 </select>
                                                             </div>
                                                             <div className="form-field">
-                                                                <label>Onasi (ixtiyoriy)</label>
+                                                                <label>{t('Onasi (ixtiyoriy)')}</label>
                                                                 <select name="mother" value={editForm.mother} onChange={handleEditChange}>
                                                                     <option value="">—</option>
                                                                     {animals
                                                                         .filter((m) => m.sex === 'urgochi' && m.status !== 'olgan' && m.id !== a.id)
                                                                         .map((m) => (
                                                                             <option key={m.id} value={m.id}>
-                                                                                №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                                                №{m.tag_number}{m.name ? t(' · {name}', { name: m.name }) : ''}
                                                                             </option>
                                                                         ))}
                                                                 </select>
@@ -475,21 +478,21 @@ function AnimalCards() {
                                                         </div>
                                                         {a.status !== 'olgan' && (
                                                             <div className="form-field">
-                                                                <label>Holati</label>
+                                                                <label>{t('Holati')}</label>
                                                                 <select name="status" value={editForm.status} onChange={handleEditChange}>
-                                                                    <option value="faol">Faol</option>
-                                                                    <option value="sotilgan">Sotilgan</option>
+                                                                    <option value="faol">{t('Faol')}</option>
+                                                                    <option value="sotilgan">{t('Sotilgan')}</option>
                                                                 </select>
                                                             </div>
                                                         )}
                                                         {editError && <p className="error-text" role="alert">{editError}</p>}
                                                         <div className="farm-edit-actions">
                                                             <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                                                                {saving ? 'Kuting...' : 'Saqlash'}
+                                                                {saving ? t('Kuting...') : t('Saqlash')}
                                                             </button>
                                                             <button type="button" className="btn-ghost" disabled={saving}
                                                                 onClick={() => setEditingId(null)}>
-                                                                Bekor qilish
+                                                                {t('Bekor qilish')}
                                                             </button>
                                                         </div>
                                                     </form>
@@ -499,43 +502,43 @@ function AnimalCards() {
                                                 <div className="work-main">
                                                     <span className="work-title">
                                                         <Link to={`/farms/${farmId}/animals/${a.id}`} className="animal-link">
-                                                            №{a.tag_number}{a.name ? ` · ${a.name}` : ''}
+                                                            №{a.tag_number}{a.name ? t(' · {name}', { name: a.name }) : ''}
                                                         </Link>
-                                                        {a.status === 'faol' && a.stage_display && <span className="work-badge">{a.stage_display}</span>}
-                                                        {a.status !== 'faol' && <span className="work-badge">{a.status_display}</span>}
-                                                        {a.is_pregnant && <span className="work-badge work-badge--preg">Bug'oz</span>}
+                                                        {a.status === 'faol' && a.stage_display && <span className="work-badge">{t(a.stage_display)}</span>}
+                                                        {a.status !== 'faol' && <span className="work-badge">{t(a.status_display)}</span>}
+                                                        {a.is_pregnant && <span className="work-badge work-badge--preg">{t("Bug'oz")}</span>}
                                                         {a.reproduction && ['soon', 'now', 'late'].includes(a.reproduction.dry_off_state) && (
-                                                            <span className="work-badge">Quritish vaqti</span>
+                                                            <span className="work-badge">{t('Quritish vaqti')}</span>
                                                         )}
                                                         {a.reproduction && ['now', 'late', 'critical'].includes(a.reproduction.rebreed_state) && (
-                                                            <span className="work-badge">Urug'lantirish kerak</span>
+                                                            <span className="work-badge">{t("Urug'lantirish kerak")}</span>
                                                         )}
                                                         {a.withdrawal && (
                                                             <span className="work-badge work-badge--shoshilinch">
-                                                                {a.withdrawal.until ? `Sotmang: ${formatDate(a.withdrawal.until)} gacha` : 'Sotmang: davolanyapti'}
+                                                                {a.withdrawal.until ? t('Sotmang: {date} gacha', { date: formatDate(a.withdrawal.until) }) : t('Sotmang: davolanyapti')}
                                                             </span>
                                                         )}
                                                     </span>
                                                     <span className="work-meta">
-                                                        {a.group_label} · {SEXES[a.sex] || a.sex}
-                                                        {a.birth_date ? ` · tug'ilgan: ${formatDate(a.birth_date)}` : ''}
+                                                        {a.group_label} · {t(SEXES[a.sex]) ? t(SEXES[a.sex]) : a.sex}
+                                                        {a.birth_date ? ` · ${t("tug'ilgan: {date}", { date: formatDate(a.birth_date) })}` : ''}
                                                     </span>
                                                     <span className="work-meta">
-                                                        {a.last_weight ? `Vazni: ${a.last_weight} kg (${formatDate(a.last_weight_date)})` : "Vazn yozilmagan"}
-                                                        {a.last_calving_date ? ` · oxirgi tug'ish: ${formatDate(a.last_calving_date)}` : ''}
-                                                        {a.is_pregnant && a.due_date ? ` · tug'ishi: ${formatDate(a.due_date)}` : ''}
+                                                        {a.last_weight ? t('Vazni: {kg} kg ({date})', { kg: a.last_weight, date: formatDate(a.last_weight_date) }) : t('Vazn yozilmagan')}
+                                                        {a.last_calving_date ? ` · ${t("oxirgi tug'ish: {date}", { date: formatDate(a.last_calving_date) })}` : ''}
+                                                        {a.is_pregnant && a.due_date ? ` · ${t("tug'ishi: {date}", { date: formatDate(a.due_date) })}` : ''}
                                                     </span>
                                                 </div>
                                                 <div className="work-side animal-actions">
-                                                    <Link to={`/farms/${farmId}/animals/${a.id}`} className="btn-ghost animal-open">Ochish</Link>
+                                                    <Link to={`/farms/${farmId}/animals/${a.id}`} className="btn-ghost animal-open">{t('Ochish')}</Link>
                                                     {isOwner && (
                                                         <>
                                                             <button type="button" className="btn-ghost" onClick={() => startEdit(a)}>
-                                                                Tahrirlash
+                                                                {t('Tahrirlash')}
                                                             </button>
                                                             <button type="button" className="farm-item-action farm-item-action--danger"
                                                                 onClick={() => handleDelete(a)}>
-                                                                O'chirish
+                                                                {t("O'chirish")}
                                                             </button>
                                                         </>
                                                     )}

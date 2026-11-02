@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describeOp, discardFailed, syncNow } from '../offline';
 import { useOfflineState } from '../offline/state';
 import { useAuth } from '../context/AuthContext';
+import { t } from '../i18n';
 
 const BAR = {
     position: 'fixed',
@@ -40,12 +41,12 @@ function OfflineBanner() {
     if (offline) {
         color = '#8A5A00';
         text = pending > 0
-            ? `Internet yo'q. ${pending} ta o'zgarish telefonda saqlandi, internet kelganda o'zi yuboriladi.`
-            : "Internet yo'q. Telefondagi saqlangan ma'lumotlar ko'rsatilmoqda.";
+            ? t('Internet yo\'q. {pending} ta o\'zgarish telefonda saqlandi, internet kelganda o\'zi yuboriladi.', { pending })
+            : t('Internet yo\'q. Telefondagi saqlangan ma\'lumotlar ko\'rsatilmoqda.');
     } else if (syncing) {
-        text = "O'zgarishlar serverga yuborilmoqda…";
+        text = t('O\'zgarishlar serverga yuborilmoqda…');
     } else if (pending > 0) {
-        text = `${pending} ta o'zgarish hali yuborilmagan.`;
+        text = t('{pending} ta o\'zgarish hali yuborilmagan.', { pending });
     }
 
     return (
@@ -54,7 +55,7 @@ function OfflineBanner() {
                 <div style={{ ...BAR, background: color }} role="status">
                     {text}
                     {!offline && !syncing && pending > 0 && (
-                        <button type="button" style={BTN} onClick={syncNow}>Hozir yuborish</button>
+                        <button type="button" style={BTN} onClick={syncNow}>{t('Hozir yuborish')}</button>
                     )}
                 </div>
             )}
@@ -63,16 +64,16 @@ function OfflineBanner() {
                     style={{ ...BAR, background: '#B3432F', bottom: text ? 'calc(44px + env(safe-area-inset-bottom))' : 0 }}
                     role="alert"
                 >
-                    <strong>{failed.length} ta o'zgarishni server qabul qilmadi.</strong>
+                    <strong>{failed.length} {t('ta o\'zgarishni server qabul qilmadi.')}</strong>
                     <button type="button" style={BTN} onClick={() => setShowFailed((v) => !v)}>
-                        {showFailed ? 'Yashirish' : "Ko'rish"}
+                        {showFailed ? t('Yashirish') : t('Ko\'rish')}
                     </button>
                     {showFailed && (
                         <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                             {failed.map((op) => (
                                 <li key={op.seq} style={{ marginBottom: 4 }}>
                                     {describeOp(op)} — {op.message}
-                                    <button type="button" style={BTN} onClick={() => discardFailed(op.seq)}>Olib tashlash</button>
+                                    <button type="button" style={BTN} onClick={() => discardFailed(op.seq)}>{t('Olib tashlash')}</button>
                                 </li>
                             ))}
                         </ul>

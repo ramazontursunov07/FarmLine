@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import { t } from '../i18n';
 
 const num = (v) => Number(v).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
 
@@ -24,14 +25,14 @@ function FeedNeed({ farmId, refreshKey }) {
                 setData(res.data);
                 setError('');
             })
-            .catch((err) => !cancelled && setError(getErrorMessage(err, "Yem ehtiyojini yuklab bo'lmadi")))
+            .catch((err) => !cancelled && setError(getErrorMessage(err, t("Yem ehtiyojini yuklab bo'lmadi"))))
             .finally(() => !cancelled && setLoading(false));
         return () => {
             cancelled = true;
         };
     }, [farmId, refreshKey]);
 
-    if (loading && !data) return <p className="work-meta">Yuklanmoqda…</p>;
+    if (loading && !data) return <p className="work-meta">{t('Yuklanmoqda…')}</p>;
     if (error) return <p className="form-error">{error}</p>;
     if (!data) return null;
 
@@ -48,19 +49,19 @@ function FeedNeed({ farmId, refreshKey }) {
                             <div className="work-main">
                                 <span className="work-title">
                                     {k.label}
-                                    {low && <span className="work-badge work-badge--shoshilinch">Kam qoldi</span>}
+                                    {low && <span className="work-badge work-badge--shoshilinch">{t('Kam qoldi')}</span>}
                                 </span>
                                 <span className="work-meta">
-                                    Kuniga kerak: <b>{num(need)} kg</b> · Omborda: <b>{num(k.stock_kg)} kg</b>
-                                    {days !== null && <> · Yetadi: <b>{num(days)} kun</b></>}
-                                    {!k.has_items && need > 0 && " · Omborda bu tur yem yo'q"}
+                                    {t('Kuniga kerak:')} <b>{num(need)} {t('kg')}</b> · {t('Omborda:')} <b>{num(k.stock_kg)} {t('kg')}</b>
+                                    {days !== null && <> · {t('Yetadi:')} <b>{num(days)} {t('kun')}</b></>}
+                                    {!k.has_items && need > 0 && ` · ${t("Omborda bu tur yem yo'q")}`}
                                 </span>
                                 {k.actual_kg_per_day !== null && (
                                     <span className="work-meta">
-                                        Haqiqiy sarf (oxirgi 14 kun): {num(k.actual_kg_per_day)} kg/kun
+                                        {t('Haqiqiy sarf (oxirgi 14 kun):')} {num(k.actual_kg_per_day)} {t('kg/kun')}
                                     </span>
                                 )}
-                                {HINTS[k.compare] && <span className="work-meta">{HINTS[k.compare]}</span>}
+                                {HINTS[k.compare] && <span className="work-meta">{t(HINTS[k.compare])}</span>}
                             </div>
                         </li>
                     );
@@ -69,7 +70,7 @@ function FeedNeed({ farmId, refreshKey }) {
 
             {data.categories.length > 0 && (
                 <p className="work-meta">
-                    Hisob: {data.categories.map((c) => `${c.label} — ${c.count} bosh`).join(', ')}
+                    {t('Hisob:')} {data.categories.map((c) => `${c.label} — ${c.count} ${t('bosh')}`).join(', ')}
                 </p>
             )}
             {data.warnings.map((w) => (

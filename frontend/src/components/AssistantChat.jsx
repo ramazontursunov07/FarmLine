@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import './AssistantChat.css';
+import { t } from '../i18n';
 
 const GREETING =
     "Salom! Men FarmLine yordamchisiman. Savol bering yoki ayting, men yozib qo'yaman: " +
@@ -71,7 +72,7 @@ function AssistantChat({ onActionDone }) {
         rec.onerror = (e) => {
             // "no-speech" -- hech narsa aytilmadi, xabar kerak emas
             if (e.error && e.error !== 'no-speech' && e.error !== 'aborted') {
-                setVoiceError(VOICE_ERRORS[e.error] || "Ovozni tanib bo'lmadi. Yozib yuboring.");
+                setVoiceError(t(VOICE_ERRORS[e.error]) || t('Ovozni tanib bo\'lmadi. Yozib yuboring.'));
             }
         };
         rec.onend = () => {
@@ -124,7 +125,7 @@ function AssistantChat({ onActionDone }) {
             addAssistant(data.answer);
             setCard(data.action || null);
         } catch (err) {
-            addAssistant(getErrorMessage(err, "AI javob bera olmadi, birozdan keyin qayta urinib ko'ring."), true);
+            addAssistant(getErrorMessage(err, t('AI javob bera olmadi, birozdan keyin qayta urinib ko\'ring.')), true);
         } finally {
             setBusy(false);
         }
@@ -139,7 +140,7 @@ function AssistantChat({ onActionDone }) {
             setCard(null);
             onActionDone?.();
         } catch (err) {
-            addAssistant(getErrorMessage(err, "Amalni bajarib bo'lmadi."), true);
+            addAssistant(getErrorMessage(err, t('Amalni bajarib bo\'lmadi.')), true);
             // Internet uzilgan bo'lsa, karta qoladi: qayta bosish mumkin. Boshqa xatoda taklif eskirgan.
             if (err.response) setCard(null);
         } finally {
@@ -149,7 +150,7 @@ function AssistantChat({ onActionDone }) {
 
     const cancelAction = () => {
         dropCard();
-        addAssistant("Bekor qilindi. Hech narsa yozilmadi.");
+        addAssistant(t('Bekor qilindi. Hech narsa yozilmadi.'));
     };
 
     const clearAll = () => {
@@ -172,30 +173,30 @@ function AssistantChat({ onActionDone }) {
                     type="button"
                     className="ai-fab"
                     onClick={() => setOpen(true)}
-                    aria-label="AI yordamchi bilan suhbat"
+                    aria-label={t('AI yordamchi bilan suhbat')}
                 >
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
                         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z" />
                     </svg>
-                    <span>AI yordamchi</span>
+                    <span>{t('AI yordamchi')}</span>
                 </button>
             )}
 
             {open && (
-                <section className="ai-panel" role="dialog" aria-label="AI yordamchi">
+                <section className="ai-panel" role="dialog" aria-label={t('AI yordamchi')}>
                     <header className="ai-panel-header">
-                        <h3>AI yordamchi</h3>
+                        <h3>{t('AI yordamchi')}</h3>
                         <div className="ai-panel-actions">
                             {messages.length > 0 && (
                                 <button type="button" className="ai-link-btn" onClick={clearAll}
                                     disabled={busy || confirming}>
-                                    Tozalash
+                                    {t('Tozalash')}
                                 </button>
                             )}
                             <button type="button" className="ai-close"
                                 onClick={() => { stopListening(); setOpen(false); }}
-                                aria-label="Yopish">
+                                aria-label={t('Yopish')}>
                                 ×
                             </button>
                         </div>
@@ -212,12 +213,12 @@ function AssistantChat({ onActionDone }) {
                             </div>
                         ))}
                         {busy && (
-                            <div className="ai-msg ai-msg--assistant ai-typing" aria-label="Javob yozilmoqda">
+                            <div className="ai-msg ai-msg--assistant ai-typing" aria-label={t('Javob yozilmoqda')}>
                                 <span /><span /><span />
                             </div>
                         )}
                         {card && (
-                            <div className="ai-action" role="group" aria-label="Amalni tasdiqlash">
+                            <div className="ai-action" role="group" aria-label={t('Amalni tasdiqlash')}>
                                 {card.items.map((item, i) => (
                                     <div key={i} className="ai-action-item">
                                         <strong>{item.title}</strong>
@@ -229,11 +230,11 @@ function AssistantChat({ onActionDone }) {
                                 <div className="ai-action-buttons">
                                     <button type="button" className="ai-confirm" onClick={confirmAction}
                                         disabled={confirming}>
-                                        {confirming ? 'Yozilmoqda...' : 'Tasdiqlash'}
+                                        {confirming ? 'Yozilmoqda...' : t('Tasdiqlash')}
                                     </button>
                                     <button type="button" className="ai-cancel" onClick={cancelAction}
                                         disabled={confirming}>
-                                        Bekor qilish
+                                        {t('Bekor qilish')}
                                     </button>
                                 </div>
                             </div>
@@ -248,7 +249,7 @@ function AssistantChat({ onActionDone }) {
                             rows={1}
                             value={text}
                             maxLength={MAX_LEN}
-                            placeholder={listening ? "Tinglayapman... gapiring" : "Yozing yoki mikrofonni bosib ayting..."}
+                            placeholder={listening ? t('Tinglayapman... gapiring') : t('Yozing yoki mikrofonni bosib ayting...')}
                             onChange={(e) => setText(e.target.value)}
                             onKeyDown={handleKeyDown}
                         />
@@ -258,7 +259,7 @@ function AssistantChat({ onActionDone }) {
                                 className={`ai-mic${listening ? ' ai-mic--on' : ''}`}
                                 onClick={toggleListening}
                                 disabled={busy || confirming}
-                                aria-label={listening ? "Yozib olishni to'xtatish" : "Ovoz bilan yozish"}
+                                aria-label={listening ? t('Yozib olishni to\'xtatish') : t('Ovoz bilan yozish')}
                                 aria-pressed={listening}
                             >
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
@@ -270,7 +271,7 @@ function AssistantChat({ onActionDone }) {
                         )}
                         <button type="button" className="ai-send" onClick={send}
                             disabled={busy || confirming || !text.trim()}>
-                            Yuborish
+                            {t('Yuborish')}
                         </button>
                     </div>
                 </section>

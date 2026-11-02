@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
+import { t } from '../i18n';
 
 const FILES = [
     ['xlsx', 'Excel yuklab olish'],
@@ -18,7 +19,7 @@ async function readError(err) {
             err.response.data = null;
         }
     }
-    return getErrorMessage(err, "Hisobotni yuklab bo'lmadi");
+    return getErrorMessage(err, t("Hisobotni yuklab bo'lmadi"));
 }
 
 // Tanlangan oy uchun kirim-chiqim, foyda/zarar va ombor hisobotini Excel yoki PDF qilib yuklab beradi.
@@ -30,7 +31,7 @@ function ReportDownload({ farmId }) {
 
     const download = async (file) => {
         if (!/^\d{4}-\d{2}$/.test(month)) {
-            setError("Oyni tanlang (masalan, 2026-10)");
+            setError(t("Oyni tanlang (masalan, 2026-10)"));
             return;
         }
         setError('');
@@ -58,9 +59,9 @@ function ReportDownload({ farmId }) {
 
     return (
         <>
-            <h3 className="section-title">Hisobotni yuklab olish</h3>
+            <h3 className="section-title">{t('Hisobotni yuklab olish')}</h3>
             <p className="workers-hint">
-                Tanlangan oy bo'yicha kirim, chiqim, foyda/zarar, sut (sog'ilgan, sotilgan, tannarx) va ombor holati. Bank yoki shirkatga ko'rsatish uchun qulay.
+                {t("Tanlangan oy bo'yicha kirim, chiqim, foyda/zarar, sut (sog'ilgan, sotilgan, tannarx) va ombor holati. Bank yoki shirkatga ko'rsatish uchun qulay.")}
             </p>
             <div className="filter-bar">
                 <input
@@ -71,14 +72,14 @@ function ReportDownload({ farmId }) {
                         setMonth(e.target.value);
                         setError('');
                     }}
-                    aria-label="Hisobot oyi"
+                    aria-label={t('Hisobot oyi')}
                     pattern="\d{4}-\d{2}"
-                    placeholder="YYYY-MM"
+                    placeholder={t('YYYY-MM')}
                 />
                 {FILES.map(([file, label]) => (
                     <button key={file} type="button" className="btn-ghost" disabled={Boolean(busy)}
                         onClick={() => download(file)}>
-                        {busy === file ? 'Tayyorlanmoqda...' : label}
+                        {busy === file ? t('Tayyorlanmoqda...') : t(label)}
                     </button>
                 ))}
             </div>

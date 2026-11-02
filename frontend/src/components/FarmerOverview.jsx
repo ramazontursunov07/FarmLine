@@ -7,6 +7,7 @@ import { formatMoney } from '../utils/format';
 import FinanceCharts from './FinanceCharts';
 import { Icon } from './dashboardKit';
 import { greeting, longDate, monthName, daysSince } from '../utils/dashboardDates';
+import { t } from '../i18n';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 const SHOWN = 5; // dastlab ko'rsatiladigan "e'tibor kerak" qatorlari soni
@@ -27,7 +28,7 @@ function formatDateTime(iso) {
 
 function lateText(dueDate) {
     const d = daysSince(dueDate);
-    return d === 0 ? 'bugun muddati' : `${d} kun kechikdi`;
+    return d === 0 ? 'bugun muddati' : t('{d} kun kechikdi', { d });
 }
 
 function AttentionList({ rows, total }) {
@@ -37,8 +38,8 @@ function AttentionList({ rows, total }) {
             <div className="db-allgood">
                 <Icon name="check" size={22} />
                 <div>
-                    <p className="db-allgood-title">Hammasi joyida</p>
-                    <p className="db-allgood-text">Muddati o'tgan vazifa, kam qolgan zaxira va davolanayotgan hayvon yo'q.</p>
+                    <p className="db-allgood-title">{t('Hammasi joyida')}</p>
+                    <p className="db-allgood-text">{t('Muddati o\'tgan vazifa, kam qolgan zaxira va davolanayotgan hayvon yo\'q.')}</p>
                 </div>
             </div>
         );
@@ -48,17 +49,17 @@ function AttentionList({ rows, total }) {
     return (
         <>
             <h2 className="db-attn-title">
-                {total} ta ish e'tiboringizni kutmoqda
+                {total} {t('ta ish e\'tiboringizni kutmoqda')}
             </h2>
             <ul className="db-attn-list">
                 {visible.map((r) => (
                     <li key={r.key}>
                         <Link to={r.to} className={`db-attn db-attn--${r.kind}`}>
-                            <span className="db-attn-icon"><Icon name={KIND[r.kind].icon} size={18} /></span>
+                            <span className="db-attn-icon"><Icon name={t(KIND[r.kind]).icon} size={18} /></span>
                             <span className="db-attn-body">
                                 <span className="db-attn-name">{r.title}</span>
                                 <span className="db-attn-meta">
-                                    <span className="db-attn-kind">{KIND[r.kind].label}</span>
+                                    <span className="db-attn-kind">{t(KIND[r.kind]).label}</span>
                                     {r.meta.map((m) => <span key={m}>{m}</span>)}
                                 </span>
                             </span>
@@ -69,11 +70,11 @@ function AttentionList({ rows, total }) {
             </ul>
             {(hidden > 0 || all) && rows.length > SHOWN && (
                 <button type="button" className="db-more" onClick={() => setAll((v) => !v)}>
-                    {all ? 'Kamroq ko\'rsatish' : `Yana ${rows.length - SHOWN} tasini ko'rsatish`}
+                    {all ? t('Kamroq ko\'rsatish') : t('Yana {v1} tasini ko\'rsatish', { v1: rows.length - SHOWN })}
                 </button>
             )}
             {!all && total > rows.length && (
-                <p className="db-attn-rest">Yana {total - rows.length} ta bor: tegishli bo'limga kirib ko'ring.</p>
+                <p className="db-attn-rest">{t('Yana')} {total - rows.length} {t('ta bor: tegishli bo\'limga kirib ko\'ring.')}</p>
             )}
         </>
     );
@@ -88,10 +89,10 @@ function MoneyPanel({ finance }) {
     const loss = profit < 0;
     const empty = income === 0 && expense === 0;
     return (
-        <aside className="db-money" aria-label="Shu oy hisobi">
-            <p className="db-money-month">{monthName()} oyi</p>
+        <aside className="db-money" aria-label={t('Shu oy hisobi')}>
+            <p className="db-money-month">{monthName()} {t('oyi')}</p>
             {empty ? (
-                <p className="db-money-empty">Bu oy hali kirim-chiqim yozilmagan.</p>
+                <p className="db-money-empty">{t('Bu oy hali kirim-chiqim yozilmagan.')}</p>
             ) : (
                 <>
                     <p className="db-money-result">
@@ -102,12 +103,12 @@ function MoneyPanel({ finance }) {
                     </p>
                     <div className="db-bars">
                         <div className="db-bar-row">
-                            <span className="db-bar-label">Kirim</span>
+                            <span className="db-bar-label">{t('Kirim')}</span>
                             <span className="db-bar-track"><span className="db-bar db-bar--in" style={{ '--w': `${(income / max) * 100}%` }} /></span>
                             <span className="db-bar-value">{formatMoney(income)}</span>
                         </div>
                         <div className="db-bar-row">
-                            <span className="db-bar-label">Chiqim</span>
+                            <span className="db-bar-label">{t('Chiqim')}</span>
                             <span className="db-bar-track"><span className="db-bar db-bar--out" style={{ '--w': `${(expense / max) * 100}%` }} /></span>
                             <span className="db-bar-value">{formatMoney(expense)}</span>
                         </div>
@@ -115,7 +116,7 @@ function MoneyPanel({ finance }) {
                 </>
             )}
             <p className="db-money-prev">
-                O'tgan oy: {prev < 0 ? 'zarar ' : prev > 0 ? 'foyda ' : ''}
+                {t('O\'tgan oy:')} {prev < 0 ? 'zarar ' : prev > 0 ? 'foyda ' : ''}
                 <strong>{formatMoney(Math.abs(prev))}</strong>
             </p>
         </aside>
@@ -138,7 +139,7 @@ function FarmerOverview({ refreshKey, children }) {
                 setData(res);
                 setError('');
             })
-            .catch((err) => !cancelled && setError(getErrorMessage(err, "Umumiy ko'rinishni yuklab bo'lmadi")));
+            .catch((err) => !cancelled && setError(getErrorMessage(err, t('Umumiy ko\'rinishni yuklab bo\'lmadi'))));
         return () => {
             cancelled = true;
         };
@@ -154,9 +155,9 @@ function FarmerOverview({ refreshKey, children }) {
         const pregnancies = data.pregnancies || { count: 0, items: [] };
         const farmName = (id) => data.farms.find((f) => f.id === id)?.name ?? '';
         rows = [
-            ...tasks.overdue_items.map((t) => ({
-                key: `t${t.id}`, kind: 'late', to: `/farms/${t.farm}/tasks`, title: t.title,
-                meta: [t.farm_name, t.assigned_to_name, lateText(t.due_date)].filter(Boolean),
+            ...tasks.overdue_items.map((tk) => ({
+                key: `t${tk.id}`, kind: 'late', to: `/farms/${tk.farm}/tasks`, title: tk.title,
+                meta: [tk.farm_name, tk.assigned_to_name, lateText(tk.due_date)].filter(Boolean),
             })),
             ...inventory.items.map((i) => ({
                 key: `i${i.id}`, kind: 'stock', to: `/farms/${i.farm}/inventory`,
@@ -165,12 +166,12 @@ function FarmerOverview({ refreshKey, children }) {
             })),
             ...treatments.items.map((e) => ({
                 key: `e${e.id}`, kind: 'care', to: `/farms/${e.farm}/work`, title: e.title,
-                meta: [farmName(e.farm), e.animal_group_label, `${e.days_since_start} kundan beri`].filter(Boolean),
+                meta: [farmName(e.farm), e.animal_group_label, t('{days_since_start} kundan beri', { days_since_start: e.days_since_start })].filter(Boolean),
             })),
             ...pregnancies.items.map((a) => ({
                 key: `p${a.id}`, kind: 'birth', to: `/farms/${a.farm}/animals/${a.id}`,
-                title: `№${a.tag_number}${a.name ? ` · ${a.name}` : ''}`,
-                meta: [a.farm_name, a.days_left < 0 ? `${-a.days_left} kun kechikdi` : a.days_left === 0 ? "bugun tug'ishi kutilmoqda" : `${a.days_left} kundan keyin tug'adi`],
+                title: `№${a.tag_number}${a.name ? t(' · {name}', { name: a.name }) : ''}`,
+                meta: [a.farm_name, a.days_left < 0 ? t('{v1} kun kechikdi', { v1: -a.days_left }) : a.days_left === 0 ? t('bugun tug\'ishi kutilmoqda') : t('{days_left} kundan keyin tug\'adi', { days_left: a.days_left })],
             })),
         ];
         total = tasks.overdue + inventory.low_count + treatments.count + pregnancies.count;
@@ -185,9 +186,9 @@ function FarmerOverview({ refreshKey, children }) {
                         <h2 className="db-hello">{greeting()}, {name}</h2>
 
                         {hasFarms && data.farms.length > 1 && (
-                            <div className="db-pills" role="group" aria-label="Ferma tanlash">
+                            <div className="db-pills" role="group" aria-label={t('Ferma tanlash')}>
                                 <button type="button" className="db-pill" aria-pressed={farmId === ''} onClick={() => setFarmId('')}>
-                                    Hamma fermalar
+                                    {t('Hamma fermalar')}
                                 </button>
                                 {data.farms.map((f) => (
                                     <button key={f.id} type="button" className="db-pill"
@@ -199,9 +200,9 @@ function FarmerOverview({ refreshKey, children }) {
                         )}
 
                         {error && <p className="db-hero-note">{error}</p>}
-                        {!error && !data && <p className="db-hero-note">Yuklanmoqda...</p>}
+                        {!error && !data && <p className="db-hero-note">{t('Yuklanmoqda...')}</p>}
                         {data && !hasFarms && (
-                            <p className="db-hero-note">Boshlash uchun pastdan birinchi fermangizni qo'shing.</p>
+                            <p className="db-hero-note">{t('Boshlash uchun pastdan birinchi fermangizni qo\'shing.')}</p>
                         )}
                         {hasFarms && <AttentionList key={farmId} rows={rows} total={total} />}
                     </div>
@@ -215,14 +216,14 @@ function FarmerOverview({ refreshKey, children }) {
                 {hasFarms && (
                     <>
                         <section className="db-section">
-                            <h2 className="db-h2">Moliya: oxirgi 6 oy</h2>
+                            <h2 className="db-h2">{t('Moliya: oxirgi 6 oy')}</h2>
                             <FinanceCharts farmId={farmId} refreshKey={refreshKey} />
                         </section>
 
                         <section className="db-section">
-                            <h2 className="db-h2">Ishchilar nima qildi</h2>
+                            <h2 className="db-h2">{t('Ishchilar nima qildi')}</h2>
                             {data.activity.length === 0 ? (
-                                <p className="db-muted">Hozircha ishchilar yozuvi yo'q.</p>
+                                <p className="db-muted">{t('Hozircha ishchilar yozuvi yo\'q.')}</p>
                             ) : (
                                 <ul className="db-activity">
                                     {data.activity.map((a, idx) => (

@@ -3,6 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { t } from '../i18n';
 
 function EyeIcon() {
     return (
@@ -49,7 +51,7 @@ function Login() {
             const back = location.state?.from;
             navigate(typeof back === 'string' && back.startsWith('/') && !back.startsWith('//') ? back : '/dashboard');
         } catch (err) {
-            setError('Login yoki parol noto\'g\'ri');
+            setError(t("Login yoki parol noto'g'ri"));
         } finally {
             setLoading(false);
         }
@@ -57,8 +59,9 @@ function Login() {
 
     return (
         <div className="auth-page">
+            <div className="lang-corner"><LanguageSwitcher /></div>
             <div className="auth-card">
-                <h2>Kirish</h2>
+                <h2>{t('Kirish')}</h2>
                 <form onSubmit={handleSubmit}>
                     <div className="form-field">
                         <label>Username</label>
@@ -70,7 +73,7 @@ function Login() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Parol</label>
+                        <label>{t('Parol')}</label>
                         <div className="password-field">
                             <input
                                 type={showPassword ? 'text' : 'password'}
@@ -90,17 +93,17 @@ function Login() {
                     </div>
                     {error && <p className="error-text">{error}</p>}
                     <button type="submit" className="btn-primary" disabled={loading}>
-                        {loading ? 'Kuting...' : 'Kirish'}
+                        {loading ? t('Kuting...') : t('Kirish')}
                     </button>
                 </form>
                 <p className="auth-footer">
-                    <Link to="/forgot-password">Parolni unutdingizmi?</Link>
+                    <Link to="/forgot-password">{t('Parolni unutdingizmi?')}</Link>
                 </p>
                 <p className="auth-footer">
-                    Hisobingiz yo'qmi? <Link to="/register">Ro'yxatdan o'tish</Link>
+                    {t("Hisobingiz yo'qmi?")} <Link to="/register">{t("Ro'yxatdan o'tish")}</Link>
                 </p>
                 <div className="auth-install">
-                    <InstallButton className="install-btn install-btn--link">Ilovani yuklab olish</InstallButton>
+                    <InstallButton className="install-btn install-btn--link">{t('Ilovani yuklab olish')}</InstallButton>
                 </div>
             </div>
         </div>

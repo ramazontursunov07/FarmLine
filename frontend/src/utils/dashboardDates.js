@@ -1,21 +1,26 @@
 // Dashboard uchun sana va salomlashish yordamchilari
+import { getLang, t } from '../i18n';
+
 const WEEKDAYS = ['yakshanba', 'dushanba', 'seshanba', 'chorshanba', 'payshanba', 'juma', 'shanba'];
+const MONTHS_RU_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
 
 export function greeting(date = new Date()) {
     const h = date.getHours();
-    if (h < 5) return 'Xayrli tun';
-    if (h < 12) return 'Xayrli tong';
-    if (h < 18) return 'Xayrli kun';
-    return 'Xayrli kech';
+    if (h < 5) return t('Xayrli tun');
+    if (h < 12) return t('Xayrli tong');
+    if (h < 18) return t('Xayrli kun');
+    return t('Xayrli kech');
 }
 
 // "payshanba, 15 oktabr"
 export function longDate(date = new Date()) {
-    return `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+    // Rus tilida sanadagi oy qaratqich kelishigida ("15 октября"), shuning uchun alohida massiv
+    const month = getLang() === 'ru' ? MONTHS_RU_GEN[date.getMonth()] : MONTHS[date.getMonth()];
+    return `${t(WEEKDAYS[date.getDay()])}, ${date.getDate()} ${month}`;
 }
 
-export const monthName = (date = new Date()) => MONTHS[date.getMonth()];
+export const monthName = (date = new Date()) => t(MONTHS[date.getMonth()]);
 
 // Necha kun o'tdi (YYYY-MM-DD dan bugungacha), kamida 0
 export function daysSince(iso) {

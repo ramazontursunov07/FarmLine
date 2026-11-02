@@ -6,7 +6,9 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import NotificationBell from '../components/NotificationBell';
+import { t } from '../i18n';
 
 const EVENT_TYPES = {
     kasallik: 'Kasallik',
@@ -126,7 +128,7 @@ function FarmWork() {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setError(err.response?.status === 404 ? 'Ferma topilmadi' : getErrorMessage(err, "Ma'lumotlarni yuklab bo'lmadi"));
+                    setError(err.response?.status === 404 ? t('Ferma topilmadi') : getErrorMessage(err, t('Ma\'lumotlarni yuklab bo\'lmadi')));
                 }
             })
             .finally(() => !cancelled && setLoading(false));
@@ -139,7 +141,7 @@ function FarmWork() {
     const canModify = (ev) => isOwner || ev.recorded_by === user.id;
 
     // Yozuvni fermer yozganmi yoki ishchi
-    const roleLabel = (userId) => (farm && userId === farm.owner ? 'Fermer' : 'Ishchi');
+    const roleLabel = (userId) => (farm && userId === farm.owner ? t('Fermer') : t('Ishchi'));
 
     const activeGroups = useMemo(() => groups.filter((g) => g.status === 'faol'), [groups]);
     const selectedGroup = eventForm.animal_group || (activeGroups[0] ? String(activeGroups[0].id) : '');
@@ -228,13 +230,13 @@ function FarmWork() {
         if (needsAnimal) {
             if (tagTyped && !pickedAnimal) {
                 setEventError(
-                    `Bu guruhda №${tagTyped} raqamli faol hayvon topilmadi. ` +
-                    'Avval "Hayvon kartochkalari" sahifasida shu raqamli kartochka oching.'
+                    t('Bu guruhda №{tagTyped} raqamli faol hayvon topilmadi. ', { tagTyped }) +
+                    t('Avval "Hayvon kartochkalari" sahifasida shu raqamli kartochka oching.')
                 );
                 return;
             }
             if (!tagTyped && animalRequired) {
-                setEventError("Qaysi hayvon ekanini yozing (quloq raqami)");
+                setEventError(t('Qaysi hayvon ekanini yozing (quloq raqami)'));
                 return;
             }
             if (pickedAnimal) {
@@ -254,7 +256,7 @@ function FarmWork() {
                 sex: c.sex,
             }));
             if (payload.calves.some((c) => !c.tag_number)) {
-                setEventError("Har bir buzoq uchun quloq raqamini kiriting");
+                setEventError(t('Har bir buzoq uchun quloq raqamini kiriting'));
                 return;
             }
         }
@@ -262,14 +264,14 @@ function FarmWork() {
         if (!isBirth && !payload.title.trim()) {
             const group = activeGroups.find((g) => String(g.id) === selectedGroup);
             const who = group
-                ? `${group.animal_type_name}${payload.animal_count ? `, ${payload.animal_count} ta` : ''}`
+                ? `${group.animal_type_name}${payload.animal_count ? t(', {animal_count} ta', { animal_count: payload.animal_count }) : ''}`
                 : '';
-            payload.title = who ? `${EVENT_TYPES[payload.event_type]}: ${who}` : EVENT_TYPES[payload.event_type];
+            payload.title = who ? t('{v1}: {who}', { v1: t(EVENT_TYPES[payload.event_type]), who }) : t(EVENT_TYPES[payload.event_type]);
         }
         // Tug'ilishda sarlavha bo'sh qolsa, o'zimiz yozamiz
         if (isBirth && !payload.title.trim()) {
             const tags = (payload.calves || []).map((c) => `№${c.tag_number}`).join(', ');
-            payload.title = tags ? `Buzoq tug'ildi: ${tags}` : "Buzoq tug'ildi";
+            payload.title = tags ? t('Buzoq tug\'ildi: {tags}', { tags }) : t('Buzoq tug\'ildi');
         }
 
         setSavingEvent(true);
@@ -277,13 +279,13 @@ function FarmWork() {
             const { data } = await api.post('animals-event/', payload);
             const made = data?.calves_created ?? [];
             if (made.length) {
-                setEventNotice(`Buzoq kartochkasi ochildi: ${made.map((a) => `№${a.tag_number}`).join(', ')}`);
+                setEventNotice(t('Buzoq kartochkasi ochildi: {v1}', { v1: made.map((a) => `№${a.tag_number}`).join(', ') }));
             }
             setEventForm(makeEventForm());
             setCalves([]);
             reload();
         } catch (err) {
-            setEventError(getErrorMessage(err, "Yozuvni saqlab bo'lmadi"));
+            setEventError(getErrorMessage(err, t('Yozuvni saqlab bo\'lmadi')));
         } finally {
             setSavingEvent(false);
         }
@@ -294,20 +296,22 @@ function FarmWork() {
             await api.patch(`animals-event/${ev.id}/`, { status: 'yakunlangan' });
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleDeleteEvent = async (ev) => {
-        const undo = ev.animal_count && COUNT_HINTS[ev.event_type]
-            ? `\n\nGuruhdagi hayvonlar soni ham ${ev.event_type === 'olim' ? 'qaytib ko\'payadi' : 'kamayadi'} (${ev.animal_count} ta).`
+        const undo = ev.animal_count && t(COUNT_HINTS[ev.event_type])
+            ? '\n\n' + (ev.event_type === 'olim'
+                ? t("Guruhdagi hayvonlar soni ham qaytib ko'payadi ({animal_count} ta).", { animal_count: ev.animal_count })
+                : t("Guruhdagi hayvonlar soni ham kamayadi ({animal_count} ta).", { animal_count: ev.animal_count }))
             : '';
-        if (!window.confirm(`"${ev.title}" yozuvini o'chirasizmi?${undo}`)) return;
+        if (!window.confirm(t('"{title}" yozuvini o\'chirasizmi?{undo}', { title: ev.title, undo }))) return;
         try {
             await api.delete(`animals-event/${ev.id}/`);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'chirib bo\'lmadi')));
         }
     };
 
@@ -319,7 +323,7 @@ function FarmWork() {
         setGroupError('');
         try {
             const name = groupForm.animal_type_name.trim();
-            let type = types.find((t) => t.name.toLowerCase() === name.toLowerCase());
+            let type = types.find((tk) => tk.name.toLowerCase() === name.toLowerCase());
             if (!type) {
                 const { data } = await api.post('animals-type/', { name });
                 type = data;
@@ -333,7 +337,7 @@ function FarmWork() {
             setGroupForm(EMPTY_GROUP_FORM);
             reload();
         } catch (err) {
-            setGroupError(getErrorMessage(err, "Guruhni qo'shib bo'lmadi"));
+            setGroupError(getErrorMessage(err, t('Guruhni qo\'shib bo\'lmadi')));
         } finally {
             setSavingGroup(false);
         }
@@ -341,11 +345,11 @@ function FarmWork() {
 
     // Guruhga hayvon qo'shish (sotib olingan, boshqa joydan keltirilgan va h.k.)
     const handleAddAnimals = (group) => {
-        const answer = window.prompt(`${group.animal_type_name}: nechta hayvon qo'shasiz?`, '1');
+        const answer = window.prompt(t('{animal_type_name}: nechta hayvon qo\'shasiz?', { animal_type_name: group.animal_type_name }), '1');
         if (answer === null) return;
         const n = Number(answer);
         if (!Number.isInteger(n) || n < 1) {
-            window.alert("Iltimos, 1 dan katta butun son kiriting.");
+            window.alert(t('Iltimos, 1 dan katta butun son kiriting.'));
             return;
         }
         patchGroup(group, { count: group.count + n });
@@ -356,20 +360,20 @@ function FarmWork() {
             await api.patch(`animals-group/${group.id}/`, data);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleDeleteGroup = async (group) => {
         const ok = window.confirm(
-            `${group.animal_type_name} guruhini o'chirasizmi?\n\nUning barcha ish yozuvlari ham o'chib ketadi. Buni qaytarib bo'lmaydi.`
+            t('{animal_type_name} guruhini o\'chirasizmi?\n\nUning barcha ish yozuvlari ham o\'chib ketadi. Buni qaytarib bo\'lmaydi.', { animal_type_name: group.animal_type_name })
         );
         if (!ok) return;
         try {
             await api.delete(`animals-group/${group.id}/`);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'chirib bo\'lmadi')));
         }
     };
 
@@ -379,27 +383,27 @@ function FarmWork() {
                 <span className="work-title">
                     {ev.title}
                     <span className="work-badge">
-                        {ev.event_type_display}{ev.animal_count ? `: ${ev.animal_count} ta` : ''}
+                        {ev.event_type_display}{ev.animal_count ? t(': {animal_count} ta', { animal_count: ev.animal_count }) : ''}
                     </span>
                     {ev.withdrawal_days > 0 && (
                         <span className="work-badge work-badge--shoshilinch">
                             {ev.withdrawal_until
-                                ? `Sut/go'sht ${formatDate(ev.withdrawal_until)} gacha sotilmaydi`
-                                : `Ushlab turish: tugagach +${ev.withdrawal_days} kun`}
+                                ? t('Sut/go\'sht {v1} gacha sotilmaydi', { v1: formatDate(ev.withdrawal_until) })
+                                : t('Ushlab turish: tugagach +{withdrawal_days} kun', { withdrawal_days: ev.withdrawal_days })}
                         </span>
                     )}
                 </span>
-                {ev.medicine_name && <span className="work-meta">Dori: {ev.medicine_name}</span>}
+                {ev.medicine_name && <span className="work-meta">{t('Dori:')} {ev.medicine_name}</span>}
                 <span className="work-meta">
-                    {ev.animal_group_label}{ev.animal_tag ? ` · №${ev.animal_tag}` : ''} · {ev.animal_group_count} ta · {formatDate(ev.start_date)}
-                    {ev.status !== 'yakunlangan' && ` · ${ev.days_since_start} kun`}
+                    {ev.animal_group_label}{ev.animal_tag ? t(' · №{animal_tag}', { animal_tag: ev.animal_tag }) : ''} · {ev.animal_group_count} {t('ta ·')} {formatDate(ev.start_date)}
+                    {ev.status !== 'yakunlangan' && t(' · {days_since_start} kun', { days_since_start: ev.days_since_start })}
                     {ev.end_date && ` – ${formatDate(ev.end_date)}`}
                 </span>
                 {ev.description && <span className="work-desc">{ev.description}</span>}
                 <span className="work-meta">
-                    {ev.status_display} · Yozgan:{' '}
+                    {ev.status_display} {t('· Yozgan:')}{' '}
                     <strong>
-                        {ev.recorded_by ? `${roleLabel(ev.recorded_by)} ${ev.recorded_by_name}` : "noma'lum"}
+                        {ev.recorded_by ? `${roleLabel(ev.recorded_by)} ${ev.recorded_by_name}` : t('noma\'lum')}
                     </strong>
                 </span>
             </div>
@@ -407,11 +411,11 @@ function FarmWork() {
                 <div className="work-side">
                     {ev.status !== 'yakunlangan' && (
                         <button type="button" className="btn-ghost" onClick={() => handleFinish(ev)}>
-                            Yakunlash
+                            {t('Yakunlash')}
                         </button>
                     )}
                     <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteEvent(ev)}>
-                        O'chirish
+                        {t('O\'chirish')}
                     </button>
                 </div>
             )}
@@ -421,61 +425,62 @@ function FarmWork() {
     return (
         <div className="app-shell">
             <header className="app-header">
-                <h1>FarmLine</h1>
+                <h1>{t('FarmLine')}</h1>
                 <div className="user-bar">
-                    <span>Salom, {user.first_name || user.username}!</span>
+                    <span>{t('Salom,')} {user.first_name || user.username}!</span>
+                    <LanguageSwitcher />
                     <NotificationBell />
-                    <Link to="/profile" className="user-link">Profil</Link>
+                    <Link to="/profile" className="user-link">{t('Profil')}</Link>
                     <InstallButton />
-                    <button className="btn-ghost" onClick={logout}>Chiqish</button>
+                    <button className="btn-ghost" onClick={logout}>{t('Chiqish')}</button>
                 </div>
             </header>
 
             <main className="app-main">
-                <Link to="/dashboard" className="back-link">← Fermalarga qaytish</Link>
+                <Link to="/dashboard" className="back-link">{t('← Fermalarga qaytish')}</Link>
 
                 {loading ? (
-                    <p className="empty-state">Yuklanmoqda...</p>
+                    <p className="empty-state">{t('Yuklanmoqda...')}</p>
                 ) : error ? (
                     <p className="error-text">{error}</p>
                 ) : (
                     <>
-                        <h2 className="panel-title">{farm.name}: ferma ishlari</h2>
+                        <h2 className="panel-title">{farm.name}{t(': ferma ishlari')}</h2>
                         <p className="panel-subtitle">
                             {farm.location}
-                            {isOwner ? ' · Ishchilar yozgan ishlar ham shu yerda ko\'rinadi' : ''}
+                            {isOwner ? t(' · Ishchilar yozgan ishlar ham shu yerda ko\'rinadi') : ''}
                         </p>
 
                         <p><TreatmentPdfButton farmId={farmId} /></p>
 
                         <Link to={`/farms/${farmId}/animals`} className="back-link">
-                            Hayvon kartochkalari (vazn, sut, tug'ish) →
+                            {t('Hayvon kartochkalari (vazn, sut, tug\'ish) →')}
                         </Link>
 
                         {/* Davom etayotgan ishlar */}
-                        <h3 className="section-title">Davom etayotgan ishlar</h3>
+                        <h3 className="section-title">{t('Davom etayotgan ishlar')}</h3>
                         {ongoing.length === 0 ? (
-                            <p className="empty-state">Hozir davom etayotgan ish yo'q</p>
+                            <p className="empty-state">{t('Hozir davom etayotgan ish yo\'q')}</p>
                         ) : (
                             <ul className="work-list">{ongoing.map((ev) => renderEvent(ev, { showActions: true }))}</ul>
                         )}
 
                         {/* Yangi yozuv */}
-                        <h3 className="section-title">Yangi ish yozuvi</h3>
+                        <h3 className="section-title">{t('Yangi ish yozuvi')}</h3>
                         <div className="work-card">
                             {eventNotice && <p className="success-text" role="status">{eventNotice}</p>}
                             {activeGroups.length === 0 ? (
                                 <p className="empty-state">
                                     {isOwner
-                                        ? "Avval pastdagi \"Hayvon guruhlari\" bo'limidan hayvon guruhini qo'shing."
-                                        : "Fermer hali hayvon guruhini qo'shmagan."}
+                                        ? t('Avval pastdagi "Hayvon guruhlari" bo\'limidan hayvon guruhini qo\'shing.')
+                                        : t('Fermer hali hayvon guruhini qo\'shmagan.')}
                                 </p>
                             ) : (
                                 <form onSubmit={handleAddEvent}>
                                     <div className="form-field">
-                                        <label id="event-type-label">Nima bo'ldi?</label>
+                                        <label id="event-type-label">{t('Nima bo\'ldi?')}</label>
                                         <div className="chips" role="radiogroup" aria-labelledby="event-type-label">
-                                            {Object.entries(EVENT_TYPES)
+                                            {Object.entries(EVENT_TYPES).map(([k, v]) => [k, t(v)])
                                                 .filter(([v]) => !HIDDEN_IN_FORM.includes(v))
                                                 .map(([v, l]) => (
                                                     <button key={v} type="button" role="radio"
@@ -489,26 +494,26 @@ function FarmWork() {
                                     </div>
                                     {activeGroups.length > 1 ? (
                                         <div className="form-field">
-                                            <label>Hayvon guruhi</label>
+                                            <label>{t('Hayvon guruhi')}</label>
                                             <select name="animal_group" value={selectedGroup} onChange={handleEventChange}>
                                                 {activeGroups.map((g) => (
                                                     <option key={g.id} value={g.id}>
-                                                        {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''} — {g.count} ta
+                                                        {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''} — {g.count} {t('ta')}
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
                                     ) : (
                                         <p className="work-meta" style={{ marginBottom: 12 }}>
-                                            Guruh: {activeGroups[0].animal_type_name}{activeGroups[0].breed ? ` (${activeGroups[0].breed})` : ''} — {activeGroups[0].count} ta
+                                            {t('Guruh:')} {activeGroups[0].animal_type_name}{activeGroups[0].breed ? ` (${activeGroups[0].breed})` : ''} — {activeGroups[0].count} {t('ta')}
                                         </p>
                                     )}
                                     {needsAnimal && (
                                         <div className="form-field">
-                                            <label>{animalRequired ? 'Qaysi hayvon? Quloq raqami' : 'Quloq raqami (ixtiyoriy)'}</label>
+                                            <label>{animalRequired ? t('Qaysi hayvon? Quloq raqami') : t('Quloq raqami (ixtiyoriy)')}</label>
                                             <input type="text" name="animal_tag" list="group-animal-tags" autoComplete="off"
                                                 value={eventForm.animal_tag} onChange={handleEventChange}
-                                                placeholder="Masalan: 14" maxLength={30} required={animalRequired} />
+                                                placeholder={t('Masalan: 14')} maxLength={30} required={animalRequired} />
                                             <datalist id="group-animal-tags">
                                                 {groupCards.map((a) => (
                                                     <option key={a.id} value={a.tag_number} label={a.name || undefined} />
@@ -516,21 +521,20 @@ function FarmWork() {
                                             </datalist>
                                             {pickedAnimal ? (
                                                 <p className="workers-hint">
-                                                    №{pickedAnimal.tag_number}{pickedAnimal.name ? ` · ${pickedAnimal.name}` : ''}
+                                                    №{pickedAnimal.tag_number}{pickedAnimal.name ? t(' · {name}', { name: pickedAnimal.name }) : ''}
                                                     {eventForm.event_type === 'olim'
-                                                        ? ` · kartochka "O'lgan" bo'ladi va guruh soni 1 taga kamayadi.`
-                                                        : ' · yozuv shu hayvonning kartochkasida ham ko\'rinadi.'}
+                                                        ? t(' · kartochka "O\'lgan" bo\'ladi va guruh soni 1 taga kamayadi.')
+                                                        : t(' · yozuv shu hayvonning kartochkasida ham ko\'rinadi.')}
                                                 </p>
                                             ) : tagTyped && tagStartsMatch ? (
-                                                <p className="workers-hint">Ro'yxatdan hayvonni tanlang yoki raqamni oxirigacha yozing.</p>
+                                                <p className="workers-hint">{t('Ro\'yxatdan hayvonni tanlang yoki raqamni oxirigacha yozing.')}</p>
                                             ) : tagTyped ? (
                                                 <p className="error-text" role="alert">
-                                                    Bu guruhda №{tagTyped} raqamli faol hayvon topilmadi.
+                                                    {t('Bu guruhda №')}{tagTyped} {t('raqamli faol hayvon topilmadi.')}
                                                 </p>
                                             ) : groupCards.length === 0 ? (
                                                 <p className="workers-hint">
-                                                    Bu guruhda hayvon kartochkasi yo'q, shuning uchun yozuv butun guruhga yoziladi.
-                                                    Aniq hayvon uchun avval "Hayvon kartochkalari" sahifasida kartochka oching.
+                                                    {t('Bu guruhda hayvon kartochkasi yo\'q, shuning uchun yozuv butun guruhga yoziladi. Aniq hayvon uchun avval "Hayvon kartochkalari" sahifasida kartochka oching.')}
                                                 </p>
                                             ) : null}
                                         </div>
@@ -538,28 +542,28 @@ function FarmWork() {
                                     {!pickedAnimal && (
                                         <div className="form-field">
                                             <label>
-                                                {COUNT_HINTS[eventForm.event_type] ? 'Nechta hayvon' : 'Nechta hayvon (ixtiyoriy)'}
+                                                {t(COUNT_HINTS[eventForm.event_type]) ? t('Nechta hayvon') : t('Nechta hayvon (ixtiyoriy)')}
                                             </label>
                                             <input type="number" name="animal_count" min="1" step="1"
                                                 value={eventForm.animal_count} onChange={handleEventChange}
-                                                required={Boolean(COUNT_HINTS[eventForm.event_type])} />
-                                            {COUNT_HINTS[eventForm.event_type] && (
+                                                required={Boolean(t(COUNT_HINTS[eventForm.event_type]))} />
+                                            {t(COUNT_HINTS[eventForm.event_type]) && (
                                                 <p className="workers-hint">
                                                     {openCards
-                                                        ? "Guruhdagi hayvonlar soni shuncha ko'payadi va har bir buzoq uchun kartochka ochiladi."
-                                                        : COUNT_HINTS[eventForm.event_type]}
+                                                        ? t('Guruhdagi hayvonlar soni shuncha ko\'payadi va har bir buzoq uchun kartochka ochiladi.')
+                                                        : t(COUNT_HINTS[eventForm.event_type])}
                                                 </p>
                                             )}
                                         </div>
                                     )}
                                     {isBirth && (
                                         <div className="form-field">
-                                            <label>Onasi (ixtiyoriy)</label>
+                                            <label>{t('Onasi (ixtiyoriy)')}</label>
                                             <select name="mother" value={eventForm.mother} onChange={handleEventChange}>
                                                 <option value="">—</option>
                                                 {mothers.map((m) => (
                                                     <option key={m.id} value={m.id}>
-                                                        №{m.tag_number}{m.name ? ` · ${m.name}` : ''}
+                                                        №{m.tag_number}{m.name ? t(' · {name}', { name: m.name }) : ''}
                                                     </option>
                                                 ))}
                                             </select>
@@ -567,8 +571,7 @@ function FarmWork() {
                                     )}
                                     {isOwner && isBirth && birthCount > MAX_CALF_CARDS && (
                                         <p className="workers-hint">
-                                            {MAX_CALF_CARDS} tadan ko'p buzoq bo'lsa, kartochkalarni keyin
-                                            "Hayvon kartochkalari" sahifasida oching.
+                                            {MAX_CALF_CARDS} {t('tadan ko\'p buzoq bo\'lsa, kartochkalarni keyin "Hayvon kartochkalari" sahifasida oching.')}
                                         </p>
                                     )}
                                     {canOpenCards && (
@@ -577,7 +580,7 @@ function FarmWork() {
                                                 <input type="checkbox" checked={withCards}
                                                     style={{ width: 'auto', margin: 0 }}
                                                     onChange={(e) => setWithCards(e.target.checked)} />
-                                                Buzoq kartochkasini ham ochish
+                                                {t('Buzoq kartochkasini ham ochish')}
                                             </label>
                                         </div>
                                     )}
@@ -585,24 +588,24 @@ function FarmWork() {
                                         const calf = calves[i] || EMPTY_CALF;
                                         return (
                                             <div className="work-card" key={i} style={{ marginBottom: 12 }}>
-                                                <p className="workers-hint" style={{ marginTop: 0 }}>{i + 1}-buzoq</p>
+                                                <p className="workers-hint" style={{ marginTop: 0 }}>{i + 1}{t('-buzoq')}</p>
                                                 <div className="form-row">
                                                     <div className="form-field">
-                                                        <label>Quloq raqami</label>
+                                                        <label>{t('Quloq raqami')}</label>
                                                         <input type="text" value={calf.tag_number} maxLength={30} required
-                                                            placeholder="Masalan: 21"
+                                                            placeholder={t('Masalan: 21')}
                                                             onChange={(e) => handleCalfChange(i, 'tag_number', e.target.value)} />
                                                     </div>
                                                     <div className="form-field">
-                                                        <label>Jinsi</label>
+                                                        <label>{t('Jinsi')}</label>
                                                         <select value={calf.sex}
                                                             onChange={(e) => handleCalfChange(i, 'sex', e.target.value)}>
-                                                            {Object.entries(SEXES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                            {Object.entries(SEXES).map(([k, v]) => [k, t(v)]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                                         </select>
                                                     </div>
                                                 </div>
                                                 <div className="form-field">
-                                                    <label>Laqabi (ixtiyoriy)</label>
+                                                    <label>{t('Laqabi (ixtiyoriy)')}</label>
                                                     <input type="text" value={calf.name} maxLength={100}
                                                         onChange={(e) => handleCalfChange(i, 'name', e.target.value)} />
                                                 </div>
@@ -610,54 +613,53 @@ function FarmWork() {
                                         );
                                     })}
                                     <div className="form-field">
-                                        <label>Sarlavha (ixtiyoriy)</label>
+                                        <label>{t('Sarlavha (ixtiyoriy)')}</label>
                                         <input type="text" name="title" value={eventForm.title} onChange={handleEventChange}
-                                            placeholder="Bo'sh qoldirsangiz, avtomatik yoziladi" />
+                                            placeholder={t('Bo\'sh qoldirsangiz, avtomatik yoziladi')} />
                                     </div>
                                     {eventForm.event_type === 'davolash' && (
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>Qaysi dori (ixtiyoriy)</label>
+                                                <label>{t('Qaysi dori (ixtiyoriy)')}</label>
                                                 <select name="medicine" value={eventForm.medicine} onChange={handleEventChange}>
-                                                    <option value="">— Tanlanmagan —</option>
+                                                    <option value="">{t('— Tanlanmagan —')}</option>
                                                     {medicines.map((m) => (
                                                         <option key={m.id} value={m.id}>
-                                                            {m.item_name}{m.withdrawal_days > 0 ? ` (${m.withdrawal_days} kun)` : ''}
+                                                            {m.item_name}{m.withdrawal_days > 0 ? t(' ({withdrawal_days} kun)', { withdrawal_days: m.withdrawal_days }) : ''}
                                                         </option>
                                                     ))}
                                                 </select>
                                             </div>
                                             <div className="form-field">
-                                                <label>Ushlab turish (kun)</label>
+                                                <label>{t('Ushlab turish (kun)')}</label>
                                                 <input type="number" name="withdrawal_days" min="0" max="365" step="1"
                                                     value={eventForm.withdrawal_days} onChange={handleEventChange} placeholder="0" />
                                             </div>
                                             <p className="workers-hint">
-                                                Davolashdan keyin shuncha kun sut va go'shtni sotib bo'lmaydi.
-                                                Tizim sotishda ogohlantiradi va Telegramga xabar yuboradi.
+                                                {t('Davolashdan keyin shuncha kun sut va go\'shtni sotib bo\'lmaydi. Tizim sotishda ogohlantiradi va Telegramga xabar yuboradi.')}
                                             </p>
                                         </div>
                                     )}
                                     <details className="form-more">
                                         <summary>
-                                            Sana: {formatDate(eventForm.start_date)}
-                                            {!COUNT_HINTS[eventForm.event_type] ? ` · ${EVENT_STATUSES[eventForm.status]}` : ''}
-                                            {' '}(o'zgartirish yoki izoh qo'shish)
+                                            {t('Sana:')} {formatDate(eventForm.start_date)}
+                                            {!t(COUNT_HINTS[eventForm.event_type]) ? ` · ${t(EVENT_STATUSES[eventForm.status])}` : ''}
+                                            {' '}{t('(o\'zgartirish yoki izoh qo\'shish)')}
                                         </summary>
                                     <div className="form-field">
-                                        <label>Izoh (ixtiyoriy)</label>
+                                        <label>{t('Izoh (ixtiyoriy)')}</label>
                                         <input type="text" name="description" value={eventForm.description} onChange={handleEventChange} />
                                     </div>
                                     <div className="form-row">
                                         <div className="form-field">
-                                            <label>Boshlangan sana</label>
+                                            <label>{t('Boshlangan sana')}</label>
                                             <input type="date" name="start_date" value={eventForm.start_date} onChange={handleEventChange} required />
                                         </div>
-                                        {!COUNT_HINTS[eventForm.event_type] && (
+                                        {!t(COUNT_HINTS[eventForm.event_type]) && (
                                             <div className="form-field">
-                                                <label>Holati</label>
+                                                <label>{t('Holati')}</label>
                                                 <select name="status" value={eventForm.status} onChange={handleEventChange}>
-                                                    {Object.entries(EVENT_STATUSES).map(([v, l]) => (
+                                                    {Object.entries(EVENT_STATUSES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
                                                         <option key={v} value={v}>{l}</option>
                                                     ))}
                                                 </select>
@@ -667,16 +669,16 @@ function FarmWork() {
                                     </details>
                                     {eventError && <p className="error-text" role="alert">{eventError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingEvent}>
-                                        {savingEvent ? 'Kuting...' : "Qo'shish"}
+                                        {savingEvent ? 'Kuting...' : t('Qo\'shish')}
                                     </button>
                                 </form>
                             )}
                         </div>
 
                         {/* Hayvon guruhlari */}
-                        <h3 className="section-title">Hayvon guruhlari</h3>
+                        <h3 className="section-title">{t('Hayvon guruhlari')}</h3>
                         {groups.length === 0 ? (
-                            <p className="empty-state">Hozircha hayvon guruhi yo'q</p>
+                            <p className="empty-state">{t('Hozircha hayvon guruhi yo\'q')}</p>
                         ) : (
                             <ul className="work-list">
                                 {groups.map((g) => (
@@ -686,29 +688,29 @@ function FarmWork() {
                                                 {g.animal_type_name}{g.breed ? ` (${g.breed})` : ''}
                                             </span>
                                             <span className="work-meta">
-                                                {g.count} ta{g.birth_date ? ` · tug'ilgan: ${formatDate(g.birth_date)}` : ''}
-                                                {!isOwner && ` · ${g.status_display}`}
+                                                {g.count} {t('ta')}{g.birth_date ? t(' · tug\'ilgan: {v1}', { v1: formatDate(g.birth_date) }) : ''}
+                                                {!isOwner && t(' · {status_display}', { status_display: g.status_display })}
                                             </span>
                                         </div>
                                         <div className="work-side">
                                             <Link to={`/farms/${farmId}/animals?group=${g.id}`} className="farm-item-action">
-                                                Kartochkalar
+                                                {t('Kartochkalar')}
                                             </Link>
                                         </div>
                                         {isOwner && (
                                             <div className="work-side">
                                                 {g.status === 'faol' && (
                                                     <button type="button" className="farm-item-action" onClick={() => handleAddAnimals(g)}>
-                                                        + Hayvon qo'shish
+                                                        {t('+ Hayvon qo\'shish')}
                                                     </button>
                                                 )}
                                                 <select value={g.status} onChange={(e) => patchGroup(g, { status: e.target.value })}>
-                                                    {Object.entries(GROUP_STATUSES).map(([v, l]) => (
+                                                    {Object.entries(GROUP_STATUSES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
                                                         <option key={v} value={v}>{l}</option>
                                                     ))}
                                                 </select>
                                                 <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteGroup(g)}>
-                                                    O'chirish
+                                                    {t('O\'chirish')}
                                                 </button>
                                             </div>
                                         )}
@@ -722,47 +724,47 @@ function FarmWork() {
                                 <form onSubmit={handleAddGroup}>
                                     <div className="form-row">
                                         <div className="form-field">
-                                            <label>Hayvon turi</label>
+                                            <label>{t('Hayvon turi')}</label>
                                             <input type="text" name="animal_type_name" list="animal-types"
                                                 value={groupForm.animal_type_name} onChange={handleGroupChange}
-                                                placeholder="Masalan: Tovuq, Qo'y, Sigir" required />
+                                                placeholder={t('Masalan: Tovuq, Qo\'y, Sigir')} required />
                                             <datalist id="animal-types">
-                                                {types.map((t) => <option key={t.id} value={t.name} />)}
+                                                {types.map((tk) => <option key={tk.id} value={tk.name} />)}
                                             </datalist>
                                         </div>
                                         <div className="form-field">
-                                            <label>Zoti (ixtiyoriy)</label>
+                                            <label>{t('Zoti (ixtiyoriy)')}</label>
                                             <input type="text" name="breed" value={groupForm.breed} onChange={handleGroupChange} />
                                         </div>
                                     </div>
                                     {groupError && <p className="error-text" role="alert">{groupError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingGroup}>
-                                        {savingGroup ? 'Kuting...' : "Guruh qo'shish"}
+                                        {savingGroup ? 'Kuting...' : t('Guruh qo\'shish')}
                                     </button>
                                 </form>
                             </div>
                         )}
 
                         {/* Barcha yozuvlar */}
-                        <h3 className="section-title">Barcha yozuvlar</h3>
+                        <h3 className="section-title">{t('Barcha yozuvlar')}</h3>
                         <div className="filter-bar">
                             <select value={filters.event_type} onChange={(e) => setFilters({ ...filters, event_type: e.target.value })}>
-                                <option value="">Barcha turlar</option>
-                                {Object.entries(EVENT_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                <option value="">{t('Barcha turlar')}</option>
+                                {Object.entries(EVENT_TYPES).map(([k, v]) => [k, t(v)]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                             </select>
                             <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-                                <option value="">Barcha holatlar</option>
-                                {Object.entries(EVENT_STATUSES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                <option value="">{t('Barcha holatlar')}</option>
+                                {Object.entries(EVENT_STATUSES).map(([k, v]) => [k, t(v)]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                             </select>
                             <select value={filters.recorded_by} onChange={(e) => setFilters({ ...filters, recorded_by: e.target.value })}>
-                                <option value="">Kim yozgan: hammasi</option>
+                                <option value="">{t('Kim yozgan: hammasi')}</option>
                                 {workers.map(([id, name]) => (
                                     <option key={id} value={id}>{roleLabel(id)}: {name}</option>
                                 ))}
                             </select>
                         </div>
                         {history.length === 0 ? (
-                            <p className="empty-state">Yozuvlar yo'q</p>
+                            <p className="empty-state">{t('Yozuvlar yo\'q')}</p>
                         ) : (
                             <ul className="work-list">{history.map((ev) => renderEvent(ev, { showActions: true }))}</ul>
                         )}

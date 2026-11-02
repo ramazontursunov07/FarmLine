@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../api/axios';
+import { t } from '../i18n';
 
 function FarmForm({ onFarmCreated }) {
     const [formData, setFormData] = useState({
@@ -24,7 +25,7 @@ function FarmForm({ onFarmCreated }) {
             onFarmCreated(response.data);
             setFormData({ name: '', location: '', farm_type: 'chorvachilik' });
         } catch (err) {
-            setError('Ferma yaratishda xatolik yuz berdi');
+            setError(t('Ferma yaratishda xatolik yuz berdi'));
         } finally {
             setLoading(false);
         }
@@ -32,9 +33,9 @@ function FarmForm({ onFarmCreated }) {
 
     return (
         <form className="farm-form" onSubmit={handleSubmit}>
-            <h3>Yangi ferma qo'shish</h3>
+            <h3>{t("Yangi ferma qo'shish")}</h3>
             <div className="form-field">
-                <label>Nomi</label>
+                <label>{t('Nomi')}</label>
                 <input
                     type="text"
                     name="name"
@@ -44,7 +45,7 @@ function FarmForm({ onFarmCreated }) {
                 />
             </div>
             <div className="form-field">
-                <label>Joylashuvi</label>
+                <label>{t('Joylashuvi')}</label>
                 <input
                     type="text"
                     name="location"
@@ -54,20 +55,20 @@ function FarmForm({ onFarmCreated }) {
                 />
             </div>
             <div className="form-field">
-                <label>Turi</label>
+                <label>{t('Turi')}</label>
                 <select
                     name="farm_type"
                     value={formData.farm_type}
                     onChange={handleChange}
                 >
-                    <option value="chorvachilik">Chorvachilik</option>
-                    <option value="parrandachilik">Parrandachilik</option>
-                    <option value="aralash">Aralash</option>
+                    <option value="chorvachilik">{t('Chorvachilik')}</option>
+                    <option value="parrandachilik">{t('Parrandachilik')}</option>
+                    <option value="aralash">{t('Aralash')}</option>
                 </select>
             </div>
             {error && <p className="error-text">{error}</p>}
             <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Kuting...' : 'Qo\'shish'}
+                {loading ? t('Kuting...') : t("Qo'shish")}
             </button>
         </form>
     );

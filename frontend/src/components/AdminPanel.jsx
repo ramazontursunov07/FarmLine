@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import { t } from '../i18n';
 
 const FARM_TYPES = {
     chorvachilik: 'Chorvachilik',
@@ -32,7 +33,7 @@ function AdminPanel() {
             setFarms(asList(farmsRes.data));
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, "Ma'lumotlarni yuklab bo'lmadi"));
+            setError(getErrorMessage(err, t('Ma\'lumotlarni yuklab bo\'lmadi')));
         } finally {
             setLoading(false);
         }
@@ -66,13 +67,13 @@ function AdminPanel() {
         );
     }, [farmers, search]);
 
-    if (loading) return <p className="empty-state">Yuklanmoqda...</p>;
+    if (loading) return <p className="empty-state">{t('Yuklanmoqda...')}</p>;
 
     if (error) {
         return (
             <div className="empty-state">
                 <p className="error-text">{error}</p>
-                <button className="btn-ghost" onClick={handleRetry}>Qayta urinish</button>
+                <button className="btn-ghost" onClick={handleRetry}>{t('Qayta urinish')}</button>
             </div>
         );
     }
@@ -82,28 +83,28 @@ function AdminPanel() {
             <div className="stat-grid">
                 <div className="stat-card">
                     <span className="stat-value">{farmers.length}</span>
-                    <span className="stat-label">Fermerlar</span>
+                    <span className="stat-label">{t('Fermerlar')}</span>
                 </div>
                 <div className="stat-card">
                     <span className="stat-value">{farms.length}</span>
-                    <span className="stat-label">Fermalar</span>
+                    <span className="stat-label">{t('Fermalar')}</span>
                 </div>
             </div>
 
-            <h3 className="section-title">Fermerlar</h3>
+            <h3 className="section-title">{t('Fermerlar')}</h3>
 
             <input
                 type="search"
                 className="search-input"
-                placeholder="Ism, username yoki telefon bo'yicha qidirish"
-                aria-label="Fermerlarni qidirish"
+                placeholder={t('Ism, username yoki telefon bo\'yicha qidirish')}
+                aria-label={t('Fermerlarni qidirish')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
             />
 
             {filtered.length === 0 ? (
                 <p className="empty-state">
-                    {farmers.length === 0 ? "Hali fermerlar yo'q" : 'Hech narsa topilmadi'}
+                    {farmers.length === 0 ? t('Hali fermerlar yo\'q') : t('Hech narsa topilmadi')}
                 </p>
             ) : (
                 <ul className="farmer-list">
@@ -122,16 +123,16 @@ function AdminPanel() {
                                         <span className="farmer-name">{fullName(u)}</span>
                                         <span className="farmer-meta">
                                             @{u.username}
-                                            {u.phone_number ? ` · ${u.phone_number}` : ''}
+                                            {u.phone_number ? t(' · {phone_number}', { phone_number: u.phone_number }) : ''}
                                         </span>
                                     </span>
-                                    <span className="farmer-count">{userFarms.length} ta ferma</span>
+                                    <span className="farmer-count">{userFarms.length} {t('ta ferma')}</span>
                                 </button>
 
                                 {isOpen && (
                                     <div className="farmer-body">
                                         {userFarms.length === 0 ? (
-                                            <p className="farmer-empty">Hali ferma qo'shmagan</p>
+                                            <p className="farmer-empty">{t('Hali ferma qo\'shmagan')}</p>
                                         ) : (
                                             <ul className="farm-list farm-list--inner">
                                                 {userFarms.map((farm) => (
@@ -139,7 +140,7 @@ function AdminPanel() {
                                                         <div>
                                                             <span className="farm-item-name">{farm.name}</span>
                                                             <span className="farm-item-type">
-                                                                {FARM_TYPES[farm.farm_type] || farm.farm_type}
+                                                                {t(FARM_TYPES[farm.farm_type]) || farm.farm_type}
                                                             </span>
                                                         </div>
                                                         <span className="farm-item-location">{farm.location}</span>

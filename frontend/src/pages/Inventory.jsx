@@ -5,10 +5,12 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today, formatMoney } from '../utils/format';
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import CreditFields from '../components/CreditFields';
 import FeedNeed from '../components/FeedNeed';
 import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
+import { t } from '../i18n';
 
 const ITEM_TYPES = { ozuqa: 'Ozuqa', dori: 'Dori-darmon', boshqa: 'Boshqa' };
 const FEED_KINDS = { '': 'Avtomatik', dagal: "Dag'al", shirali: 'Shirali', konsentrat: 'Konsentrat', hisobsiz: 'Hisobga olinmasin' };
@@ -70,7 +72,7 @@ function Inventory() {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setError(err.response?.status === 404 ? 'Ferma topilmadi' : getErrorMessage(err, "Omborni yuklab bo'lmadi"));
+                    setError(err.response?.status === 404 ? t('Ferma topilmadi') : getErrorMessage(err, t("Omborni yuklab bo'lmadi")));
                 }
             })
             .finally(() => !cancelled && setLoading(false));
@@ -80,7 +82,7 @@ function Inventory() {
     }, [farmId, reloadKey]);
 
     const isOwner = farm ? farm.owner_username === user.username : false;
-    const roleLabel = (userId) => (farm && userId === farm.owner ? 'Fermer' : 'Ishchi');
+    const roleLabel = (userId) => (farm && userId === farm.owner ? t('Fermer') : t('Ishchi'));
 
     // Zaxirasi kam qolganlar birinchi
     const sortedItems = useMemo(
@@ -95,9 +97,9 @@ function Inventory() {
     const history = useMemo(
         () =>
             txs.filter(
-                (t) =>
-                    (!filters.inventory_item || String(t.inventory_item) === filters.inventory_item) &&
-                    (!filters.transaction_type || t.transaction_type === filters.transaction_type)
+                (tx) =>
+                    (!filters.inventory_item || String(tx.inventory_item) === filters.inventory_item) &&
+                    (!filters.transaction_type || tx.transaction_type === filters.transaction_type)
             ),
         [txs, filters]
     );
@@ -109,7 +111,7 @@ function Inventory() {
         e.preventDefault();
         const hasStock = Number(itemForm.quantity) > 0;
         if (hasStock && farm.can_view_finance && itemForm.initial_amount === ''
-            && !window.confirm("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?")) return;
+            && !window.confirm(t("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?"))) return;
         setSavingItem(true);
         setItemError('');
         try {
@@ -121,7 +123,7 @@ function Inventory() {
             setItemForm(EMPTY_ITEM);
             reload();
         } catch (err) {
-            setItemError(getErrorMessage(err, "Mahsulotni qo'shib bo'lmadi"));
+            setItemError(getErrorMessage(err, t("Mahsulotni qo'shib bo'lmadi")));
         } finally {
             setSavingItem(false);
         }
@@ -130,11 +132,11 @@ function Inventory() {
     const handleAddTx = async (e) => {
         e.preventDefault();
         if (buyOnCredit(txForm, credit) && (txForm.amount === '' || Number(txForm.amount) <= 0)) {
-            setTxError("Nasiyaga olish uchun jami narxni kiriting");
+            setTxError(t('Nasiyaga olish uchun jami narxni kiriting'));
             return;
         }
         if (txForm.transaction_type === 'kirim' && farm.can_view_finance && txForm.amount === ''
-            && !window.confirm("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?")) return;
+            && !window.confirm(t("Narx kiritilmadi: balansdan pul ayrilmaydi. Davom etamizmi?"))) return;
         setSavingTx(true);
         setTxError('');
         try {
@@ -147,7 +149,7 @@ function Inventory() {
             setTxForm({ ...makeTx(), inventory_item: selectedItemId, transaction_type: txForm.transaction_type });
             reload();
         } catch (err) {
-            setTxError(getErrorMessage(err, "Yozuvni saqlab bo'lmadi"));
+            setTxError(getErrorMessage(err, t("Yozuvni saqlab bo'lmadi")));
         } finally {
             setSavingTx(false);
         }
@@ -162,20 +164,20 @@ function Inventory() {
 
     const handleThreshold = async (item) => {
         const value = window.prompt(
-            `"${item.item_name}": zaxira qancha (${item.unit}) dan kam qolganda ogohlantirilsin?`,
+            t('"{name}": zaxira qancha ({unit}) dan kam qolganda ogohlantirilsin?', { name: item.item_name, unit: item.unit }),
             item.low_stock_threshold
         );
         if (value === null) return;
         const n = Number(value);
         if (value.trim() === '' || Number.isNaN(n) || n < 0) {
-            window.alert("Iltimos, 0 yoki undan katta son kiriting");
+            window.alert(t('Iltimos, 0 yoki undan katta son kiriting'));
             return;
         }
         try {
             await api.patch(`inventory-item/${item.id}/`, { low_stock_threshold: n });
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
@@ -184,114 +186,117 @@ function Inventory() {
             await api.patch(`inventory-item/${item.id}/`, { feed_kind: value });
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleKgPerUnit = async (item) => {
         const value = window.prompt(
-            `"${item.item_name}": 1 ${item.unit} necha kg? (masalan, 1 qop = 50 kg)`,
+            t('"{name}": 1 {unit} necha kg? (masalan, 1 qop = 50 kg)', { name: item.item_name, unit: item.unit }),
             item.kg_per_unit ?? ''
         );
         if (value === null) return;
         const n = Number(value.replace(',', '.'));
         if (value.trim() === '' || Number.isNaN(n) || n <= 0) {
-            window.alert("Iltimos, 0 dan katta son kiriting");
+            window.alert(t('Iltimos, 0 dan katta son kiriting'));
             return;
         }
         try {
             await api.patch(`inventory-item/${item.id}/`, { kg_per_unit: n });
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleWithdrawal = async (item) => {
         const value = window.prompt(
-            `"${item.item_name}" bilan davolangan hayvonning sutini va go'shtini necha kun sotib bo'lmaydi? (0 = cheklov yo'q)`,
+            t('"{name}" bilan davolangan hayvonning sutini va go\'shtini necha kun sotib bo\'lmaydi? (0 = cheklov yo\'q)', { name: item.item_name }),
             item.withdrawal_days
         );
         if (value === null) return;
         const n = Number(value);
         if (value.trim() === '' || !Number.isInteger(n) || n < 0 || n > 365) {
-            window.alert("Iltimos, 0 dan 365 gacha butun son kiriting");
+            window.alert(t('Iltimos, 0 dan 365 gacha butun son kiriting'));
             return;
         }
         try {
             await api.patch(`inventory-item/${item.id}/`, { withdrawal_days: n });
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'zgartirib bo\'lmadi')));
         }
     };
 
     const handleDeleteItem = async (item) => {
         const ok = window.confirm(
-            `"${item.item_name}" mahsulotini o'chirasizmi?\n\nUning barcha kirim-sarf tarixi ham o'chib ketadi. Buni qaytarib bo'lmaydi.`
+            t('"{name}" mahsulotini o\'chirasizmi?', { name: item.item_name }) + '\n\n' +
+            t("Uning barcha kirim-sarf tarixi ham o'chib ketadi. Buni qaytarib bo'lmaydi.")
         );
         if (!ok) return;
         try {
             await api.delete(`inventory-item/${item.id}/`);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'chirib bo\'lmadi')));
         }
     };
 
-    const handleDeleteTx = async (t) => {
+    const handleDeleteTx = async (tx) => {
         const ok = window.confirm(
-            `Bu yozuvni o'chirasizmi?\n\n${t.transaction_type_display}: ${qty(t.quantity)} ${t.inventory_unit} (${t.inventory_name})\n` +
-            'Zaxira avtomatik tuzatiladi.' +
-            (t.finance_transaction ? "\nMoliyadagi chiqim yozuvi ham o'chiriladi." : '')
+            t("Bu yozuvni o'chirasizmi?") + '\n\n' +
+            `${t(tx.transaction_type_display)}: ${qty(tx.quantity)} ${tx.inventory_unit} (${tx.inventory_name})\n` +
+            t('Zaxira avtomatik tuzatiladi.') +
+            (tx.finance_transaction ? '\n' + t("Moliyadagi chiqim yozuvi ham o'chiriladi.") : '')
         );
         if (!ok) return;
         try {
-            await api.delete(`inventory-transaction/${t.id}/`);
+            await api.delete(`inventory-transaction/${tx.id}/`);
             reload();
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'chirib bo\'lmadi')));
         }
     };
 
     return (
         <div className="app-shell">
             <header className="app-header">
-                <h1>FarmLine</h1>
+                <h1>{t('FarmLine')}</h1>
                 <div className="user-bar">
-                    <span>Salom, {user.first_name || user.username}!</span>
+                    <span>{t('Salom, {name}!', { name: user.first_name || user.username })}</span>
+                    <LanguageSwitcher />
                     <NotificationBell />
-                    <Link to="/profile" className="user-link">Profil</Link>
+                    <Link to="/profile" className="user-link">{t('Profil')}</Link>
                     <InstallButton />
-                    <button className="btn-ghost" onClick={logout}>Chiqish</button>
+                    <button className="btn-ghost" onClick={logout}>{t('Chiqish')}</button>
                 </div>
             </header>
 
             <main className="app-main">
-                <Link to="/dashboard" className="back-link">← Fermalarga qaytish</Link>
+                <Link to="/dashboard" className="back-link">{t('← Fermalarga qaytish')}</Link>
 
                 {loading ? (
-                    <p className="empty-state">Yuklanmoqda...</p>
+                    <p className="empty-state">{t('Yuklanmoqda...')}</p>
                 ) : error ? (
                     <p className="error-text">{error}</p>
                 ) : (
                     <>
-                        <h2 className="panel-title">{farm.name}: ombor</h2>
+                        <h2 className="panel-title">{t('{name}: ombor', { name: farm.name })}</h2>
                         <p className="panel-subtitle">
                             {lowCount > 0 ? (
-                                <span className="task-overdue">{lowCount} ta mahsulot zaxirasi kam qolgan</span>
+                                <span className="task-overdue">{t('{n} ta mahsulot zaxirasi kam qolgan', { n: lowCount })}</span>
                             ) : (
-                                'Ozuqa, dori va boshqa mahsulotlar zaxirasi'
+                                t('Ozuqa, dori va boshqa mahsulotlar zaxirasi')
                             )}
                         </p>
 
                         {/* Zaxira */}
-                        <h3 className="section-title">Zaxira</h3>
+                        <h3 className="section-title">{t('Zaxira')}</h3>
                         {sortedItems.length === 0 ? (
                             <p className="empty-state">
                                 {isOwner
-                                    ? "Omborda hali mahsulot yo'q. Pastdagi formadan qo'shing."
-                                    : "Fermer hali omborga mahsulot qo'shmagan."}
+                                    ? t("Omborda hali mahsulot yo'q. Pastdagi formadan qo'shing.")
+                                    : t("Fermer hali omborga mahsulot qo'shmagan.")}
                             </p>
                         ) : (
                             <ul className="work-list">
@@ -300,53 +305,53 @@ function Inventory() {
                                         <div className="work-main">
                                             <span className="work-title">
                                                 {item.item_name}
-                                                <span className="work-badge">{item.item_type_display}</span>
-                                                {item.is_low_stock && <span className="work-badge work-badge--shoshilinch">Kam qoldi</span>}
+                                                <span className="work-badge">{t(item.item_type_display)}</span>
+                                                {item.is_low_stock && <span className="work-badge work-badge--shoshilinch">{t('Kam qoldi')}</span>}
                                                 {item.item_type === 'dori' && item.withdrawal_days > 0 && (
-                                                    <span className="work-badge work-badge--shoshilinch">Ushlab turish: {item.withdrawal_days} kun</span>
+                                                    <span className="work-badge work-badge--shoshilinch">{t('Ushlab turish: {n} kun', { n: item.withdrawal_days })}</span>
                                                 )}
                                             </span>
                                             <span className="stock-amount">{qty(item.quantity)} {item.unit}</span>
                                             <span className="work-meta">
-                                                Ogohlantirish chegarasi: {qty(item.low_stock_threshold)} {item.unit}
+                                                {t('Ogohlantirish chegarasi:')} {qty(item.low_stock_threshold)} {item.unit}
                                             </span>
                                         </div>
                                         <div className="work-side">
-                                            <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'sarf')}>Sarf</button>
-                                            <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'kirim')}>Kirim</button>
+                                            <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'sarf')}>{t('Sarf')}</button>
+                                            <button type="button" className="btn-ghost" onClick={() => quickTx(item, 'kirim')}>{t('Kirim')}</button>
                                             {isOwner && (
                                                 <details className="more-menu">
-                                                    <summary>Ko'proq</summary>
+                                                    <summary>{t("Ko'proq")}</summary>
                                                     <div className="more-menu-body">
                                                     <button type="button" className="farm-item-action" onClick={() => handleThreshold(item)}>
-                                                        Chegara
+                                                        {t('Chegara')}
                                                     </button>
                                                     {item.item_type === 'ozuqa' && (
                                                         <>
                                                             <select
                                                                 className="farm-item-action"
-                                                                aria-label={`${item.item_name}: yem turi`}
+                                                                aria-label={t('{name}: yem turi', { name: item.item_name })}
                                                                 value={item.feed_kind || ''}
                                                                 onChange={(e) => handleFeedKind(item, e.target.value)}
                                                             >
-                                                                {Object.entries(FEED_KINDS).map(([v, l]) => (
-                                                                    <option key={v} value={v}>{v ? l : 'Yem turi: avtomatik'}</option>
+                                                                {Object.entries(FEED_KINDS).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
+                                                                    <option key={v} value={v}>{v ? t(l) : t('Yem turi: avtomatik')}</option>
                                                                 ))}
                                                             </select>
                                                             {!WEIGHT_UNITS.includes(item.unit.trim().toLowerCase().replace(/\.$/, '')) && (
                                                                 <button type="button" className="farm-item-action" onClick={() => handleKgPerUnit(item)}>
-                                                                    Kg/birlik{item.kg_per_unit ? `: ${qty(item.kg_per_unit)}` : ''}
+                                                                    {t('Kg/birlik')}{item.kg_per_unit ? `: ${qty(item.kg_per_unit)}` : ''}
                                                                 </button>
                                                             )}
                                                         </>
                                                     )}
                                                     {item.item_type === 'dori' && (
                                                         <button type="button" className="farm-item-action" onClick={() => handleWithdrawal(item)}>
-                                                            Muddat
+                                                            {t('Muddat')}
                                                         </button>
                                                     )}
                                                     <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteItem(item)}>
-                                                        O'chirish
+                                                        {t("O'chirish")}
                                                     </button>
                                                     </div>
                                                 </details>
@@ -358,19 +363,19 @@ function Inventory() {
                         )}
 
                         {/* Yem ehtiyoji */}
-                        <h3 className="section-title">Yem ehtiyoji (hayvonlar bo'yicha)</h3>
+                        <h3 className="section-title">{t("Yem ehtiyoji (hayvonlar bo'yicha)")}</h3>
                         <FeedNeed farmId={farmId} refreshKey={reloadKey} />
 
                         {/* Kirim / sarf yozish */}
-                        <h3 className="section-title">Kirim yoki sarf yozish</h3>
+                        <h3 className="section-title">{t('Kirim yoki sarf yozish')}</h3>
                         <div className="work-card" id="inventory-form">
                             {sortedItems.length === 0 ? (
-                                <p className="empty-state">Avval omborga mahsulot qo'shilishi kerak.</p>
+                                <p className="empty-state">{t("Avval omborga mahsulot qo'shilishi kerak.")}</p>
                             ) : (
                                 <form onSubmit={handleAddTx}>
                                     <div className="form-row">
                                         <div className="form-field">
-                                            <label>Mahsulot</label>
+                                            <label>{t('Mahsulot')}</label>
                                             <select name="inventory_item" value={selectedItemId} onChange={handleTxChange}>
                                                 {sortedItems.map((i) => (
                                                     <option key={i.id} value={i.id}>{i.item_name} ({qty(i.quantity)} {i.unit})</option>
@@ -378,30 +383,30 @@ function Inventory() {
                                             </select>
                                         </div>
                                         <div className="form-field">
-                                            <label>Harakat</label>
+                                            <label>{t('Harakat')}</label>
                                             <select name="transaction_type" value={txForm.transaction_type} onChange={handleTxChange}>
-                                                {Object.entries(TX_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                {Object.entries(TX_TYPES).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                                             </select>
                                         </div>
                                     </div>
                                     <div className="form-row">
                                         <div className="form-field">
-                                            <label>Miqdor{selectedItem ? ` (${selectedItem.unit})` : ''}</label>
+                                            <label>{t('Miqdor')}{selectedItem ? ` (${selectedItem.unit})` : ''}</label>
                                             <input type="number" name="quantity" min="0.01" step="0.01" value={txForm.quantity}
                                                 onChange={handleTxChange} required />
                                         </div>
                                         <div className="form-field">
-                                            <label>Sana</label>
+                                            <label>{t('Sana')}</label>
                                             <input type="date" name="date" value={txForm.date} onChange={handleTxChange} required />
                                         </div>
                                     </div>
                                     {txForm.transaction_type === 'kirim' && farm.can_view_finance && (
                                         <div className="form-field">
-                                            <label>Jami narxi, so'm</label>
+                                            <label>{t('Jami narxi, so\'m')}</label>
                                             <input type="number" name="amount" min="0.01" step="0.01" value={txForm.amount}
-                                                onChange={handleTxChange} placeholder="Masalan: 450000" />
+                                                onChange={handleTxChange} placeholder={t('Masalan: 450000')} />
                                             <p className="workers-hint">
-                                                Kiritilgan summa moliyada avtomatik "Chiqim" bo'lib yoziladi va balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.
+                                                {t('Kiritilgan summa moliyada avtomatik "Chiqim" bo\'lib yoziladi va balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.')}
                                             </p>
                                         </div>
                                     )}
@@ -410,16 +415,16 @@ function Inventory() {
                                             value={credit} onChange={setCredit} />
                                     )}
                                     <div className="form-field">
-                                        <label>Izoh (ixtiyoriy)</label>
+                                        <label>{t('Izoh (ixtiyoriy)')}</label>
                                         <input type="text" name="note" value={txForm.note} onChange={handleTxChange}
-                                            placeholder="Masalan: ertalabki ovqatlantirish" />
+                                            placeholder={t('Masalan: ertalabki ovqatlantirish')} />
                                     </div>
                                     {selectedItem && (
-                                        <p className="workers-hint">Hozir omborda: {qty(selectedItem.quantity)} {selectedItem.unit}</p>
+                                        <p className="workers-hint">{t('Hozir omborda:')} {qty(selectedItem.quantity)} {selectedItem.unit}</p>
                                     )}
                                     {txError && <p className="error-text" role="alert">{txError}</p>}
                                     <button type="submit" className="btn-primary btn-auto" disabled={savingTx}>
-                                        {savingTx ? 'Kuting...' : 'Yozish'}
+                                        {savingTx ? 'Kuting...' : t('Yozish')}
                                     </button>
                                 </form>
                             )}
@@ -428,64 +433,63 @@ function Inventory() {
                         {/* Yangi mahsulot (faqat fermer) */}
                         {isOwner && (
                             <>
-                                <h3 className="section-title">Yangi mahsulot qo'shish</h3>
+                                <h3 className="section-title">{t('Yangi mahsulot qo\'shish')}</h3>
                                 <div className="work-card">
                                     <form onSubmit={handleAddItem}>
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>Nomi</label>
+                                                <label>{t('Nomi')}</label>
                                                 <input type="text" name="item_name" value={itemForm.item_name} onChange={handleItemChange}
-                                                    placeholder="Masalan: Omixta yem" required />
+                                                    placeholder={t('Masalan: Omixta yem')} required />
                                             </div>
                                             <div className="form-field">
-                                                <label>Turi</label>
+                                                <label>{t('Turi')}</label>
                                                 <select name="item_type" value={itemForm.item_type} onChange={handleItemChange}>
-                                                    {Object.entries(ITEM_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                                    {Object.entries(ITEM_TYPES).map(([k, v]) => [k, t(v)]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                         <div className="form-row">
                                             <div className="form-field">
-                                                <label>O'lchov birligi</label>
+                                                <label>{t('O\'lchov birligi')}</label>
                                                 <input type="text" name="unit" value={itemForm.unit} onChange={handleItemChange}
-                                                    placeholder="kg, litr, dona, qop" required />
+                                                    placeholder={t('kg, litr, dona, qop')} required />
                                             </div>
                                             <div className="form-field">
-                                                <label>Hozirgi miqdor</label>
+                                                <label>{t('Hozirgi miqdor')}</label>
                                                 <input type="number" name="quantity" min="0" step="0.01" value={itemForm.quantity}
                                                     onChange={handleItemChange} required />
                                             </div>
                                         </div>
                                         <div className="form-field">
-                                            <label>Kam qolish chegarasi (shundan kam qolsa ogohlantiriladi)</label>
+                                            <label>{t('Kam qolish chegarasi (shundan kam qolsa ogohlantiriladi)')}</label>
                                             <input type="number" name="low_stock_threshold" min="0" step="0.01"
                                                 value={itemForm.low_stock_threshold} onChange={handleItemChange} required />
                                         </div>
                                         {itemForm.item_type === 'dori' && (
                                             <div className="form-field">
-                                                <label>Ushlab turish muddati (kun)</label>
+                                                <label>{t('Ushlab turish muddati (kun)')}</label>
                                                 <input type="number" name="withdrawal_days" min="0" max="365" step="1"
                                                     value={itemForm.withdrawal_days} onChange={handleItemChange} />
                                                 <p className="workers-hint">
-                                                    Shu dori bilan davolangan sigirning sutini va go'shtini necha kun sotib bo'lmaydi
-                                                    (dori qutisida yozilgan). Antibiotikda odatda 3–7 kun. Bilmasangiz, 0 qoldiring.
+                                                    {t('Shu dori bilan davolangan sigirning sutini va go\'shtini necha kun sotib bo\'lmaydi (dori qutisida yozilgan). Antibiotikda odatda 3–7 kun. Bilmasangiz, 0 qoldiring.')}
                                                 </p>
                                             </div>
                                         )}
                                         {farm.can_view_finance && Number(itemForm.quantity) > 0 && (
                                             <div className="form-field">
-                                                <label>Jami narxi, so'm</label>
+                                                <label>{t('Jami narxi, so\'m')}</label>
                                                 <input type="number" name="initial_amount" min="0.01" step="0.01"
                                                     value={itemForm.initial_amount} onChange={handleItemChange}
-                                                    placeholder="Masalan: 450000" />
+                                                    placeholder={t('Masalan: 450000')} />
                                                 <p className="workers-hint">
-                                                    Kiritilsa, shu summa balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.
+                                                    {t('Kiritilsa, shu summa balansdan ayriladi. Narx kiritilmasa, balansdan pul ayrilmaydi.')}
                                                 </p>
                                             </div>
                                         )}
                                         {itemError && <p className="error-text" role="alert">{itemError}</p>}
                                         <button type="submit" className="btn-primary btn-auto" disabled={savingItem}>
-                                            {savingItem ? 'Kuting...' : "Mahsulot qo'shish"}
+                                            {savingItem ? 'Kuting...' : t('Mahsulot qo\'shish')}
                                         </button>
                                     </form>
                                 </div>
@@ -493,46 +497,46 @@ function Inventory() {
                         )}
 
                         {/* Tarix */}
-                        <h3 className="section-title">Kirim-sarf tarixi</h3>
+                        <h3 className="section-title">{t('Kirim-sarf tarixi')}</h3>
                         <div className="filter-bar">
                             <select value={filters.inventory_item} onChange={(e) => setFilters({ ...filters, inventory_item: e.target.value })}>
-                                <option value="">Barcha mahsulotlar</option>
+                                <option value="">{t('Barcha mahsulotlar')}</option>
                                 {items.map((i) => <option key={i.id} value={i.id}>{i.item_name}</option>)}
                             </select>
                             <select value={filters.transaction_type} onChange={(e) => setFilters({ ...filters, transaction_type: e.target.value })}>
-                                <option value="">Kirim va sarf</option>
-                                <option value="sarf">Faqat sarf</option>
-                                <option value="kirim">Faqat kirim</option>
+                                <option value="">{t('Kirim va sarf')}</option>
+                                <option value="sarf">{t('Faqat sarf')}</option>
+                                <option value="kirim">{t('Faqat kirim')}</option>
                             </select>
                         </div>
                         {history.length === 0 ? (
-                            <p className="empty-state">Yozuvlar yo'q</p>
+                            <p className="empty-state">{t('Yozuvlar yo\'q')}</p>
                         ) : (
                             <ul className="work-list">
-                                {history.map((t) => (
-                                    <li key={t.id} className={`work-item work-item--${t.transaction_type === 'kirim' ? 'bajarildi' : 'yangi'}`}>
+                                {history.map((tx) => (
+                                    <li key={tx.id} className={`work-item work-item--${tx.transaction_type === 'kirim' ? 'bajarildi' : 'yangi'}`}>
                                         <div className="work-main">
                                             <span className="work-title">
-                                                {t.inventory_name}:{' '}
-                                                <span className={t.transaction_type === 'kirim' ? 'amount-in' : 'amount-out'}>
-                                                    {t.transaction_type === 'kirim' ? '+' : '−'}{qty(t.quantity)} {t.inventory_unit}
+                                                {tx.inventory_name}:{' '}
+                                                <span className={tx.transaction_type === 'kirim' ? 'amount-in' : 'amount-out'}>
+                                                    {tx.transaction_type === 'kirim' ? '+' : '−'}{qty(tx.quantity)} {tx.inventory_unit}
                                                 </span>
                                             </span>
                                             <span className="work-meta">
-                                                {t.transaction_type_display} · {formatDate(t.date)} · Yozgan:{' '}
+                                                {tx.transaction_type_display} · {formatDate(tx.date)} {t('· Yozgan:')}{' '}
                                                 <strong>
-                                                    {t.recorded_by ? `${roleLabel(t.recorded_by)} ${t.recorded_by_name}` : "noma'lum"}
+                                                    {tx.recorded_by ? `${roleLabel(tx.recorded_by)} ${tx.recorded_by_name}` : t('noma\'lum')}
                                                 </strong>
-                                                {t.amount && (
-                                                    <> · Moliyada chiqim: <strong>{formatMoney(t.amount)}</strong></>
+                                                {tx.amount && (
+                                                    <> {t('· Moliyada chiqim:')} <strong>{formatMoney(tx.amount)}</strong></>
                                                 )}
                                             </span>
-                                            {t.note && <span className="work-desc">{t.note}</span>}
+                                            {tx.note && <span className="work-desc">{tx.note}</span>}
                                         </div>
                                         {isOwner && (
                                             <div className="work-side">
-                                                <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteTx(t)}>
-                                                    O'chirish
+                                                <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => handleDeleteTx(tx)}>
+                                                    {t('O\'chirish')}
                                                 </button>
                                             </div>
                                         )}

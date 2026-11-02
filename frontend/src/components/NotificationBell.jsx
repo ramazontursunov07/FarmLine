@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import './NotificationBell.css';
+import { t } from '../i18n';
 
 const POLL_MS = 60000;
 
@@ -22,10 +23,10 @@ function BellIcon() {
 function timeAgo(iso) {
     const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
     if (mins < 1) return 'hozir';
-    if (mins < 60) return `${mins} daqiqa oldin`;
+    if (mins < 60) return t('{mins} daqiqa oldin', { mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} soat oldin`;
-    return `${Math.floor(hours / 24)} kun oldin`;
+    if (hours < 24) return t('{hours} soat oldin', { hours });
+    return t('{v1} kun oldin', { v1: Math.floor(hours / 24) });
 }
 
 // Navbardagi qo'ng'iroqcha: o'qilmaganlar soni va bildirishnomalar ro'yxati
@@ -112,25 +113,25 @@ export default function NotificationBell() {
     return (
         <div className="notif" ref={box}>
             <button type="button" className="notif-btn" onClick={() => setOpen((v) => !v)}
-                aria-label={unread ? `Bildirishnomalar, ${unread} ta yangi` : 'Bildirishnomalar'}
+                aria-label={unread ? t('Bildirishnomalar, {unread} ta yangi', { unread }) : t('Bildirishnomalar')}
                 aria-expanded={open} aria-haspopup="true">
                 <BellIcon />
                 {unread > 0 && <span className="notif-badge">{unread > 99 ? '99+' : unread}</span>}
             </button>
             {open && (
-                <div className="notif-panel" role="region" aria-label="Bildirishnomalar">
+                <div className="notif-panel" role="region" aria-label={t('Bildirishnomalar')}>
                     <div className="notif-head">
-                        <strong>Bildirishnomalar</strong>
+                        <strong>{t('Bildirishnomalar')}</strong>
                         <div className="notif-actions">
-                            {unread > 0 && <button type="button" className="notif-link" onClick={handleReadAll}>Hammasini o'qildi</button>}
+                            {unread > 0 && <button type="button" className="notif-link" onClick={handleReadAll}>{t('Hammasini o\'qildi')}</button>}
                             {items && items.some((n) => n.is_read) && (
-                                <button type="button" className="notif-link" onClick={handleClear}>Tozalash</button>
+                                <button type="button" className="notif-link" onClick={handleClear}>{t('Tozalash')}</button>
                             )}
                         </div>
                     </div>
-                    {error && <p className="notif-empty">Yuklab bo'lmadi. Internetni tekshiring.</p>}
-                    {!error && items === null && <p className="notif-empty">Yuklanmoqda...</p>}
-                    {!error && items && items.length === 0 && <p className="notif-empty">Hozircha bildirishnoma yo'q.</p>}
+                    {error && <p className="notif-empty">{t('Yuklab bo\'lmadi. Internetni tekshiring.')}</p>}
+                    {!error && items === null && <p className="notif-empty">{t('Yuklanmoqda...')}</p>}
+                    {!error && items && items.length === 0 && <p className="notif-empty">{t('Hozircha bildirishnoma yo\'q.')}</p>}
                     {items && items.length > 0 && (
                         <ul className="notif-list">
                             {items.map((n) => (

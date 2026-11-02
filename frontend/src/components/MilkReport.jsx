@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatPeriod, today } from '../utils/format';
+import { t } from '../i18n';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const signed = (n) => `${Number(n) > 0 ? '+' : ''}${num(n)}`;
@@ -26,7 +27,7 @@ function MilkReport({ farmId, refreshKey }) {
                 setData(res);
                 setError('');
             })
-            .catch((err) => !cancelled && setError(getErrorMessage(err, "Sut hisobotini yuklab bo'lmadi")))
+            .catch((err) => !cancelled && setError(getErrorMessage(err, t("Sut hisobotini yuklab bo'lmadi"))))
             .finally(() => !cancelled && setLoading(false));
         return () => {
             cancelled = true;
@@ -38,45 +39,45 @@ function MilkReport({ farmId, refreshKey }) {
     return (
         <section className="milk-report">
             <div className="overview-head">
-                <h3 className="section-title">Sut hisoboti</h3>
+                <h3 className="section-title">{t('Sut hisoboti')}</h3>
                 <input type="month" value={month} max={today().slice(0, 7)}
-                    onChange={(e) => setMonth(e.target.value)} aria-label="Oy" />
+                    onChange={(e) => setMonth(e.target.value)} aria-label={t('Oy')} />
             </div>
 
             {error ? (
                 <p className="error-text" role="alert">{error}</p>
             ) : loading && !data ? (
-                <p className="empty-state">Yuklanmoqda...</p>
+                <p className="empty-state">{t('Yuklanmoqda...')}</p>
             ) : data && (
                 <>
                     <div className="stat-grid stat-grid--3">
                         <div className="stat-card">
-                            <span className="stat-value">{num(data.total)} l</span>
-                            <span className="stat-label">{monthName(data.month)}: hamma sigirlar jami</span>
-                            <span className="stat-sub">{data.animals_count} ta sigir sut bergan</span>
+                            <span className="stat-value">{num(data.total)} {t('l')}</span>
+                            <span className="stat-label">{t('{month}: hamma sigirlar jami', { month: monthName(data.month) })}</span>
+                            <span className="stat-sub">{t('{count} ta sigir sut bergan', { count: data.animals_count })}</span>
                         </div>
                         <div className="stat-card">
-                            <span className="stat-value">{num(data.previous_total)} l</span>
-                            <span className="stat-label">O'tgan oy ({monthName(data.previous_month)})</span>
+                            <span className="stat-value">{num(data.previous_total)} {t('l')}</span>
+                            <span className="stat-label">{t("O'tgan oy ({month})", { month: monthName(data.previous_month) })}</span>
                         </div>
                         <div className="stat-card">
-                            <span className={`stat-value ${changeClass(data.change)}`}>{signed(data.change)} l</span>
-                            <span className="stat-label">O'tgan oyga nisbatan</span>
+                            <span className={`stat-value ${changeClass(data.change)}`}>{signed(data.change)} {t('l')}</span>
+                            <span className="stat-label">{t("O'tgan oyga nisbatan")}</span>
                         </div>
                     </div>
 
                     {data.animals.length === 0 ? (
-                        <p className="empty-state">Bu oy va o'tgan oy uchun sut yozilmagan</p>
+                        <p className="empty-state">{t("Bu oy va o'tgan oy uchun sut yozilmagan")}</p>
                     ) : (
                         <div className="report-wrap">
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th>Sigir</th>
-                                        <th>{monthName(data.month)}, l</th>
-                                        <th>O'tgan oy, l</th>
-                                        <th>Farq, l</th>
-                                        <th>Kuniga o'rtacha, l</th>
+                                        <th>{t('Sigir')}</th>
+                                        <th>{monthName(data.month)}, {t('l')}</th>
+                                        <th>{t("O'tgan oy, l")}</th>
+                                        <th>{t('Farq, l')}</th>
+                                        <th>{t("Kuniga o'rtacha, l")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -84,7 +85,7 @@ function MilkReport({ farmId, refreshKey }) {
                                         <tr key={a.animal}>
                                             <td>
                                                 <Link to={`/farms/${farmId}/animals/${a.animal}`} className="animal-link">
-                                                    №{a.tag_number}{a.name ? ` · ${a.name}` : ''}
+                                                    №{a.tag_number}{a.name ? t(' · {name}', { name: a.name }) : ''}
                                                 </Link>
                                             </td>
                                             <td><strong>{num(a.liters)}</strong></td>
@@ -94,7 +95,7 @@ function MilkReport({ farmId, refreshKey }) {
                                         </tr>
                                     ))}
                                     <tr>
-                                        <td><strong>Jami</strong></td>
+                                        <td><strong>{t('Jami')}</strong></td>
                                         <td><strong>{num(data.total)}</strong></td>
                                         <td><strong>{num(data.previous_total)}</strong></td>
                                         <td className={changeClass(data.change)}><strong>{signed(data.change)}</strong></td>

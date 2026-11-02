@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { t } from '../i18n';
 
 function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -19,7 +21,7 @@ function ResetPassword() {
         setError('');
 
         if (newPassword !== confirm) {
-            setError('Parollar bir xil emas');
+            setError(t('Parollar bir xil emas'));
             return;
         }
 
@@ -28,7 +30,7 @@ function ResetPassword() {
             await api.post('users/reset-password/', { token, new_password: newPassword });
             setDone(true);
         } catch (err) {
-            setError(getErrorMessage(err, "Parolni yangilab bo'lmadi"));
+            setError(getErrorMessage(err, t("Parolni yangilab bo'lmadi")));
         } finally {
             setLoading(false);
         }
@@ -37,11 +39,12 @@ function ResetPassword() {
     if (!token) {
         return (
             <div className="auth-page">
+                <div className="lang-corner"><LanguageSwitcher /></div>
                 <div className="auth-card">
-                    <h2>Parolni tiklash</h2>
-                    <p className="error-text" role="alert">Havola noto'g'ri: token topilmadi.</p>
+                    <h2>{t('Parolni tiklash')}</h2>
+                    <p className="error-text" role="alert">{t("Havola noto'g'ri: token topilmadi.")}</p>
                     <p className="auth-footer">
-                        <Link to="/forgot-password">Yangi havola so'rash</Link>
+                        <Link to="/forgot-password">{t("Yangi havola so'rash")}</Link>
                     </p>
                 </div>
             </div>
@@ -51,11 +54,12 @@ function ResetPassword() {
     if (done) {
         return (
             <div className="auth-page">
+                <div className="lang-corner"><LanguageSwitcher /></div>
                 <div className="auth-card">
-                    <h2>Parol yangilandi</h2>
-                    <p className="success-text" role="status">Endi yangi parol bilan kirishingiz mumkin.</p>
+                    <h2>{t('Parol yangilandi')}</h2>
+                    <p className="success-text" role="status">{t('Endi yangi parol bilan kirishingiz mumkin.')}</p>
                     <p className="auth-footer">
-                        <Link to="/login">Kirish</Link>
+                        <Link to="/login">{t('Kirish')}</Link>
                     </p>
                 </div>
             </div>
@@ -66,17 +70,18 @@ function ResetPassword() {
 
     return (
         <div className="auth-page">
+            <div className="lang-corner"><LanguageSwitcher /></div>
             <div className="auth-card">
-                <h2>Yangi parol</h2>
+                <h2>{t('Yangi parol')}</h2>
                 <form onSubmit={handleSubmit}>
                     <div className="form-field">
-                        <label>Yangi parol</label>
+                        <label>{t('Yangi parol')}</label>
                         <input type={inputType} value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             autoComplete="new-password" minLength={8} required />
                     </div>
                     <div className="form-field">
-                        <label>Yangi parolni takrorlang</label>
+                        <label>{t('Yangi parolni takrorlang')}</label>
                         <input type={inputType} value={confirm}
                             onChange={(e) => setConfirm(e.target.value)}
                             autoComplete="new-password" minLength={8} required />
@@ -84,18 +89,18 @@ function ResetPassword() {
                     <label className="check-field">
                         <input type="checkbox" checked={showPasswords}
                             onChange={(e) => setShowPasswords(e.target.checked)} />
-                        Parollarni ko'rsatish
+                        {t("Parollarni ko'rsatish")}
                     </label>
                     <p className="workers-hint">
-                        Kamida 8 ta belgi bo'lsin va faqat raqamlardan iborat bo'lmasin.
+                        {t("Kamida 8 ta belgi bo'lsin va faqat raqamlardan iborat bo'lmasin.")}
                     </p>
                     {error && <p className="error-text" role="alert">{error}</p>}
                     <button type="submit" className="btn-primary" disabled={loading}>
-                        {loading ? 'Kuting...' : 'Parolni yangilash'}
+                        {loading ? t('Kuting...') : t('Parolni yangilash')}
                     </button>
                 </form>
                 <p className="auth-footer">
-                    <Link to="/login">← Kirishga qaytish</Link>
+                    <Link to="/login">{t('← Kirishga qaytish')}</Link>
                 </p>
             </div>
         </div>

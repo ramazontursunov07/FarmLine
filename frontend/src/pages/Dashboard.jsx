@@ -11,6 +11,8 @@ import WeatherPanel from '../components/WeatherPanel';
 import TelegramBanner from '../components/TelegramBanner';
 import { getErrorMessage } from '../utils/errors';
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { t } from '../i18n';
 import NotificationBell from '../components/NotificationBell';
 import AssistantChat from '../components/AssistantChat';
 import { Icon } from '../components/dashboardKit';
@@ -84,7 +86,7 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
             onUpdated(data);
             setEditing(false);
         } catch (err) {
-            setError(getErrorMessage(err, "Fermani saqlab bo'lmadi"));
+            setError(getErrorMessage(err, t("Fermani saqlab bo'lmadi")));
         } finally {
             setSaving(false);
         }
@@ -92,16 +94,16 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
 
     const handleDelete = async () => {
         const ok = window.confirm(
-            `"${farm.name}" fermasini o'chirmoqchimisiz?\n\n` +
-            "Fermaning barcha ma'lumotlari (kirim-chiqim, hayvonlar, ishchilar) ham o'chib ketadi. " +
-            "Buni qaytarib bo'lmaydi."
+            t('"{name}" fermasini o\'chirmoqchimisiz?', { name: farm.name }) + '\n\n' +
+            t("Fermaning barcha ma'lumotlari (kirim-chiqim, hayvonlar, ishchilar) ham o'chib ketadi.") + ' ' +
+            t("Buni qaytarib bo'lmaydi.")
         );
         if (!ok) return;
         try {
             await api.delete(`farms/${farm.id}/`);
             onDeleted(farm.id);
         } catch (err) {
-            window.alert(getErrorMessage(err, "Fermani o'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t("Fermani o'chirib bo'lmadi")));
         }
     };
 
@@ -110,28 +112,28 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
             <li className="db-farm db-farm--editing">
                 <form className="farm-edit-form" onSubmit={handleSave}>
                     <div className="form-field">
-                        <label>Nomi</label>
+                        <label>{t('Nomi')}</label>
                         <input type="text" name="name" value={formData.name} onChange={handleChange} required />
                     </div>
                     <div className="form-field">
-                        <label>Joylashuvi</label>
+                        <label>{t('Joylashuvi')}</label>
                         <input type="text" name="location" value={formData.location} onChange={handleChange} required />
                     </div>
                     <div className="form-field">
-                        <label>Turi</label>
+                        <label>{t('Turi')}</label>
                         <select name="farm_type" value={formData.farm_type} onChange={handleChange}>
-                            <option value="chorvachilik">Chorvachilik</option>
-                            <option value="parrandachilik">Parrandachilik</option>
-                            <option value="aralash">Aralash</option>
+                            <option value="chorvachilik">{t('Chorvachilik')}</option>
+                            <option value="parrandachilik">{t('Parrandachilik')}</option>
+                            <option value="aralash">{t('Aralash')}</option>
                         </select>
                     </div>
                     {error && <p className="error-text">{error}</p>}
                     <div className="farm-edit-actions">
                         <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? 'Kuting...' : 'Saqlash'}
+                            {saving ? t('Kuting...') : t('Saqlash')}
                         </button>
                         <button type="button" className="btn-ghost" onClick={() => setEditing(false)} disabled={saving}>
-                            Bekor qilish
+                            {t('Bekor qilish')}
                         </button>
                     </div>
                 </form>
@@ -140,14 +142,14 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
     }
 
     const taskStatus = tasks.overdue > 0
-        ? `${tasks.overdue} ta muddati o'tgan`
-        : tasks.open > 0 ? `${tasks.open} ta ochiq` : "Ochiq vazifa yo'q";
-    const stockStatus = lowStock > 0 ? `${lowStock} ta kam qolgan` : 'Zaxira yetarli';
+        ? t("{n} ta muddati o'tgan", { n: tasks.overdue })
+        : tasks.open > 0 ? t('{n} ta ochiq', { n: tasks.open }) : t("Ochiq vazifa yo'q");
+    const stockStatus = lowStock > 0 ? t('{n} ta kam qolgan', { n: lowStock }) : t('Zaxira yetarli');
     const debtStatus = !showFinance
-        ? "Ko'rishga ruxsat yo'q"
+        ? t("Ko'rishga ruxsat yo'q")
         : debts.overdue_count > 0
-            ? `${debts.overdue_count} ta muddati o'tgan`
-            : 'Kim qancha qarz';
+            ? t("{n} ta muddati o'tgan", { n: debts.overdue_count })
+            : t('Kim qancha qarz');
 
     return (
         <li className="db-farm">
@@ -156,46 +158,46 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
                     <h3 className="db-farm-name">{farm.name}</h3>
                     <p className="db-farm-place">{farm.location}</p>
                 </div>
-                <span className="db-farm-type">{FARM_TYPES[farm.farm_type] || farm.farm_type}</span>
+                <span className="db-farm-type">{t(FARM_TYPES[farm.farm_type]) ? t(FARM_TYPES[farm.farm_type]) : farm.farm_type}</span>
             </div>
 
             <div className="db-rows">
                 <FarmRow
                     to={`/farms/${farm.id}/work`}
                     icon="work"
-                    title="Ferma ishlari"
-                    status="Hayvonlar va davolash"
+                    title={t('Ferma ishlari')}
+                    status={t('Hayvonlar va davolash')}
                 />
                 <FarmRow
                     to={`/farms/${farm.id}/animals`}
                     icon="tag"
-                    title="Barcha hayvonlar"
-                    status="Vazn, sut, tug'ish, davolash"
+                    title={t('Barcha hayvonlar')}
+                    status={t("Vazn, sut, tug'ish, davolash")}
                 />
                 <FarmRow
                     to={`/farms/${farm.id}/tasks`}
                     icon="tasks"
-                    title="Vazifalar"
+                    title={t('Vazifalar')}
                     status={taskStatus}
                     alert={tasks.overdue > 0}
                 />
                 <FarmRow
                     to={`/farms/${farm.id}/inventory`}
                     icon="stock"
-                    title="Ombor"
+                    title={t('Ombor')}
                     status={stockStatus}
                     alert={lowStock > 0}
                 />
                 <FarmRow
                     to={showFinance ? `/farms/${farm.id}/finance` : null}
                     icon={showFinance ? 'money' : 'lock'}
-                    title="Kirim-chiqim"
-                    status={showFinance ? 'Hisob-kitob' : "Ko'rishga ruxsat yo'q"}
+                    title={t('Kirim-chiqim')}
+                    status={showFinance ? t('Hisob-kitob') : t("Ko'rishga ruxsat yo'q")}
                 />
                 <FarmRow
                     to={showFinance ? `/farms/${farm.id}/debts` : null}
                     icon={showFinance ? 'debt' : 'lock'}
-                    title="Qarzlar"
+                    title={t('Qarzlar')}
                     status={debtStatus}
                     alert={showFinance && debts.overdue_count > 0}
                 />
@@ -203,8 +205,8 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
                     <>
                         <FarmRow
                             icon="users"
-                            title="Ishchilar"
-                            status="Qo'shish va ruxsatlar"
+                            title={t('Ishchilar')}
+                            status={t("Qo'shish va ruxsatlar")}
                             onClick={() => setShowWorkers((v) => !v)}
                             expanded={showWorkers}
                         />
@@ -216,10 +218,10 @@ function FarmItem({ farm, showFinance, canManage, tasks, lowStock, debts, onUpda
             {canManage && (
                 <div className="db-farm-actions">
                     <button type="button" className="db-link-btn" onClick={startEdit}>
-                        Tahrirlash
+                        {t('Tahrirlash')}
                     </button>
                     <button type="button" className="db-link-btn db-link-btn--danger" onClick={handleDelete}>
-                        O'chirish
+                        {t("O'chirish")}
                     </button>
                 </div>
             )}
@@ -238,7 +240,7 @@ function NewFarm({ onCreated, first }) {
             <li className="db-farm db-farm--new">
                 <button type="button" className="db-newfarm-btn" onClick={() => setOpen(true)}>
                     <Icon name="plus" size={22} />
-                    <span>Yangi ferma qo'shish</span>
+                    <span>{t("Yangi ferma qo'shish")}</span>
                 </button>
             </li>
         );
@@ -247,7 +249,7 @@ function NewFarm({ onCreated, first }) {
         <li className="db-farm db-farm--form">
             <FarmForm onFarmCreated={(farm) => { onCreated(farm); setOpen(false); }} />
             {!first && (
-                <button type="button" className="db-link-btn" onClick={() => setOpen(false)}>Bekor qilish</button>
+                <button type="button" className="db-link-btn" onClick={() => setOpen(false)}>{t('Bekor qilish')}</button>
             )}
         </li>
     );
@@ -293,7 +295,7 @@ function Dashboard() {
             setFarms(Array.isArray(data) ? data : data.results ?? []);
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, "Fermalarni yuklab bo'lmadi"));
+            setError(getErrorMessage(err, t("Fermalarni yuklab bo'lmadi")));
         } finally {
             setLoading(false);
         }
@@ -313,10 +315,10 @@ function Dashboard() {
                 if (cancelled) return;
                 const list = Array.isArray(data) ? data : data.results ?? [];
                 const counts = {};
-                list.forEach((t) => {
-                    const c = counts[t.farm] || (counts[t.farm] = { open: 0, overdue: 0 });
+                list.forEach((task) => {
+                    const c = counts[task.farm] || (counts[task.farm] = { open: 0, overdue: 0 });
                     c.open += 1;
-                    if (t.is_overdue) c.overdue += 1;
+                    if (task.is_overdue) c.overdue += 1;
                 });
                 setTaskCounts(counts);
             })
@@ -388,12 +390,12 @@ function Dashboard() {
     };
 
     const renderFarms = () => {
-        if (loading) return <p className="db-muted">Yuklanmoqda...</p>;
+        if (loading) return <p className="db-muted">{t('Yuklanmoqda...')}</p>;
         if (error) {
             return (
                 <div className="db-muted">
                     <p className="error-text">{error}</p>
-                    <button className="btn-ghost" onClick={handleRetry}>Qayta urinish</button>
+                    <button className="btn-ghost" onClick={handleRetry}>{t('Qayta urinish')}</button>
                 </div>
             );
         }
@@ -418,7 +420,7 @@ function Dashboard() {
         <>
             {!loading && !error && farms.length > 0 && <WeatherPanel farms={farms} />}
             <section className="db-section">
-                <h2 className="db-h2">{user.role === 'fermer' ? 'Mening fermalarim' : 'Sizning fermalaringiz'}</h2>
+                <h2 className="db-h2">{user.role === 'fermer' ? t('Mening fermalarim') : t('Sizning fermalaringiz')}</h2>
                 {renderFarms()}
             </section>
         </>
@@ -427,13 +429,14 @@ function Dashboard() {
     return (
         <div className="app-shell db-page">
             <header className="app-header">
-                <h1>FarmLine</h1>
+                <h1>{t('FarmLine')}</h1>
                 <div className="user-bar">
-                    <span>Salom, {user.first_name || user.username}!</span>
+                    <span>{t('Salom, {name}!', { name: user.first_name || user.username })}</span>
+                    <LanguageSwitcher />
                     <NotificationBell />
-                    <Link to="/profile" className="user-link">Profil</Link>
+                    <Link to="/profile" className="user-link">{t('Profil')}</Link>
                     <InstallButton />
-                    <button className="btn-ghost" onClick={handleLogout}>Chiqish</button>
+                    <button className="btn-ghost" onClick={handleLogout}>{t('Chiqish')}</button>
                 </div>
             </header>
 
@@ -441,8 +444,8 @@ function Dashboard() {
                 <main className="app-main">
                     <TelegramBanner />
                     <div className="panel">
-                        <h2 className="panel-title">Admin Panel</h2>
-                        <p className="panel-subtitle">Barcha fermerlar va ularning fermalari</p>
+                        <h2 className="panel-title">{t('Admin Panel')}</h2>
+                        <p className="panel-subtitle">{t('Barcha fermerlar va ularning fermalari')}</p>
                         <AdminPanel />
                     </div>
                 </main>
@@ -464,15 +467,16 @@ function Dashboard() {
                                 <h2 className="db-hello">{greeting()}, {user.first_name || user.username}</h2>
                                 <p className="db-hero-note">
                                     {openTasks === 0
-                                        ? "Sizga tayinlangan ochiq vazifa yo'q."
-                                        : `Sizda ${openTasks} ta ochiq vazifa bor${lateTasks > 0 ? `, ${lateTasks} tasining muddati o'tgan` : ''}.`}
+                                        ? t("Sizga tayinlangan ochiq vazifa yo'q.")
+                                        : t('Sizda {n} ta ochiq vazifa bor', { n: openTasks }) +
+                                            (lateTasks > 0 ? t(", {n} tasining muddati o'tgan", { n: lateTasks }) : '') + '.'}
                                 </p>
                             </div>
                         </div>
                     </section>
                     <div className="db-main">
                         {!loading && !error && farms.length > 0 && (<WorkerHome farms={farms} onChanged={() => setDataVersion((v) => v + 1)} />)}
-                        {farms.length > 0 ? (<details className="more-menu"><summary className="db-h2">Boshqa bo'limlar</summary>{farmsSection}</details>) : farmsSection}
+                        {farms.length > 0 ? (<details className="more-menu"><summary className="db-h2">{t("Boshqa bo'limlar")}</summary>{farmsSection}</details>) : farmsSection}
                     </div>
                 </>
             )}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { t } from '../i18n';
 
 function EyeIcon() {
     return (
@@ -60,7 +62,7 @@ function Register() {
                 const firstError = Object.values(errorData)[0];
                 setError(Array.isArray(firstError) ? firstError[0] : firstError);
             } else {
-                setError('Xatolik yuz berdi, qayta urinib ko\'ring');
+                setError(t("Xatolik yuz berdi, qayta urinib ko'ring"));
             }
         } finally {
             setLoading(false);
@@ -69,11 +71,12 @@ function Register() {
 
     return (
         <div className="auth-page">
+            <div className="lang-corner"><LanguageSwitcher /></div>
             <div className="auth-card">
-                <h2>Ro'yxatdan o'tish</h2>
+                <h2>{t("Ro'yxatdan o'tish")}</h2>
                 <form onSubmit={handleSubmit}>
                     <div className="form-field">
-                        <label>Username</label>
+                        <label>{t('Username')}</label>
                         <input
                             type="text"
                             name="username"
@@ -83,7 +86,7 @@ function Register() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Ism</label>
+                        <label>{t('Ism')}</label>
                         <input
                             type="text"
                             name="first_name"
@@ -92,7 +95,7 @@ function Register() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Familiya</label>
+                        <label>{t('Familiya')}</label>
                         <input
                             type="text"
                             name="last_name"
@@ -101,7 +104,7 @@ function Register() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Email</label>
+                        <label>{t('Email')}</label>
                         <input
                             type="email"
                             name="email"
@@ -110,7 +113,7 @@ function Register() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Telefon raqam</label>
+                        <label>{t('Telefon raqam')}</label>
                         <input
                             type="text"
                             name="phone_number"
@@ -119,7 +122,7 @@ function Register() {
                         />
                     </div>
                     <div className="form-field">
-                        <label>Parol</label>
+                        <label>{t('Parol')}</label>
                         <div className="password-field">
                             <input
                                 type={showPassword ? 'text' : 'password'}
@@ -139,7 +142,7 @@ function Register() {
                         </div>
                     </div>
                     <div className="form-field">
-                        <label>Parolni tasdiqlang</label>
+                        <label>{t('Parolni tasdiqlang')}</label>
                         <div className="password-field">
                             <input
                                 type={showPassword2 ? 'text' : 'password'}
@@ -160,11 +163,11 @@ function Register() {
                     </div>
                     {error && <p className="error-text">{error}</p>}
                     <button type="submit" className="btn-primary" disabled={loading}>
-                        {loading ? 'Kuting...' : 'Ro\'yxatdan o\'tish'}
+                        {loading ? t('Kuting...') : t("Ro'yxatdan o'tish")}
                     </button>
                 </form>
                 <p className="auth-footer">
-                    Hisobingiz bormi? <Link to="/login">Kirish</Link>
+                    {t('Hisobingiz bormi?')} <Link to="/login">{t('Kirish')}</Link>
                 </p>
             </div>
         </div>

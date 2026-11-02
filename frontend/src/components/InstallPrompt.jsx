@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useInstall from '../hooks/useInstall';
 import InstallButton from './InstallButton';
+import { t } from '../i18n';
 
 const DISMISS_KEY = 'pwa-install-dismissed-at';
 const DISMISS_DAYS = 14;
@@ -33,14 +34,14 @@ function InstallPrompt() {
     };
 
     return (
-        <div className="install-banner" role="region" aria-label="Ilovani yuklab olish">
+        <div className="install-banner" role="region" aria-label={t('Ilovani yuklab olish')}>
             <div className="install-banner-text">
-                <strong>Ilovani telefoningizga yuklab oling</strong>
-                <span>Bosh ekrandan bir bosishda ochiladi va internet yomon joyda ham ishlaydi.</span>
+                <strong>{t('Ilovani telefoningizga yuklab oling')}</strong>
+                <span>{t('Bosh ekrandan bir bosishda ochiladi va internet yomon joyda ham ishlaydi.')}</span>
             </div>
             <InstallButton className="install-banner-button install-btn" />
             <button type="button" className="install-banner-close" onClick={dismiss}>
-                Keyinroq
+                {t('Keyinroq')}
             </button>
         </div>
     );

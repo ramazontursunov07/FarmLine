@@ -5,10 +5,12 @@ import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../utils/errors";
 import { formatMoney, formatPeriod, today } from "../utils/format";
 import InstallButton from '../components/InstallButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import ReportDownload from '../components/ReportDownload';
 import CreditFields from '../components/CreditFields';
 import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
+import { t } from '../i18n';
 
 const TYPES = { kirim: "Kirim", chiqim: "Chiqim" };
 
@@ -36,7 +38,9 @@ const EMPTY_FILTERS = { transaction_type: "", category: "", date_from: "", date_
 // Telefonda "so'm" yozuvi yashiriladi (jadval ekranga sig'sin); kompyuterda to'liq ko'rinadi
 function Money({ value }) {
     const text = formatMoney(value);
-    return <>{text.replace(" so'm", '')}<span className="hide-sm"> so'm</span></>;
+    const unit = t("so'm");
+    if (!text.endsWith(` ${unit}`)) return <>{text}</>;
+    return <>{text.slice(0, -(unit.length + 1))}<span className="hide-sm"> {unit}</span></>;
 }
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
@@ -75,7 +79,7 @@ function Finance() {
             .then(({ data }) => !cancelled && setFarm(data))
             .catch((err) => {
                 if (!cancelled) {
-                    setFarmError(err.response?.status === 404 ? "Ferma topilmadi" : getErrorMessage(err));
+                    setFarmError(err.response?.status === 404 ? t("Ferma topilmadi") : getErrorMessage(err));
                 }
             });
         return () => {
@@ -98,7 +102,7 @@ function Finance() {
                 setSummary(sum.data);
                 setError("");
             })
-            .catch((err) => !cancelled && setError(getErrorMessage(err, "Ma'lumotlarni yuklab bo'lmadi")))
+            .catch((err) => !cancelled && setError(getErrorMessage(err, t("Ma'lumotlarni yuklab bo'lmadi"))))
             .finally(() => !cancelled && setLoading(false));
 
         return () => {
@@ -131,7 +135,7 @@ function Finance() {
                 setReport(data);
                 setReportError("");
             })
-            .catch((err) => !cancelled && setReportError(getErrorMessage(err, "Hisobotni yuklab bo'lmadi")));
+            .catch((err) => !cancelled && setReportError(getErrorMessage(err, t("Hisobotni yuklab bo'lmadi"))));
 
         return () => {
             cancelled = true;
@@ -186,28 +190,28 @@ function Finance() {
             // tur va kategoriya saqlanadi, summa va izoh tozalanadi (ketma-ket kiritish qulay bo'lsin)
             setForm((prev) => ({ ...prev, amount: "", description: "", animal_group: "", animal_count: "" }));
             if (credit.on_credit) {
-                setFormNotice("Nasiya yozildi: u \"Qarzlar\" sahifasida turadi. Pul to'langanda balansga qo'shiladi.");
+                setFormNotice(t('Nasiya yozildi: u "Qarzlar" sahifasida turadi. Pul to\'langanda balansga qo\'shiladi.'));
             }
             setCredit(EMPTY_CREDIT());
             reload();
         } catch (err) {
-            setFormError(getErrorMessage(err, "Saqlashda xatolik yuz berdi"));
+            setFormError(getErrorMessage(err, t("Saqlashda xatolik yuz berdi")));
         } finally {
             setSaving(false);
         }
     };
 
     const handleDelete = async (tx) => {
-        const label = `${TYPES[tx.transaction_type]}: ${formatMoney(tx.amount)}`;
+        const label = `${t(TYPES[tx.transaction_type])}: ${formatMoney(tx.amount)}`;
         const back = tx.animal_count
-            ? `\n\n${tx.animal_count} ta ${tx.animal_group_label || "hayvon"} guruhga qaytariladi.`
+            ? `\n\n${t('{count} ta {name} guruhga qaytariladi.', { count: tx.animal_count, name: tx.animal_group_label || t("hayvon") })}`
             : "";
-        if (!window.confirm(`Bu yozuv o'chirilsinmi?\n${label}${back}`)) return;
+        if (!window.confirm(`${t("Bu yozuv o'chirilsinmi?")}\n${label}${back}`)) return;
         try {
             await api.delete(`finance/${tx.id}/`);
             reload();
         } catch (err) {
-            setError(getErrorMessage(err, "O'chirib bo'lmadi"));
+            setError(getErrorMessage(err, t("O'chirib bo'lmadi")));
         }
     };
 
@@ -216,48 +220,49 @@ function Finance() {
     return (
         <div className="app-shell">
             <header className="app-header">
-                <h1>FarmLine</h1>
+                <h1>{t('FarmLine')}</h1>
                 <div className="user-bar">
-                    <span>Salom, {user.first_name || user.username}!</span>
+                    <span>{t('Salom, {name}!', { name: user.first_name || user.username })}</span>
+                    <LanguageSwitcher />
                     <NotificationBell />
-                    <Link to="/profile" className="user-link">Profil</Link>
+                    <Link to="/profile" className="user-link">{t('Profil')}</Link>
                     <InstallButton />
-                    <button className="btn-ghost" onClick={logout}>Chiqish</button>
+                    <button className="btn-ghost" onClick={logout}>{t('Chiqish')}</button>
                 </div>
             </header>
 
             <main className="app-main">
-                <Link to="/dashboard" className="back-link">← Fermalarga qaytish</Link>
+                <Link to="/dashboard" className="back-link">{t('← Fermalarga qaytish')}</Link>
 
                 {farmError ? (
                     <p className="error-text">{farmError}</p>
                 ) : (
                     <>
-                        <h2 className="panel-title">{farm ? farm.name : "..."}: kirim-chiqim</h2>
+                        <h2 className="panel-title">{farm ? farm.name : "..."}: {t('kirim-chiqim')}</h2>
                         {farm && <p className="panel-subtitle">{farm.location}</p>}
 
                         {/* Jamlanma */}
                         <div className="stat-grid stat-grid--3">
                             <div className="stat-card">
                                 <span className="stat-value amount-in">{formatMoney(summary?.income)}</span>
-                                <span className="stat-label">Jami kirim</span>
+                                <span className="stat-label">{t('Jami kirim')}</span>
                             </div>
                             <div className="stat-card">
                                 <span className="stat-value amount-out">{formatMoney(summary?.expense)}</span>
-                                <span className="stat-label">Jami chiqim</span>
+                                <span className="stat-label">{t('Jami chiqim')}</span>
                             </div>
                             <div className="stat-card">
                                 <span className={`stat-value ${Number(summary?.balance) < 0 ? "amount-out" : ""}`}>
                                     {formatMoney(summary?.balance)}
                                 </span>
-                                <span className="stat-label">Balans</span>
+                                <span className="stat-label">{t('Balans')}</span>
                             </div>
                         </div>
 
                         {/* Foyda / zarar hisoboti */}
-                        <h3 className="section-title">Foyda va zarar</h3>
+                        <h3 className="section-title">{t('Foyda va zarar')}</h3>
                         <div className="period-tabs">
-                            {[["day", "Kunlik"], ["week", "Haftalik"], ["month", "Oylik"], ["year", "Yillik"]].map(([v, l]) => (
+                            {[["day", t("Kunlik")], ["week", t("Haftalik")], ["month", t("Oylik")], ["year", t("Yillik")]].map(([v, l]) => (
                                 <button key={v} type="button"
                                     className={`btn-ghost ${reportPeriod === v ? "is-active" : ""}`}
                                     onClick={() => setReportPeriod(v)}>
@@ -268,16 +273,16 @@ function Finance() {
                         {reportError ? (
                             <p className="error-text">{reportError}</p>
                         ) : report.length === 0 ? (
-                            <p className="empty-state">Hisobot uchun yozuvlar yo'q</p>
+                            <p className="empty-state">{t("Hisobot uchun yozuvlar yo'q")}</p>
                         ) : (
                             <div className="report-wrap">
                                 <table className="report-table report-table--money">
                                     <thead>
                                         <tr>
-                                            <th>Davr</th>
-                                            <th>Kirim</th>
-                                            <th>Chiqim</th>
-                                            <th>Foyda / zarar</th>
+                                            <th>{t('Davr')}</th>
+                                            <th>{t('Kirim')}</th>
+                                            <th>{t('Chiqim')}</th>
+                                            <th>{t('Foyda / zarar')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -303,22 +308,22 @@ function Finance() {
 
                         {/* Yangi yozuv */}
                         <form className="farm-form" onSubmit={handleSubmit}>
-                            <h3>Yangi yozuv qo'shish</h3>
+                            <h3>{t("Yangi yozuv qo'shish")}</h3>
                             <div className="form-row">
                                 <div className="form-field">
-                                    <label htmlFor="tx-type">Turi</label>
+                                    <label htmlFor="tx-type">{t('Turi')}</label>
                                     <select id="tx-type" name="transaction_type" value={form.transaction_type}
                                         onChange={handleFormChange}>
-                                        {Object.entries(TYPES).map(([v, l]) => (
-                                            <option key={v} value={v}>{l}</option>
+                                        {Object.entries(TYPES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
+                                            <option key={v} value={v}>{t(l)}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-field">
-                                    <label htmlFor="tx-category">Kategoriya</label>
+                                    <label htmlFor="tx-category">{t('Kategoriya')}</label>
                                     <select id="tx-category" name="category" value={form.category}
                                         onChange={handleFormChange}>
-                                        {Object.entries(CATEGORIES).map(([v, l]) => (
+                                        {Object.entries(CATEGORIES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
                                             <option key={v} value={v}>{l}</option>
                                         ))}
                                     </select>
@@ -326,12 +331,12 @@ function Finance() {
                             </div>
                             <div className="form-row">
                                 <div className="form-field">
-                                    <label htmlFor="tx-amount">Summa (so'm)</label>
+                                    <label htmlFor="tx-amount">{t("Summa (so'm)")}</label>
                                     <input id="tx-amount" type="number" name="amount" min="0.01" step="0.01"
                                         inputMode="decimal" value={form.amount} onChange={handleFormChange} required />
                                 </div>
                                 <div className="form-field">
-                                    <label htmlFor="tx-date">Sana</label>
+                                    <label htmlFor="tx-date">{t('Sana')}</label>
                                     <input id="tx-date" type="date" name="date" value={form.date}
                                         onChange={handleFormChange} required />
                                 </div>
@@ -339,20 +344,20 @@ function Finance() {
                             {isSale && groups.length > 0 && (
                                 <div className="form-row">
                                     <div className="form-field">
-                                        <label htmlFor="tx-group">Qaysi hayvonlar sotildi (ixtiyoriy)</label>
+                                        <label htmlFor="tx-group">{t("Qaysi hayvonlar sotildi (ixtiyoriy)")}</label>
                                         <select id="tx-group" name="animal_group" value={form.animal_group}
                                             onChange={handleFormChange}>
-                                            <option value="">Hayvon sonini hisobga olmaslik</option>
+                                            <option value="">{t("Hayvon sonini hisobga olmaslik")}</option>
                                             {groups.map((g) => (
                                                 <option key={g.id} value={g.id}>
-                                                    {g.animal_type_name}{g.breed ? ` (${g.breed})` : ""} — {g.count} ta
+                                                    {g.animal_type_name}{g.breed ? ` (${g.breed})` : ""} — {t('{count} ta', { count: g.count })}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
                                     {selectedGroup && (
                                         <div className="form-field">
-                                            <label htmlFor="tx-count">Sotilgan soni</label>
+                                            <label htmlFor="tx-count">{t('Sotilgan soni')}</label>
                                             <input id="tx-count" type="number" name="animal_count" min="1" step="1"
                                                 max={selectedGroup.count} value={form.animal_count}
                                                 onChange={handleFormChange} required />
@@ -362,71 +367,71 @@ function Finance() {
                             )}
                             {isSale && selectedGroup && (
                                 <p className="workers-hint">
-                                    Guruhda hozir {selectedGroup.count} ta bor. Saqlaganingizda sotilgan soni avtomatik ayriladi.
+                                    {t('Guruhda hozir {count} ta bor. Saqlaganingizda sotilgan soni avtomatik ayriladi.', { count: selectedGroup.count })}
                                 </p>
                             )}
                             <CreditFields farmId={farmId} kind={form.transaction_type === "kirim" ? "mijoz" : "taminotchi"}
                                 total={form.amount} value={credit} onChange={setCredit} />
                             <div className="form-field">
-                                <label htmlFor="tx-desc">Izoh (ixtiyoriy)</label>
+                                <label htmlFor="tx-desc">{t("Izoh (ixtiyoriy)")}</label>
                                 <input id="tx-desc" type="text" name="description" value={form.description}
                                     onChange={handleFormChange} />
                             </div>
                             {formError && <p className="error-text" role="alert">{formError}</p>}
                             {formNotice && <p className="workers-hint" role="status">{formNotice}</p>}
                             <button type="submit" className="btn-primary" disabled={saving}>
-                                {saving ? "Saqlanmoqda..." : "Saqlash"}
+                                {saving ? t("Saqlanmoqda...") : t("Saqlash")}
                             </button>
                         </form>
 
                         {/* Filtrlar */}
-                        <h3 className="section-title">Yozuvlar</h3>
+                        <h3 className="section-title">{t('Yozuvlar')}</h3>
                         <div className="filter-bar">
                             <select name="transaction_type" value={filters.transaction_type}
-                                onChange={handleFilter} aria-label="Turi bo'yicha filtr">
-                                <option value="">Barcha turlar</option>
-                                {Object.entries(TYPES).map(([v, l]) => (
+                                onChange={handleFilter} aria-label={t("Turi bo'yicha filtr")}>
+                                <option value="">{t("Barcha turlar")}</option>
+                                {Object.entries(TYPES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
                                     <option key={v} value={v}>{l}</option>
                                 ))}
                             </select>
                             <select name="category" value={filters.category}
-                                onChange={handleFilter} aria-label="Kategoriya bo'yicha filtr">
-                                <option value="">Barcha kategoriyalar</option>
-                                {Object.entries(CATEGORIES).map(([v, l]) => (
+                                onChange={handleFilter} aria-label={t("Kategoriya bo'yicha filtr")}>
+                                <option value="">{t("Barcha kategoriyalar")}</option>
+                                {Object.entries(CATEGORIES).map(([k, v]) => [k, t(v)]).map(([v, l]) => (
                                     <option key={v} value={v}>{l}</option>
                                 ))}
                             </select>
                             <input type="date" name="date_from" value={filters.date_from}
-                                onChange={handleFilter} aria-label="Boshlanish sanasi" />
+                                onChange={handleFilter} aria-label={t("Boshlanish sanasi")} />
                             <input type="date" name="date_to" value={filters.date_to}
-                                onChange={handleFilter} aria-label="Tugash sanasi" />
+                                onChange={handleFilter} aria-label={t("Tugash sanasi")} />
                             {hasFilters && (
-                                <button type="button" className="btn-ghost" onClick={clearFilters}>Tozalash</button>
+                                <button type="button" className="btn-ghost" onClick={clearFilters}>{t('Tozalash')}</button>
                             )}
                         </div>
 
                         {/* Ro'yxat */}
                         {loading ? (
-                            <p className="empty-state">Yuklanmoqda...</p>
+                            <p className="empty-state">{t("Yuklanmoqda...")}</p>
                         ) : error ? (
                             <div className="empty-state">
                                 <p className="error-text">{error}</p>
-                                <button className="btn-ghost" onClick={reload}>Qayta urinish</button>
+                                <button className="btn-ghost" onClick={reload}>{t("Qayta urinish")}</button>
                             </div>
                         ) : transactions.length === 0 ? (
                             <p className="empty-state">
-                                {hasFilters ? "Hech narsa topilmadi" : "Hali yozuvlar yo'q"}
+                                {hasFilters ? t("Hech narsa topilmadi") : t("Hali yozuvlar yo'q")}
                             </p>
                         ) : (
                             <ul className="tx-list">
                                 {transactions.map((tx) => (
                                     <li key={tx.id} className={`tx-item tx-item--${tx.transaction_type}`}>
                                         <div className="tx-main">
-                                            <span className="tx-category">{CATEGORIES[tx.category] || tx.category}</span>
+                                            <span className="tx-category">{t(CATEGORIES[tx.category]) ? t(CATEGORIES[tx.category]) : tx.category}</span>
                                             <span className="tx-meta">
                                                 {tx.date}
-                                                {tx.animal_count ? ` · ${tx.animal_count} ta ${tx.animal_group_label || "hayvon"} sotildi` : ""}
-                                                {tx.description ? ` · ${tx.description}` : ""}
+                                                {tx.animal_count ? ` · ${t('{count} ta {name} sotildi', { count: tx.animal_count, name: tx.animal_group_label || t("hayvon") })}` : ""}
+                                                {tx.description ? t(' · {description}', { description: tx.description }) : ""}
                                             </span>
                                         </div>
                                         <div className="tx-side">
@@ -434,8 +439,8 @@ function Finance() {
                                                 {tx.transaction_type === "kirim" ? "+" : "−"}{formatMoney(tx.amount)}
                                             </span>
                                             <button type="button" className="tx-delete" onClick={() => handleDelete(tx)}
-                                                aria-label="Yozuvni o'chirish">
-                                                O'chirish
+                                                aria-label={t("Yozuvni o'chirish")}>
+                                                {t("O'chirish")}
                                             </button>
                                         </div>
                                     </li>

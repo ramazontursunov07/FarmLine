@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { t } from '../i18n';
 
 // Berilgan manzilni QR kod rasmiga aylantiradi (telefon kamerasi bilan skanerlanadi).
-function QrImage({ value, size = 200, alt = 'QR kod' }) {
+function QrImage({ value, size = 200, alt = t('QR kod') }) {
     const [src, setSrc] = useState('');
 
     useEffect(() => {

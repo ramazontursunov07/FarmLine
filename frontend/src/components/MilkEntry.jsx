@@ -3,8 +3,11 @@ import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { today } from '../utils/format';
 import './MilkEntry.css';
+import { t } from '../i18n';
 
 const SESSIONS = { ertalab: 'Ertalab', kechqurun: 'Kechqurun', kun: 'Butun kun' };
+// Gap ichida ishlatiladigan shakl: "ertalabki sut" va hokazo
+const SESSION_MILK = { ertalab: 'ertalabki sut', kechqurun: 'kechqurungi sut', kun: 'butun kunlik sut' };
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 const num = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -32,13 +35,13 @@ function parseLiters(raw) {
 // Tanlangan vaqt uchun bu sigirga yozib bo'lmaydimi (allaqachon yozilgan yoki bir kunda aralashib ketadi)?
 function lockText(records = [], session) {
     const same = records.find((r) => r.session === session);
-    if (same) return `${SESSIONS[session]}: ${num(same.liters)} l yozilgan`;
+    if (same) return t('{session}: {liters} l yozilgan', { session: t(SESSIONS[session]), liters: num(same.liters) });
     if (session === 'kun' && records.length) {
         const total = records.reduce((s, r) => s + Number(r.liters), 0);
-        return `Ertalab/kechqurun yozilgan, jami ${num(total)} l`;
+        return t('Ertalab/kechqurun yozilgan, jami {total} l', { total: num(total) });
     }
     const whole = records.find((r) => r.session === 'kun');
-    if (session !== 'kun' && whole) return `Butun kun yozilgan: ${num(whole.liters)} l`;
+    if (session !== 'kun' && whole) return t('Butun kun yozilgan: {liters} l', { liters: num(whole.liters) });
     return null;
 }
 
@@ -67,7 +70,7 @@ function MilkEntry({ farmId, animals, onSaved }) {
             setExisting(map);
             setLoadError('');
         } catch {
-            setLoadError("Shu kungi yozuvlar yuklanmadi. Yozish mumkin, lekin allaqachon yozilgan bo'lsa, server rad etadi.");
+            setLoadError(t("Shu kungi yozuvlar yuklanmadi. Yozish mumkin, lekin allaqachon yozilgan bo'lsa, server rad etadi."));
         }
     }, [farmId, date]);
 
@@ -117,16 +120,16 @@ function MilkEntry({ farmId, animals, onSaved }) {
         const invalid = {};
         for (const r of typed) {
             if (parseLiters(values[r.animal.id]) == null) {
-                invalid[r.animal.id] = "Litrni to'g'ri kiriting (masalan 8 yoki 8,5; 100 dan oshmasin)";
+                invalid[r.animal.id] = t("Litrni to'g'ri kiriting (masalan 8 yoki 8,5; 100 dan oshmasin)");
             }
         }
         if (Object.keys(invalid).length) {
             setErrors(invalid);
-            setFormError("Ba'zi sigirlarning litri noto'g'ri kiritilgan.");
+            setFormError(t("Ba'zi sigirlarning litri noto'g'ri kiritilgan."));
             return;
         }
         if (typed.length === 0) {
-            setFormError("Kamida bitta sigirning litrini kiriting.");
+            setFormError(t('Kamida bitta sigirning litrini kiriting.'));
             return;
         }
 
@@ -152,7 +155,7 @@ function MilkEntry({ farmId, animals, onSaved }) {
                 delete nextValues[animal.id];
                 nextExisting[animal.id] = [...(nextExisting[animal.id] || []), { session, liters: parseLiters(values[animal.id]) }];
             } else {
-                nextErrors[animal.id] = getErrorMessage(res.reason, "Yozib bo'lmadi");
+                nextErrors[animal.id] = getErrorMessage(res.reason, t("Yozib bo'lmadi"));
             }
         });
         setValues(nextValues);
@@ -162,13 +165,14 @@ function MilkEntry({ farmId, animals, onSaved }) {
 
         if (saved > 0) {
             setNotice(
-                `${saved} ta sigirning ${SESSIONS[session].toLowerCase()} suti yozildi: jami ${num(savedLiters)} l.` +
-                (pending ? " Internet yo'q: ulanganda serverga yuboriladi." : '')
+                t('{count} ta sigirning {what} yozildi: jami {total} l.', {
+                    count: saved, what: t(SESSION_MILK[session]), total: num(savedLiters),
+                }) + (pending ? ` ${t("Internet yo'q: ulanganda serverga yuboriladi.")}` : '')
             );
             onSaved?.();
         }
         if (Object.keys(nextErrors).length) {
-            setFormError(`${Object.keys(nextErrors).length} ta sigirning sutini yozib bo'lmadi. Pastdagi xabarlarni ko'ring.`);
+            setFormError(t("{count} ta sigirning sutini yozib bo'lmadi. Pastdagi xabarlarni ko'ring.", { count: Object.keys(nextErrors).length }));
         }
     };
 
@@ -176,7 +180,7 @@ function MilkEntry({ farmId, animals, onSaved }) {
         <section className="milk-entry">
             <button type="button" className={open ? 'btn-ghost' : 'btn-primary btn-auto'} onClick={() => setOpen(!open)}
                 aria-expanded={open}>
-                {open ? 'Sut yozishni yopish' : 'Sut yozish'}
+                {open ? t('Sut yozishni yopish') : t('Sut yozish')}
             </button>
 
             {open && (
@@ -184,18 +188,18 @@ function MilkEntry({ farmId, animals, onSaved }) {
                     <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleKeyDown} noValidate>
                         <div className="form-row">
                             <div className="form-field">
-                                <label htmlFor="milk-date">Sana</label>
+                                <label htmlFor="milk-date">{t('Sana')}</label>
                                 <input id="milk-date" type="date" value={date} max={today()} required
                                     onChange={(e) => { setDate(e.target.value || today()); setNotice(''); }} />
                             </div>
                             <div className="form-field">
-                                <span className="milk-entry-label" id="milk-session-label">Qaysi vaqtdagi sut</span>
+                                <span className="milk-entry-label" id="milk-session-label">{t('Qaysi vaqtdagi sut')}</span>
                                 <div className="milk-entry-seg" role="group" aria-labelledby="milk-session-label">
-                                    {Object.entries(SESSIONS).map(([value, label]) => (
+                                    {Object.entries(SESSIONS).map(([k, v]) => [k, t(v)]).map(([value, label]) => (
                                         <button key={value} type="button" aria-pressed={session === value}
                                             className={session === value ? 'is-active' : ''}
                                             onClick={() => { setSession(value); setNotice(''); }}>
-                                            {label}
+                                            {t(label)}
                                         </button>
                                     ))}
                                 </div>
@@ -204,8 +208,8 @@ function MilkEntry({ farmId, animals, onSaved }) {
 
                         <p className="workers-hint">
                             {session === 'kun'
-                                ? "«Butun kun» tanlansa, shu kunga ertalab/kechqurun alohida yozilmaydi: sutni kun bo'yicha jami kiriting."
-                                : "Sog'ilmagan sigirlarning litrini bo'sh qoldiring. Yozilgan sutni o'zgartirish uchun sigir kartochkasini oching."}
+                                ? t("«Butun kun» tanlansa, shu kunga ertalab/kechqurun alohida yozilmaydi: sutni kun bo'yicha jami kiriting.")
+                                : t("Sog'ilmagan sigirlarning litrini bo'sh qoldiring. Yozilgan sutni o'zgartirish uchun sigir kartochkasini oching.")}
                         </p>
 
                         {loadError && <p className="error-text" role="status">{loadError}</p>}
@@ -214,7 +218,7 @@ function MilkEntry({ farmId, animals, onSaved }) {
                             {rows.map(({ animal, lock }) => (
                                 <li key={animal.id} className={`milk-entry-row${lock ? ' is-done' : ''}`}>
                                     <label htmlFor={`milk-${animal.id}`} className="milk-entry-name">
-                                        №{animal.tag_number}{animal.name ? ` · ${animal.name}` : ''}
+                                        №{animal.tag_number}{animal.name ? t(' · {name}', { name: animal.name }) : ''}
                                     </label>
                                     {lock ? (
                                         <span className="milk-entry-done">✓ {lock}</span>
@@ -222,10 +226,10 @@ function MilkEntry({ farmId, animals, onSaved }) {
                                         <span className="milk-entry-field">
                                             <input id={`milk-${animal.id}`} data-milk inputMode="decimal" enterKeyHint="next"
                                                 placeholder="0" autoComplete="off" value={values[animal.id] ?? ''}
-                                                aria-label={`№${animal.tag_number} ${SESSIONS[session].toLowerCase()} suti, litr`}
+                                                aria-label={t('№{tag}: {what}, litr', { tag: animal.tag_number, what: t(SESSION_MILK[session]) })}
                                                 aria-invalid={Boolean(errors[animal.id])}
                                                 onChange={(e) => setValue(animal.id, e.target.value)} />
-                                            <span className="milk-entry-unit">l</span>
+                                            <span className="milk-entry-unit">{t('l')}</span>
                                         </span>
                                     )}
                                     {errors[animal.id] && (
@@ -240,10 +244,10 @@ function MilkEntry({ farmId, animals, onSaved }) {
 
                         <div className="milk-entry-actions">
                             <button type="submit" className="btn-primary btn-auto" disabled={saving || typed.length === 0}>
-                                {saving ? 'Saqlanmoqda...' : `Saqlash: ${SESSIONS[session].toLowerCase()}`}
+                                {saving ? t('Saqlanmoqda...') : t('Saqlash: {what}', { what: t(SESSION_MILK[session]) })}
                             </button>
                             <span className="milk-entry-total">
-                                {typed.length > 0 ? `${typed.length} ta sigir, jami ${num(total)} l` : 'Litr kiritilmagan'}
+                                {typed.length > 0 ? t('{count} ta sigir, jami {total} l', { count: typed.length, total: num(total) }) : t('Litr kiritilmagan')}
                             </span>
                         </div>
                     </form>

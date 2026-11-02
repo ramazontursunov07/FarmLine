@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
+import { t } from '../i18n';
 
 const FREQ = { kunlik: 'Har kuni', haftalik: 'Har hafta', oylik: 'Har oy', yillik: 'Har yili' };
 const EMPTY = { title: '', assigned_to: '', frequency: 'yillik', next_due: '', lead_days: 3, priority: 'oddiy' };
@@ -55,7 +56,7 @@ function RecurringTasks({ farmId, workers, onCreated }) {
             setKey((k) => k + 1);
             onCreated?.();
         } catch (err) {
-            setError(getErrorMessage(err, "Saqlab bo'lmadi"));
+            setError(getErrorMessage(err, t("Saqlab bo'lmadi")));
         } finally {
             setSaving(false);
         }
@@ -66,68 +67,68 @@ function RecurringTasks({ farmId, workers, onCreated }) {
             await api.patch(`tasks-recurring/${it.id}/`, { is_active: !it.is_active });
             setKey((k) => k + 1);
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'zgartirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t("O'zgartirib bo'lmadi")));
         }
     };
 
     const remove = async (it) => {
-        if (!window.confirm(`"${it.title}" takrorlanuvchi vazifasini o'chirasizmi?`)) return;
+        if (!window.confirm(t('"{title}" takrorlanuvchi vazifasini o\'chirasizmi?', { title: it.title }))) return;
         try {
             await api.delete(`tasks-recurring/${it.id}/`);
             setKey((k) => k + 1);
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t("O'chirib bo'lmadi")));
         }
     };
 
     return (
         <details className="more-menu">
-            <summary className="section-title">🔁 Takrorlanuvchi vazifalar ({items.length})</summary>
+            <summary className="section-title">🔁 {t('Takrorlanuvchi vazifalar')} ({items.length})</summary>
             <div className="work-card">
                 <p className="panel-subtitle">
-                    Masalan, har yili vaksina yoki har oy tortish. Muddat kelganda vazifa o'zi yaratiladi va ishchiga Telegramdan xabar boradi.
+                    {t("Masalan, har yili vaksina yoki har oy tortish. Muddat kelganda vazifa o'zi yaratiladi va ishchiga Telegramdan xabar boradi.")}
                 </p>
                 <div className="filter-bar">
                     {PRESETS.map((p) => (
                         <button key={p.label} type="button" className="btn-ghost"
-                            onClick={() => setForm({ ...form, title: p.title, frequency: p.frequency, priority: p.priority, lead_days: p.lead_days })}>
-                            {p.label}
+                            onClick={() => setForm({ ...form, title: t(p.title), frequency: p.frequency, priority: p.priority, lead_days: p.lead_days })}>
+                            {t(p.label)}
                         </button>
                     ))}
                 </div>
                 <form onSubmit={submit}>
                     <div className="form-field">
-                        <label>Vazifa</label>
+                        <label>{t('Vazifa')}</label>
                         <input type="text" name="title" value={form.title} onChange={change} required />
                     </div>
                     <div className="form-row">
                         <div className="form-field">
-                            <label>Qanchalik tez-tez</label>
+                            <label>{t('Qanchalik tez-tez')}</label>
                             <select name="frequency" value={form.frequency} onChange={change}>
-                                {Object.entries(FREQ).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                {Object.entries(FREQ).map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
                             </select>
                         </div>
                         <div className="form-field">
-                            <label>Birinchi muddat</label>
+                            <label>{t('Birinchi muddat')}</label>
                             <input type="date" name="next_due" value={form.next_due} onChange={change} required />
                         </div>
                     </div>
                     <div className="form-row">
                         <div className="form-field">
-                            <label>Kimga</label>
+                            <label>{t('Kimga')}</label>
                             <select name="assigned_to" value={form.assigned_to} onChange={change}>
-                                <option value="">Barcha ishchilarga</option>
+                                <option value="">{t('Barcha ishchilarga')}</option>
                                 {workers.map((w) => <option key={w.id} value={w.user}>{w.user_full_name}</option>)}
                             </select>
                         </div>
                         <div className="form-field">
-                            <label>Necha kun oldin eslatilsin</label>
+                            <label>{t('Necha kun oldin eslatilsin')}</label>
                             <input type="number" min="0" max="60" name="lead_days" value={form.lead_days} onChange={change} />
                         </div>
                     </div>
                     {error && <p className="error-text" role="alert">{error}</p>}
                     <button type="submit" className="btn-primary btn-auto" disabled={saving}>
-                        {saving ? 'Kuting...' : "Qo'shish"}
+                        {saving ? t('Kuting...') : t("Qo'shish")}
                     </button>
                 </form>
             </div>
@@ -139,18 +140,18 @@ function RecurringTasks({ farmId, workers, onCreated }) {
                             <div className="work-main">
                                 <span className="work-title">
                                     {it.title}
-                                    {!it.is_active && <span className="work-badge">To'xtatilgan</span>}
+                                    {!it.is_active && <span className="work-badge">{t("To'xtatilgan")}</span>}
                                 </span>
                                 <span className="work-meta">
-                                    {it.frequency_display} · keyingisi: <strong>{fmt(it.next_due)}</strong> · Kimga: {it.assigned_to_name}
+                                    {it.frequency_display} · {t('keyingisi:')} <strong>{fmt(it.next_due)}</strong> · {t('Kimga:')} {it.assigned_to_name}
                                 </span>
                             </div>
                             <div className="work-side">
                                 <button type="button" className="btn-ghost" onClick={() => toggle(it)}>
-                                    {it.is_active ? "To'xtatish" : 'Yoqish'}
+                                    {it.is_active ? t("To'xtatish") : t('Yoqish')}
                                 </button>
                                 <button type="button" className="farm-item-action farm-item-action--danger" onClick={() => remove(it)}>
-                                    O'chirish
+                                    {t("O'chirish")}
                                 </button>
                             </div>
                         </li>

@@ -4,6 +4,7 @@ import { getErrorMessage } from '../utils/errors';
 import { formatMoney, today } from '../utils/format';
 import CreditFields from './CreditFields';
 import { EMPTY_CREDIT, creditPayload } from '../utils/credit';
+import { t } from '../i18n';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
@@ -37,7 +38,7 @@ function MilkSales({ farmId, refreshKey }) {
             }
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, "Sut omborini yuklab bo'lmadi"));
+            setError(getErrorMessage(err, t('Sut omborini yuklab bo\'lmadi')));
         }
     }, [farmId]);
 
@@ -67,11 +68,11 @@ function MilkSales({ farmId, refreshKey }) {
             setCredit(EMPTY_CREDIT());
             setVersion((v) => v + 1);
         } catch (err) {
-            const message = getErrorMessage(err, "Sutni sotib bo'lmadi (internet bormi?)");
+            const message = getErrorMessage(err, t('Sutni sotib bo\'lmadi (internet bormi?)'));
             // Dori ushlab turish muddatidagi sut: ogohlantiramiz, fermer o'zi qaror qiladi
             if (!confirmWithheld && message.includes('ushlab turish')) {
                 setSaving(false);
-                if (window.confirm(`${message}\n\nAntibiotikli sut odamni kasal qilishi yoki sutni qaytarishga olib kelishi mumkin. Baribir sotasizmi?`)) {
+                if (window.confirm(t('{message}\n\nAntibiotikli sut odamni kasal qilishi yoki sutni qaytarishga olib kelishi mumkin. Baribir sotasizmi?', { message }))) {
                     await sell(true);
                 } else {
                     setFormError(message);
@@ -92,30 +93,30 @@ function MilkSales({ farmId, refreshKey }) {
     // Ro'yxatdan o'chirish: faqat yozuv yo'qoladi, balans va sotilgan sut hisobi o'zgarmaydi
     const handleDelete = async (s) => {
         const ok = window.confirm(
-            `${formatDate(s.date)} dagi ${num(s.liters)} l sotuv yozuvini ro'yxatdan o'chirasizmi?\n\n` +
-            `Faqat yozuv o'chadi: balans (${formatMoney(s.amount)} kirim) va sotilgan sut hisobi o'zgarmaydi.`
+            t('{v1} dagi {v2} l sotuv yozuvini ro\'yxatdan o\'chirasizmi?\n\n', { v1: formatDate(s.date), v2: num(s.liters) }) +
+            t('Faqat yozuv o\'chadi: balans ({v1} kirim) va sotilgan sut hisobi o\'zgarmaydi.', { v1: formatMoney(s.amount) })
         );
         if (!ok) return;
         try {
             await api.delete(`animals-milk-sale/${s.id}/`);
             setVersion((v) => v + 1);
         } catch (err) {
-            window.alert(getErrorMessage(err, "O'chirib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('O\'chirib bo\'lmadi')));
         }
     };
 
     // Xato kiritilgan sotuvni bekor qilish: sut omborga qaytadi, pul kirimdan olib tashlanadi
     const handleCancel = async (s) => {
         const ok = window.confirm(
-            `${formatDate(s.date)} dagi ${num(s.liters)} l sotuv xato kiritilganmi?\n\n` +
-            `Bekor qilinsa, sut omborga qaytadi, ${formatMoney(s.amount)} esa kirimdan olib tashlanadi.`
+            t('{v1} dagi {v2} l sotuv xato kiritilganmi?\n\n', { v1: formatDate(s.date), v2: num(s.liters) }) +
+            t('Bekor qilinsa, sut omborga qaytadi, {v1} esa kirimdan olib tashlanadi.', { v1: formatMoney(s.amount) })
         );
         if (!ok) return;
         try {
             await api.post(`animals-milk-sale/${s.id}/cancel/`);
             setVersion((v) => v + 1);
         } catch (err) {
-            window.alert(getErrorMessage(err, "Bekor qilib bo'lmadi"));
+            window.alert(getErrorMessage(err, t('Bekor qilib bo\'lmadi')));
         }
     };
 
@@ -124,34 +125,34 @@ function MilkSales({ farmId, refreshKey }) {
 
     return (
         <section className="milk-report">
-            <h3 className="section-title">Sut ombori</h3>
+            <h3 className="section-title">{t('Sut ombori')}</h3>
             <div className="stat-grid stat-grid--3">
                 <div className="stat-card">
-                    <span className="stat-value">{num(stock.produced)} l</span>
-                    <span className="stat-label">Jami sog'ilgan</span>
+                    <span className="stat-value">{num(stock.produced)} {t('l')}</span>
+                    <span className="stat-label">{t('Jami sog\'ilgan')}</span>
                 </div>
                 <div className="stat-card">
-                    <span className="stat-value">{num(stock.sold)} l</span>
-                    <span className="stat-label">Sotilgan</span>
+                    <span className="stat-value">{num(stock.sold)} {t('l')}</span>
+                    <span className="stat-label">{t('Sotilgan')}</span>
                 </div>
                 <div className="stat-card">
-                    <span className="stat-value">{num(stock.available)} l</span>
-                    <span className="stat-label">Omborda qolgan</span>
+                    <span className="stat-value">{num(stock.available)} {t('l')}</span>
+                    <span className="stat-label">{t('Omborda qolgan')}</span>
                 </div>
             </div>
 
             {stock.withdrawals?.length > 0 && (
                 <div className="withdrawal-box" role="alert">
-                    <strong>⛔ Dori ushlab turish muddati: {stock.withdrawals.length} ta sigir</strong>
+                    <strong>{t('⛔ Dori ushlab turish muddati:')} {stock.withdrawals.length} {t('ta sigir')}</strong>
                     <span>
-                        Bu sigirlarning sutini va go'shtini hozircha sotmang.
-                        {Number(stock.withheld) > 0 && ` Ombordagi ${num(stock.withheld)} l sut sotuvga yaroqsiz, sotsa bo'ladigani: ${num(stock.sellable)} l.`}
+                        {t('Bu sigirlarning sutini va go\'shtini hozircha sotmang.')}
+                        {Number(stock.withheld) > 0 && t(' Ombordagi {v1} l sut sotuvga yaroqsiz, sotsa bo\'ladigani: {v2} l.', { v1: num(stock.withheld), v2: num(stock.sellable) })}
                     </span>
                     <ul>
                         {stock.withdrawals.map((w) => (
                             <li key={w.animal}>
                                 №{w.tag_number}{w.name ? ` ${w.name}` : ''} — {w.medicine}:{' '}
-                                {w.until ? `${formatDate(w.until)} gacha (${w.days_left} kun qoldi)` : 'davolash davom etmoqda'}
+                                {w.until ? t('{v1} gacha ({days_left} kun qoldi)', { v1: formatDate(w.until), days_left: w.days_left }) : 'davolash davom etmoqda'}
                             </li>
                         ))}
                     </ul>
@@ -163,33 +164,33 @@ function MilkSales({ farmId, refreshKey }) {
                     <form className="animal-inline-form" onSubmit={handleSell}>
                         <div className="form-row">
                             <div className="form-field">
-                                <label>Necha litr sotildi</label>
+                                <label>{t('Necha litr sotildi')}</label>
                                 <input type="number" name="liters" min="0.1" step="0.1" max={stock.available}
                                     value={form.liters} onChange={handleChange} required />
                             </div>
                             <div className="form-field">
-                                <label>1 litr narxi (so'm)</label>
+                                <label>{t('1 litr narxi (so\'m)')}</label>
                                 <input type="number" name="price_per_liter" min="1" step="1"
                                     value={form.price_per_liter} onChange={handleChange} required />
                             </div>
                         </div>
                         <div className="form-row">
                             <div className="form-field">
-                                <label>Sana</label>
+                                <label>{t('Sana')}</label>
                                 <input type="date" name="date" value={form.date} max={today()}
                                     onChange={handleChange} required />
                             </div>
                             <div className="form-field">
-                                <label>Izoh (ixtiyoriy)</label>
+                                <label>{t('Izoh (ixtiyoriy)')}</label>
                                 <input type="text" name="note" value={form.note} maxLength={200}
                                     onChange={handleChange} />
                             </div>
                         </div>
                         {!credit.on_credit && (
                             <div className="form-field">
-                                <label>Mijoz (ixtiyoriy)</label>
+                                <label>{t('Mijoz (ixtiyoriy)')}</label>
                                 <input type="text" name="customer_name" value={form.customer_name} maxLength={120}
-                                    list="milk-customers" placeholder="Ismini yozing yoki ro'yxatdan tanlang"
+                                    list="milk-customers" placeholder={t('Ismini yozing yoki ro\'yxatdan tanlang')}
                                     onChange={handleChange} />
                                 <datalist id="milk-customers">
                                     {customers.map((c) => <option key={c.id} value={c.name} />)}
@@ -200,19 +201,19 @@ function MilkSales({ farmId, refreshKey }) {
                         {!credit.on_credit && (
                             <p className="workers-hint">
                                 {total > 0
-                                    ? `Jami: ${formatMoney(total)}. Sotilgach, bu pul kirim sifatida balansga qo'shiladi.`
-                                    : "Sotilgach, pul kirim sifatida balansga qo'shiladi va sut ombordan ayriladi."}
+                                    ? t('Jami: {v1}. Sotilgach, bu pul kirim sifatida balansga qo\'shiladi.', { v1: formatMoney(total) })
+                                    : t('Sotilgach, pul kirim sifatida balansga qo\'shiladi va sut ombordan ayriladi.')}
                             </p>
                         )}
                         {formError && <p className="error-text" role="alert">{formError}</p>}
                         <button type="submit" className="btn-primary btn-auto" disabled={saving || Number(stock.available) <= 0}>
-                            {saving ? 'Kuting...' : 'Sutni sotish'}
+                            {saving ? 'Kuting...' : t('Sutni sotish')}
                         </button>
                     </form>
 
                     {customers.some((c) => c.sales > 0 || Number(c.debt) > 0) && (
                         <details className="more-menu">
-                            <summary className="section-title">👥 Mijozlar ({customers.length})</summary>
+                            <summary className="section-title">{t('👥 Mijozlar (')}{customers.length})</summary>
                             <ul className="work-list">
                                 {customers.map((c) => (
                                     <li key={c.id} className="work-item">
@@ -221,13 +222,13 @@ function MilkSales({ farmId, refreshKey }) {
                                                 {c.name}
                                                 {Number(c.debt) > 0 && (
                                                     <span className={`work-badge${c.debt_overdue ? ' work-badge--shoshilinch' : ' work-badge--credit'}`}>
-                                                        Qarz: {formatMoney(c.debt)}
+                                                        {t('Qarz:')} {formatMoney(c.debt)}
                                                     </span>
                                                 )}
                                             </span>
                                             <span className="work-meta">
-                                                {num(c.liters)} l · {formatMoney(c.revenue)} · {c.sales} marta
-                                                {c.last_date ? ` · oxirgi: ${formatDate(c.last_date)}` : ''}
+                                                {num(c.liters)} {t('l ·')} {formatMoney(c.revenue)} · {c.sales} {t('marta')}
+                                                {c.last_date ? t(' · oxirgi: {v1}', { v1: formatDate(c.last_date) }) : ''}
                                             </span>
                                             {c.phone && <a className="work-meta" href={`tel:${c.phone}`}>📞 {c.phone}</a>}
                                         </div>
@@ -243,24 +244,24 @@ function MilkSales({ farmId, refreshKey }) {
                                 <li key={s.id} className="work-item">
                                     <div className="work-main">
                                         <span className="work-title">
-                                            {num(s.liters)} l × {formatMoney(s.price_per_liter)}
-                                            {s.on_credit && <span className="work-badge work-badge--credit">Nasiya</span>}
+                                            {num(s.liters)} {t('l ×')} {formatMoney(s.price_per_liter)}
+                                            {s.on_credit && <span className="work-badge work-badge--credit">{t('Nasiya')}</span>}
                                         </span>
                                         <span className="work-meta">
-                                            {formatDate(s.date)} · jami {formatMoney(s.amount)}
-                                            {s.on_credit ? ` · ${s.party_name}, qolgan qarz: ${formatMoney(s.debt_remaining)}` : ''}
-                                            {!s.on_credit && s.customer_name ? ` · ${s.customer_name}` : ''}
-                                            {s.note ? ` · ${s.note}` : ''}
+                                            {formatDate(s.date)} {t('· jami')} {formatMoney(s.amount)}
+                                            {s.on_credit ? t(' · {party_name}, qolgan qarz: {v2}', { party_name: s.party_name, v2: formatMoney(s.debt_remaining) }) : ''}
+                                            {!s.on_credit && s.customer_name ? t(' · {customer_name}', { customer_name: s.customer_name }) : ''}
+                                            {s.note ? t(' · {note}', { note: s.note }) : ''}
                                         </span>
                                     </div>
                                     <div className="work-side">
                                         <button type="button" className="farm-item-action"
                                             onClick={() => handleDelete(s)}>
-                                            O'chirish
+                                            {t('O\'chirish')}
                                         </button>
                                         <button type="button" className="farm-item-action farm-item-action--danger"
                                             onClick={() => handleCancel(s)}>
-                                            Xato — bekor qilish
+                                            {t('Xato — bekor qilish')}
                                         </button>
                                     </div>
                                 </li>

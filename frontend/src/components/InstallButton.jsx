@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import useInstall from '../hooks/useInstall';
 import { promptInstall } from '../offline/install';
 import './InstallButton.css';
+import { t } from '../i18n';
 
 function DownloadIcon() {
     return (
@@ -24,26 +25,26 @@ function InstallGuide({ onClose }) {
 
     let steps;
     if (!secure) {
-        steps = ["Bu sahifa xavfsiz (HTTPS) emas, shuning uchun brauzer o'rnatishga ruxsat bermaydi. Ilova HTTPS manzilda ochilishi kerak."];
+        steps = [t('Bu sahifa xavfsiz (HTTPS) emas, shuning uchun brauzer o\'rnatishga ruxsat bermaydi. Ilova HTTPS manzilda ochilishi kerak.')];
     } else if (inApp) {
         steps = [
-            "Siz sahifani Telegram yoki boshqa ilova ichida ochgansiz, bu yerda o'rnatib bo'lmaydi.",
-            "Yuqori burchakdagi ⋮ (uch nuqta) tugmasini bosing.",
-            "«Brauzerda ochish» ni tanlang (Chrome yoki Safari).",
-            "U yerda «Ilovani yuklab olish» tugmasini qayta bosing.",
+            t('Siz sahifani Telegram yoki boshqa ilova ichida ochgansiz, bu yerda o\'rnatib bo\'lmaydi.'),
+            t('Yuqori burchakdagi ⋮ (uch nuqta) tugmasini bosing.'),
+            t('«Brauzerda ochish» ni tanlang (Chrome yoki Safari).'),
+            t('U yerda «Ilovani yuklab olish» tugmasini qayta bosing.'),
         ];
     } else if (ios) {
         steps = [
-            "Sahifani Safari brauzerida oching.",
-            "Pastdagi «Ulashish» tugmasini bosing (kvadrat va yuqoriga strelka).",
-            "Pastga suring va «Bosh ekranga qo'shish» ni tanlang.",
-            "«Qo'shish» ni bosing. FarmLine ikonkasi bosh ekranda paydo bo'ladi.",
+            t('Sahifani Safari brauzerida oching.'),
+            t('Pastdagi «Ulashish» tugmasini bosing (kvadrat va yuqoriga strelka).'),
+            t('Pastga suring va «Bosh ekranga qo\'shish» ni tanlang.'),
+            t('«Qo\'shish» ni bosing. FarmLine ikonkasi bosh ekranda paydo bo\'ladi.'),
         ];
     } else {
         steps = [
-            "Chrome brauzerida yuqori burchakdagi ⋮ (uch nuqta) tugmasini bosing.",
-            "«Ilovani o'rnatish» yoki «Bosh ekranga qo'shish» ni tanlang.",
-            "«O'rnatish» ni tasdiqlang. FarmLine ikonkasi bosh ekranda paydo bo'ladi.",
+            t('Chrome brauzerida yuqori burchakdagi ⋮ (uch nuqta) tugmasini bosing.'),
+            t('«Ilovani o\'rnatish» yoki «Bosh ekranga qo\'shish» ni tanlang.'),
+            t('«O\'rnatish» ni tasdiqlang. FarmLine ikonkasi bosh ekranda paydo bo\'ladi.'),
         ];
     }
 
@@ -55,12 +56,12 @@ function InstallGuide({ onClose }) {
             onClick={(e) => { if (e.target === ref.current) ref.current.close(); }}
             aria-labelledby="install-guide-title"
         >
-            <h3 id="install-guide-title">Ilovani telefonga o'rnatish</h3>
+            <h3 id="install-guide-title">{t('Ilovani telefonga o\'rnatish')}</h3>
             <ol>
                 {steps.map((s) => <li key={s}>{s}</li>)}
             </ol>
             <button type="button" className="btn-primary btn-auto" onClick={() => ref.current.close()}>
-                Tushunarli
+                {t('Tushunarli')}
             </button>
         </dialog>
     );
@@ -68,7 +69,7 @@ function InstallGuide({ onClose }) {
 
 // "Ilovani yuklab olish" tugmasi. O'rnatilgan bo'lsa, ko'rinmaydi.
 // Sarlavhada kichik tugma (btn-install). Boshqa joyda className va yozuvni o'zingiz berasiz.
-function InstallButton({ className = 'btn-install', children = 'Yuklab olish' }) {
+function InstallButton({ className = 'btn-install', children = t('Yuklab olish') }) {
     const { canPrompt, installed } = useInstall();
     const [guideOpen, setGuideOpen] = useState(false);
 

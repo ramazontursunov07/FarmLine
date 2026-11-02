@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney, formatPeriod, today } from '../utils/format';
+import { t } from '../i18n';
 
 const num = (n) => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const money = (v) => (v === null || v === undefined ? '—' : formatMoney(v));
@@ -39,7 +40,7 @@ function MilkProfit({ farmId, refreshKey }) {
                     setData(res);
                     setError('');
                 })
-                .catch((err) => !cancelled && setError(getErrorMessage(err, "Hisobotni yuklab bo'lmadi")))
+                .catch((err) => !cancelled && setError(getErrorMessage(err, t('Hisobotni yuklab bo\'lmadi'))))
                 .finally(() => !cancelled && setLoading(false));
         }, 350);
         return () => {
@@ -51,21 +52,21 @@ function MilkProfit({ farmId, refreshKey }) {
     const toggleCategory = (key) =>
         setExcluded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
-    const t = data?.totals;
+    const tk = data?.totals;
     const losers = data ? data.cows.filter((c) => c.verdict === 'zarar' || c.verdict === 'sut_yoq').slice(0, 3) : [];
 
     return (
         <section className="milk-report">
             <div className="overview-head">
-                <h3 className="section-title">Sut tannarxi va sigirlar foydasi</h3>
+                <h3 className="section-title">{t('Sut tannarxi va sigirlar foydasi')}</h3>
                 <input type="month" value={month} max={today().slice(0, 7)}
-                    onChange={(e) => setMonth(e.target.value)} aria-label="Oy" />
+                    onChange={(e) => setMonth(e.target.value)} aria-label={t('Oy')} />
             </div>
 
             {error ? (
                 <p className="error-text" role="alert">{error}</p>
             ) : loading && !data ? (
-                <p className="empty-state">Yuklanmoqda...</p>
+                <p className="empty-state">{t('Yuklanmoqda...')}</p>
             ) : data && (
                 <>
                     {data.warnings.map((w) => (
@@ -74,51 +75,51 @@ function MilkProfit({ farmId, refreshKey }) {
 
                     <div className="stat-grid">
                         <div className="stat-card">
-                            <span className="stat-value">{t.cost_per_liter ? `${money(t.cost_per_liter)}` : '—'}</span>
-                            <span className="stat-label">1 litr sut tannarxi</span>
-                            <span className="stat-sub">{formatPeriod(`${data.month}-01`, 'month')}: {num(t.liters)} l, xarajat {money(t.cost)}</span>
+                            <span className="stat-value">{tk.cost_per_liter ? `${money(tk.cost_per_liter)}` : '—'}</span>
+                            <span className="stat-label">{t('1 litr sut tannarxi')}</span>
+                            <span className="stat-sub">{formatPeriod(`${data.month}-01`, 'month')}: {num(tk.liters)} {t('l, xarajat')} {money(tk.cost)}</span>
                         </div>
                         <div className="stat-card">
-                            <span className="stat-value">{t.feed_cost_per_liter ? money(t.feed_cost_per_liter) : '—'}</span>
-                            <span className="stat-label">Shundan yemga (1 litr)</span>
+                            <span className="stat-value">{tk.feed_cost_per_liter ? money(tk.feed_cost_per_liter) : '—'}</span>
+                            <span className="stat-label">{t('Shundan yemga (1 litr)')}</span>
                             <span className="stat-sub">
-                                yem xarajati {money(t.feed_cost)}
-                                {t.cost_per_liter && t.feed_cost_per_liter
-                                    ? ` · tannarxning ${Math.round((Number(t.feed_cost) / Number(t.cost)) * 100) || 0}%` : ''}
+                                {t('yem xarajati')} {money(tk.feed_cost)}
+                                {tk.cost_per_liter && tk.feed_cost_per_liter
+                                    ? t(' · tannarxning {v1}%', { v1: Math.round((Number(tk.feed_cost) / Number(tk.cost)) * 100) || 0 }) : ''}
                             </span>
                         </div>
                         <div className="stat-card">
-                            <span className="stat-value">{t.price_per_liter ? money(t.price_per_liter) : '—'}</span>
-                            <span className="stat-label">1 litr sotuv narxi</span>
+                            <span className="stat-value">{tk.price_per_liter ? money(tk.price_per_liter) : '—'}</span>
+                            <span className="stat-label">{t('1 litr sotuv narxi')}</span>
                             <span className="stat-sub">
-                                {t.price_source === 'sotuv' && "shu oydagi sotuvlardan"}
-                                {t.price_source === 'sotuv_90' && "oxirgi 90 kundagi sotuvlardan"}
-                                {t.price_source === 'qolda' && "siz kiritgan narx"}
-                                {!t.price_source && "sotuv yo'q"}
+                                {tk.price_source === 'sotuv' && "shu oydagi sotuvlardan"}
+                                {tk.price_source === 'sotuv_90' && "oxirgi 90 kundagi sotuvlardan"}
+                                {tk.price_source === 'qolda' && "siz kiritgan narx"}
+                                {!tk.price_source && t('sotuv yo\'q')}
                             </span>
                         </div>
                         <div className="stat-card">
-                            <span className={`stat-value ${profitClass(t.profit)}`}>{money(t.profit)}</span>
-                            <span className="stat-label">Sutdan foyda / zarar</span>
+                            <span className={`stat-value ${profitClass(tk.profit)}`}>{money(tk.profit)}</span>
+                            <span className="stat-label">{t('Sutdan foyda / zarar')}</span>
                         </div>
                         <div className="stat-card">
-                            <span className={`stat-value ${t.losing_cows > 0 ? 'amount-out' : ''}`}>{t.losing_cows} / {t.cows}</span>
-                            <span className="stat-label">Zarar keltirayotgan sigirlar</span>
+                            <span className={`stat-value ${tk.losing_cows > 0 ? 'amount-out' : ''}`}>{tk.losing_cows} / {tk.cows}</span>
+                            <span className="stat-label">{t('Zarar keltirayotgan sigirlar')}</span>
                         </div>
                     </div>
 
                     <div className="form-row">
                         <div className="form-field">
-                            <label>1 litr narxini o'zim kiritaman (so'm)</label>
+                            <label>{t('1 litr narxini o\'zim kiritaman (so\'m)')}</label>
                             <input type="number" min="1" step="1" inputMode="numeric" value={price}
-                                placeholder="Bo'sh qolsa, sotuvlardan olinadi"
+                                placeholder={t('Bo\'sh qolsa, sotuvlardan olinadi')}
                                 onChange={(e) => setPrice(e.target.value)} />
                         </div>
                     </div>
 
                     {data.costs.length > 0 && (
                         <div className="form-field">
-                            <label>Qaysi xarajatlar hisobga olinsin</label>
+                            <label>{t('Qaysi xarajatlar hisobga olinsin')}</label>
                             <div className="profit-cats">
                                 {data.costs.map((c) => (
                                     <label key={c.category} className="profit-cat">
@@ -133,15 +134,15 @@ function MilkProfit({ farmId, refreshKey }) {
 
                     {losers.length > 0 && (
                         <div className="withdrawal-box">
-                            <strong>Sotish uchun nomzodlar</strong>
+                            <strong>{t('Sotish uchun nomzodlar')}</strong>
                             <ul>
                                 {losers.map((c) => (
                                     <li key={c.id}>
                                         №{c.tag_number}{c.name ? ` ${c.name}` : ''} —{' '}
                                         {c.verdict === 'sut_yoq'
                                             ? "bu oy sut bermagan"
-                                            : `kuniga ${num(c.daily_avg)} l, zarar ${money(Math.abs(Number(c.profit)))}`}
-                                        {c.break_even_daily && ` (zararsiz bo'lishi uchun kuniga ~${num(c.break_even_daily)} l kerak)`}
+                                            : t('kuniga {v1} l, zarar {v2}', { v1: num(c.daily_avg), v2: money(Math.abs(Number(c.profit))) })}
+                                        {c.break_even_daily && t(' (zararsiz bo\'lishi uchun kuniga ~{v1} l kerak)', { v1: num(c.break_even_daily) })}
                                     </li>
                                 ))}
                             </ul>
@@ -149,29 +150,29 @@ function MilkProfit({ farmId, refreshKey }) {
                     )}
 
                     {data.cows.length === 0 ? (
-                        <p className="empty-state">Hisoblash uchun sigir kartochkalari yo'q</p>
+                        <p className="empty-state">{t('Hisoblash uchun sigir kartochkalari yo\'q')}</p>
                     ) : (
                         <div className="report-wrap">
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th>Sigir</th>
-                                        <th>Sut, l</th>
-                                        <th className="hide-sm">Kuniga, l</th>
-                                        <th className="hide-sm">Xarajat</th>
-                                        <th className="hide-sm">Daromad</th>
-                                        <th>Foyda</th>
-                                        <th>Holat</th>
+                                        <th>{t('Sigir')}</th>
+                                        <th>{t('Sut, l')}</th>
+                                        <th className="hide-sm">{t('Kuniga, l')}</th>
+                                        <th className="hide-sm">{t('Xarajat')}</th>
+                                        <th className="hide-sm">{t('Daromad')}</th>
+                                        <th>{t('Foyda')}</th>
+                                        <th>{t('Holat')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {data.cows.map((c) => {
-                                        const v = VERDICTS[c.verdict];
+                                        const v = t(VERDICTS[c.verdict]);
                                         return (
                                             <tr key={c.id}>
                                                 <td>
                                                     <Link to={`/farms/${farmId}/animals/${c.id}`} className="animal-link">
-                                                        №{c.tag_number}{c.name ? ` · ${c.name}` : ''}
+                                                        №{c.tag_number}{c.name ? t(' · {name}', { name: c.name }) : ''}
                                                     </Link>
                                                     {!c.active && <span className="work-badge">{c.status}</span>}
                                                 </td>
@@ -190,10 +191,7 @@ function MilkProfit({ farmId, refreshKey }) {
                     )}
 
                     <p className="workers-hint">
-                        Qanday hisoblanadi: tannarx = shu oydagi chiqimlar ÷ sog'ilgan sut. Har bir sigirga qancha yem
-                        ketgani alohida yozilmagani uchun umumiy xarajat sigirlar o'rtasida kunlari bo'yicha teng
-                        bo'linadi; sigirning daromadi = sog'gan suti × 1 litr narxi. Nasiyaga olingan va hali
-                        to'lanmagan xarajatlar kirmaydi. Qaror qabul qilishdan oldin bir necha oyni solishtiring.
+                        {t('Qanday hisoblanadi: tannarx = shu oydagi chiqimlar ÷ sog\'ilgan sut. Har bir sigirga qancha yem ketgani alohida yozilmagani uchun umumiy xarajat sigirlar o\'rtasida kunlari bo\'yicha teng bo\'linadi; sigirning daromadi = sog\'gan suti × 1 litr narxi. Nasiyaga olingan va hali to\'lanmagan xarajatlar kirmaydi. Qaror qabul qilishdan oldin bir necha oyni solishtiring.')}
                     </p>
                 </>
             )}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
 import { getErrorMessage } from '../utils/errors';
 import { formatMoney } from '../utils/format';
+import { t } from '../i18n';
 
 const asList = (d) => (Array.isArray(d) ? d : d?.results ?? []);
 const pad = (n) => String(n).padStart(2, '0');
@@ -28,7 +29,7 @@ function AttendanceSheet({ workers }) {
             setRecords(map);
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, "Davomatni yuklab bo'lmadi"));
+            setError(getErrorMessage(err, t("Davomatni yuklab bo'lmadi")));
         }
     }, [workers, month]);
 
@@ -52,7 +53,7 @@ function AttendanceSheet({ workers }) {
             setError('');
         } catch (err) {
             setRecords(prev);
-            setError(getErrorMessage(err, "Belgilab bo'lmadi"));
+            setError(getErrorMessage(err, t("Belgilab bo'lmadi")));
         }
     };
 
@@ -76,11 +77,9 @@ function AttendanceSheet({ workers }) {
 
     return (
         <details className="more-menu attendance">
-            <summary className="section-title">📅 Davomat</summary>
+            <summary className="section-title">📅 {t('Davomat')}</summary>
             <p className="workers-hint">
-                Faqat kelmagan kunlarni belgilang: kunni bossangiz <b>✗ kelmadi</b>, yana bossangiz <b>ruxsat</b>, yana bossangiz
-                oddiy holatga qaytadi. Belgilanmagan kun — keldi. «Kelmadi» kunlari oy oxirida oylikdan ushlab qolinadi,
-                «ruxsat» ushlanmaydi.
+                {t("Faqat kelmagan kunlarni belgilang: kunni bossangiz «✗ kelmadi», yana bossangiz «ruxsat», yana bossangiz oddiy holatga qaytadi. Belgilanmagan kun — keldi. «Kelmadi» kunlari oy oxirida oylikdan ushlab qolinadi, «ruxsat» ushlanmaydi.")}
             </p>
             <div className="attendance-month">
                 <button type="button" className="btn-ghost" onClick={() => shift(-1)}>←</button>
@@ -95,9 +94,9 @@ function AttendanceSheet({ workers }) {
                         <div className="attendance-head">
                             <strong>{w.user_full_name}</strong>
                             <span className="worker-meta">
-                                Kelmagan: {st.absent} kun
-                                {st.excused > 0 && ` · ruxsat: ${st.excused}`}
-                                {st.deduction > 0 && ` · ushlanadi ≈ ${formatMoney(st.deduction)}`}
+                                {t('Kelmagan: {count} kun', { count: st.absent })}
+                                {st.excused > 0 && ` · ${t('ruxsat: {count}', { count: st.excused })}`}
+                                {st.deduction > 0 && ` · ${t('ushlanadi ≈ {sum}', { sum: formatMoney(st.deduction) })}`}
                             </span>
                         </div>
                         <div className="attendance-days">
@@ -109,7 +108,7 @@ function AttendanceSheet({ workers }) {
                                 return (
                                     <button key={day} type="button" disabled={future}
                                         className={`att-day${s ? ` att-day--${s}` : ''}`}
-                                        aria-label={`${day}-kun: ${s === 'kelmadi' ? 'kelmadi' : s === 'ruxsat' ? 'ruxsat bilan' : 'keldi'}`}
+                                        aria-label={t('{day}-kun: {status}', { day, status: s === 'kelmadi' ? t('kelmadi') : s === 'ruxsat' ? t('ruxsat bilan') : t('keldi') })}
                                         onClick={() => toggle(w, dateStr)}>
                                         {day}
                                     </button>

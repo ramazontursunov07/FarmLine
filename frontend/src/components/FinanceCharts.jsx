@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { formatMoney } from '../utils/format';
+import { t } from '../i18n';
 
 const MONTHS_SHORT = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
 const MONTHS_COUNT = 6;
@@ -25,7 +26,7 @@ function lastMonths() {
     const list = [];
     for (let i = MONTHS_COUNT - 1; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        list.push({ key: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, label: MONTHS_SHORT[d.getMonth()] });
+        list.push({ key: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, label: t(MONTHS_SHORT[d.getMonth()]) });
     }
     return list;
 }
@@ -34,9 +35,9 @@ function lastMonths() {
 function compact(value) {
     const abs = Math.abs(value);
     const sign = value < 0 ? '−' : '';
-    if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(1).replace('.', ',')} mlrd`;
-    if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1).replace('.', ',')} mln`;
-    if (abs >= 1e3) return `${sign}${Math.round(abs / 1e3)} ming`;
+    if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(1).replace('.', ',')} ${t('mlrd')}`;
+    if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1).replace('.', ',')} ${t('mln')}`;
+    if (abs >= 1e3) return `${sign}${Math.round(abs / 1e3)} ${t('ming')}`;
     return `${sign}${Math.round(abs)}`;
 }
 
@@ -55,7 +56,7 @@ function ProfitChart({ months }) {
 
     return (
         <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img"
-            aria-label="Oylar bo'yicha foyda va zarar">
+            aria-label={t("Oylar bo'yicha foyda va zarar")}>
             <line x1="0" x2={W} y1={zeroY} y2={zeroY} className="chart-axis" />
             {months.map((m, i) => {
                 const h = (Math.abs(m.profit) / range) * plotH;
@@ -65,7 +66,7 @@ function ProfitChart({ months }) {
                 const labelY = isLoss ? y + h + 12 : y - 5;
                 return (
                     <g key={m.key}>
-                        <title>{`${m.label}: ${m.profit >= 0 ? 'foyda' : 'zarar'} ${formatMoney(Math.abs(m.profit))}\nKirim ${formatMoney(m.income)} · Chiqim ${formatMoney(m.expense)}`}</title>
+                        <title>{`${m.label}: ${m.profit >= 0 ? t('foyda') : t('zarar')} ${formatMoney(Math.abs(m.profit))}\n${t('Kirim')} ${formatMoney(m.income)} · ${t('Chiqim')} ${formatMoney(m.expense)}`}</title>
                         <rect x={x} y={y} width={barW} height={Math.max(h, m.profit === 0 ? 0 : 1.5)} rx="3"
                             className={isLoss ? 'chart-bar chart-bar--loss' : 'chart-bar chart-bar--profit'} />
                         {m.profit !== 0 && (
@@ -86,7 +87,7 @@ function ExpenseDonut({ items, total }) {
     let offset = 0;
     return (
         <div className="donut-wrap">
-            <svg className="donut-svg" viewBox="0 0 42 42" role="img" aria-label="Chiqimlar kategoriyalar bo'yicha">
+            <svg className="donut-svg" viewBox="0 0 42 42" role="img" aria-label={t("Chiqimlar kategoriyalar bo'yicha")}>
                 <circle cx="21" cy="21" r={R} className="donut-track" />
                 {items.map((it, i) => {
                     const pct = (it.total / total) * 100;
@@ -94,13 +95,13 @@ function ExpenseDonut({ items, total }) {
                         <circle key={it.category} cx="21" cy="21" r={R} fill="none"
                             stroke={SLICE_COLORS[i % SLICE_COLORS.length]} strokeWidth="6"
                             strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset={25 - offset}>
-                            <title>{`${it.label}: ${formatMoney(it.total)} (${pct.toFixed(1)}%)`}</title>
+                            <title>{t('{label}: {v2} ({v3}%)', { label: it.label, v2: formatMoney(it.total), v3: pct.toFixed(1) })}</title>
                         </circle>
                     );
                     offset += pct;
                     return circle;
                 })}
-                <text x="21" y="20.5" textAnchor="middle" className="donut-total-label">Jami</text>
+                <text x="21" y="20.5" textAnchor="middle" className="donut-total-label">{t('Jami')}</text>
                 <text x="21" y="25.5" textAnchor="middle" className="donut-total">{compact(total)}</text>
             </svg>
             <ul className="donut-legend">
@@ -153,7 +154,7 @@ function FinanceCharts({ farmId, refreshKey }) {
                         .filter((c) => c.transaction_type === 'chiqim')
                         .map((c) => ({
                             category: c.category,
-                            label: CATEGORY_LABELS[c.category] || c.category,
+                            label: t(CATEGORY_LABELS[c.category]) ? t(CATEGORY_LABELS[c.category]) : c.category,
                             total: Number(c.total) || 0,
                         }))
                         .filter((c) => c.total > 0)
@@ -176,26 +177,26 @@ function FinanceCharts({ farmId, refreshKey }) {
     return (
         <div className="charts-grid">
             <section className="overview-box chart-box">
-                <h3 className="overview-box-title">Oylik foyda / zarar (oxirgi {MONTHS_COUNT} oy)</h3>
+                <h3 className="overview-box-title">{t('Oylik foyda / zarar (oxirgi {n} oy)', { n: MONTHS_COUNT })}</h3>
                 {hasData ? (
                     <>
                         <ProfitChart months={months} />
                         <p className="chart-legend">
-                            <span className="chart-key chart-key--profit" /> Foyda
-                            <span className="chart-key chart-key--loss" /> Zarar
+                            <span className="chart-key chart-key--profit" /> {t('Foyda')}
+                            <span className="chart-key chart-key--loss" /> {t('Zarar')}
                         </p>
                     </>
                 ) : (
-                    <p className="overview-ok">Hali kirim-chiqim yozuvlari yo'q</p>
+                    <p className="overview-ok">{t("Hali kirim-chiqim yozuvlari yo'q")}</p>
                 )}
             </section>
 
             <section className="overview-box chart-box">
-                <h3 className="overview-box-title">Eng katta chiqimlar (oxirgi {MONTHS_COUNT} oy)</h3>
+                <h3 className="overview-box-title">{t('Eng katta chiqimlar (oxirgi {n} oy)', { n: MONTHS_COUNT })}</h3>
                 {expenseTotal > 0 ? (
                     <ExpenseDonut items={expenses} total={expenseTotal} />
                 ) : (
-                    <p className="overview-ok">Hali chiqim yozuvlari yo'q</p>
+                    <p className="overview-ok">{t("Hali chiqim yozuvlari yo'q")}</p>
                 )}
             </section>
         </div>
