@@ -13,7 +13,15 @@ const ROLES = { fermer: 'Fermer', ishchi: 'Ishchi', admin: 'Admin' };
 
 function Profile() {
     const { installed } = useInstall();
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
+
+    // Shaxsiy ma'lumotlar (serverdan to'liq profil: telefon va email ham shu yerda keladi)
+    const [profile, setProfile] = useState(null);
+    const [editing, setEditing] = useState(false);
+    const [form, setForm] = useState({ first_name: '', last_name: '', phone_number: '', email: '' });
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [saved, setSaved] = useState(false);
 
     // Telegram ulanishi
     const [telegramLinked, setTelegramLinked] = useState(null); // null: hali yuklanmagan
@@ -24,6 +32,7 @@ function Profile() {
     const loadTelegramStatus = useCallback(async () => {
         try {
             const { data } = await api.get('users/profile/');
+            setProfile(data);
             const linked = Boolean(data.telegram_linked);
             setTelegramLinked(linked);
             setTelegramError('');
@@ -74,7 +83,58 @@ function Profile() {
         }
     };
 
-    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+    // Ko'rsatiladigan ma'lumot: serverdan kelgan profil bo'lsa o'sha, bo'lmasa saqlangan nusxa
+    const info = profile || user;
+    const fullName = [info.first_name, info.last_name].filter(Boolean).join(' ');
+
+    const startEdit = () => {
+        setForm({
+            first_name: info.first_name || '',
+            last_name: info.last_name || '',
+            phone_number: info.phone_number || '',
+            email: info.email || '',
+        });
+        setSaveError('');
+        setSaved(false);
+        setEditing(true);
+    };
+
+    const cancelEdit = () => {
+        setEditing(false);
+        setSaveError('');
+    };
+
+    const handleFormChange = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setSaveError('');
+        setSaving(true);
+        try {
+            const payload = {
+                first_name: form.first_name.trim(),
+                last_name: form.last_name.trim(),
+                phone_number: form.phone_number.trim(),
+                email: form.email.trim(),
+            };
+            const { data } = await api.patch('users/profile/', payload);
+            setProfile(data);
+            updateUser({
+                first_name: data.first_name,
+                last_name: data.last_name,
+                email: data.email,
+                phone_number: data.phone_number,
+            });
+            setEditing(false);
+            setSaved(true);
+        } catch (err) {
+            setSaveError(getErrorMessage(err, t("Saqlab bo'lmadi, qayta urinib ko'ring")));
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="app-shell">
@@ -94,20 +154,73 @@ function Profile() {
                 <h2 className="panel-title">{t('Profil')}</h2>
                 <p className="panel-subtitle">{t("Shaxsiy ma'lumotlar va xavfsizlik")}</p>
 
-                <div className="work-card profile-info">
-                    <div>
-                        <span className="work-meta">{t('Ism-familiya')}</span>
-                        <span className="work-title">{fullName || '—'}</span>
+                {editing ? (
+                    <form className="work-card" onSubmit={handleSave}>
+                        <div className="form-field">
+                            <label>{t('Ism')}</label>
+                            <input type="text" name="first_name" value={form.first_name}
+                                onChange={handleFormChange} maxLength={150} />
+                        </div>
+                        <div className="form-field">
+                            <label>{t('Familiya')}</label>
+                            <input type="text" name="last_name" value={form.last_name}
+                                onChange={handleFormChange} maxLength={150} />
+                        </div>
+                        <div className="form-field">
+                            <label>{t('Telefon raqam')}</label>
+                            <input type="tel" name="phone_number" value={form.phone_number}
+                                onChange={handleFormChange} maxLength={20} placeholder="+998 90 123 45 67" />
+                        </div>
+                        <div className="form-field">
+                            <label>{t('Email')}</label>
+                            <input type="email" name="email" value={form.email}
+                                onChange={handleFormChange} maxLength={254} />
+                        </div>
+
+                        {saveError && <p className="error-text" role="alert">{saveError}</p>}
+
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <button type="submit" className="btn-primary btn-auto" disabled={saving}>
+                                {saving ? t('Kuting...') : t('Saqlash')}
+                            </button>
+                            <button type="button" className="btn-ghost" onClick={cancelEdit} disabled={saving}>
+                                {t('Bekor qilish')}
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <div className="work-card">
+                        <div className="profile-info">
+                            <div>
+                                <span className="work-meta">{t('Ism-familiya')}</span>
+                                <span className="work-title">{fullName || '—'}</span>
+                            </div>
+                            <div>
+                                <span className="work-meta">{t('Username')}</span>
+                                <span className="work-title">{user.username}</span>
+                            </div>
+                            <div>
+                                <span className="work-meta">{t('Rol')}</span>
+                                <span className="work-title">{t(ROLES[user.role]) ? t(ROLES[user.role]) : user.role}</span>
+                            </div>
+                            <div>
+                                <span className="work-meta">{t('Telefon raqam')}</span>
+                                <span className="work-title">{info.phone_number || '—'}</span>
+                            </div>
+                            <div>
+                                <span className="work-meta">{t('Email')}</span>
+                                <span className="work-title">{info.email || '—'}</span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button type="button" className="btn-ghost" onClick={startEdit}>
+                                {t('Tahrirlash')}
+                            </button>
+                            {saved && <span className="success-text">{t('Saqlandi ✓')}</span>}
+                        </div>
                     </div>
-                    <div>
-                        <span className="work-meta">{t('Username')}</span>
-                        <span className="work-title">{user.username}</span>
-                    </div>
-                    <div>
-                        <span className="work-meta">{t('Rol')}</span>
-                        <span className="work-title">{t(ROLES[user.role]) ? t(ROLES[user.role]) : user.role}</span>
-                    </div>
-                </div>
+                )}
 
                 <h3 className="section-title">{t('Telegram')}</h3>
                 <div className="work-card">

@@ -26,8 +26,17 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    // Profil tahrirlanganda ism, telefon va email yangilanadi (sarlavhadagi "Salom, ..." ham o'zgaradi)
+    const updateUser = (changes) => {
+        setUser((prev) => {
+            const next = { ...prev, ...changes };
+            localStorage.setItem('user', JSON.stringify(next));
+            return next;
+        });
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );
